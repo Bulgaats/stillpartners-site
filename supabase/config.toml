@@ -1,0 +1,23 @@
+project_id = "still-partners-app"
+
+[api]
+enabled = true
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/dashboard"]
+jwt_expiry = 3600
+enable_signup = false
+
+[storage]
+enabled = true
+
+[functions.generate-invoices]
+verify_jwt = true
+
+[functions.send-invoice-email]
+verify_jwt = true

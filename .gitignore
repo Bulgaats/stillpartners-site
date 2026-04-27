@@ -1,0 +1,11 @@
+.next
+node_modules
+.env
+.env*.local
+dist
+coverage
+test-results
+tsconfig.tsbuildinfo
+supabase/.branches
+supabase/.temp
+.vercel

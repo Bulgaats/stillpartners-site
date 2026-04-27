@@ -1,0 +1,43 @@
+{
+  "name": "Still Partners",
+  "short_name": "Still",
+  "description": "Perth construction labour hire by Still Partners Pty Ltd",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F3EC",
+  "theme_color": "#182126",
+  "icons": [
+    {
+      "src": "/assets/logo/app-icon-master.png?v=20260427-cache-reset",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo/logo-icon-dark.svg?v=20260427-cache-reset",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logo/logo-icon-light.svg?v=20260427-cache-reset",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logo/logo-full-light.svg?v=20260427-cache-reset",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/logo/logo-full-dark.svg?v=20260427-cache-reset",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
