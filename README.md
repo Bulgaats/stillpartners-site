@@ -1,7 +1,8 @@
 # Still Partners PWA
 
-Mobile-first PWA for Still Partners Pty Ltd, a Perth labour hire company
-supplying subcontracted construction workers to main contractors.
+Mobile-first PWA for Still Partners Pty Ltd, a Perth construction subcontract
+services company supporting commercial projects with reinforcement scope delivery,
+project administration, and completion records.
 
 ## Stack
 
@@ -40,15 +41,16 @@ The initial migration creates:
 - `profiles` with `worker` and `admin` production roles. The local demo keeps a
   Daily Leading Hand view for testing, but Leading Hand is a per-job/day
   scheduling responsibility, not a permanent worker type.
-- `public_subcontractor_leads`, `public_client_leads`, and `contact_messages`
-  for public forms.
+- `subcontractor_applications`, `client_requests`, and `contact_messages`
+  for public website form submissions. Older lead tables may still exist for
+  backwards compatibility, but new production forms write to these tables.
 - `worker_payment_details` for bank details isolated from crew access.
 - `clients`, `sites`, `jobs`, `job_assignments`, and `leading_hand_workers`.
 - `subcontractor_agreements` and `worker_documents`.
 - `timesheets`/work completion entries, where `tonnes_completed` is the primary
   production output unit and `estimated_hours` is optional internal planning
   data only.
-- `timesheet_correction_requests` for worker correction workflows.
+- `timesheet_correction_requests` for contractor correction workflows.
 - `worker_rates`, `worker_rate_decisions`, `contract_addendums`,
   `client_rates`, `invoices`, `invoice_lines`, `payments`.
 - `recurring_expenses`, `expense_entries`, and `profit_dashboard`.
@@ -56,12 +58,12 @@ The initial migration creates:
 
 ## RLS model
 
-- Workers can read and update their own profile, upload their own documents,
+- Contractors can read and update their own profile, upload their own documents,
   sign their own agreement, view assigned jobs, submit their own completed
-  tonnes, and read their own invoices and worker rates.
-- A worker selected as the Daily Leading Hand for a specific scheduled job/day
+  tonnes, and read their own invoices and contractor rates.
+- A contractor selected as the Daily Leading Hand for a specific scheduled job/day
   can enter completed tonnes for that assigned crew only. They cannot read
-  worker pay rates or client charge rates.
+  contractor pay rates or client charge rates.
 - Admins have full operational access across scheduling, approvals, rates,
   invoices, payments, expenses, and dashboard reporting.
 - Anonymous public users can insert public form leads only.
@@ -118,11 +120,11 @@ layer reads from Supabase tables through RLS and server actions handle writes:
   a 14-day period
 - invoice paid actions update payment status and paid timestamp
 - recurring expenses are stored in `recurring_expenses`
-- profit uses paid client invoices, paid worker invoices, and recurring
+- profit uses paid client invoices, paid contractor invoices, and recurring
   expenses
 - invoice generation creates a basic PDF, uploads it to the private `invoices`
   Storage bucket, and stores the generated storage path on the invoice record
-- worker invoices follow `Draft -> Approved -> Submitted -> Paid`; workers
+- contractor invoices follow `Draft -> Approved -> Submitted -> Paid`; contractors
   review and approve before downloading the PDF and confirming they sent it
   from their own email
 
@@ -136,8 +138,8 @@ Agreement wording notes live in
 
 ## Local setup
 
-The public pages can load without Supabase variables. Auth, forms, storage, and
-the dashboard require Supabase configuration.
+The public pages can load without Supabase variables. Production public form
+submissions, auth, storage, and the dashboard require Supabase configuration.
 
 1. Install dependencies:
 
@@ -202,6 +204,15 @@ the dashboard require Supabase configuration.
    Or paste/run the SQL files in `supabase/migrations/` in filename order in
    your Supabase SQL editor.
 
+   For the public website forms, confirm the latest migration has created:
+
+   - `subcontractor_applications`
+   - `client_requests`
+   - `contact_messages`
+
+   Anonymous users can insert into these tables through RLS, but cannot read
+   submitted messages. Admin users can manage submissions after logging in.
+
 8. Create at least one admin user:
 
    - Create a user in Supabase Auth.
@@ -251,15 +262,29 @@ For Vercel:
    SUPABASE_SERVICE_ROLE_KEY
    ```
 
-3. Set `NEXT_PUBLIC_SITE_URL` to the production URL.
-4. Add the production callback URL in Supabase Auth:
+3. For public website form submissions, `NEXT_PUBLIC_SUPABASE_URL` and
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY` are required. Get them in Supabase from:
+
+   ```text
+   Supabase Dashboard -> Project Settings -> API
+   ```
+
+   Use:
+
+   - `Project URL` as `NEXT_PUBLIC_SUPABASE_URL`
+   - `anon public` key as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+   Do not use the service role key in browser/public env variables.
+
+4. Set `NEXT_PUBLIC_SITE_URL` to the production URL.
+5. Add the production callback URL in Supabase Auth:
 
    ```text
    https://your-domain.example/dashboard
    ```
 
-5. Run Supabase migrations before sending real users to the app.
-6. Confirm private Storage buckets and RLS policies exist in production.
+6. Run Supabase migrations before sending real users to the app.
+7. Confirm private Storage buckets and RLS policies exist in production.
 
 The current PDF generator is intentionally lightweight and dependency-free. It
 creates a valid basic PDF suitable for MVP testing. Before launch, replace it
@@ -301,8 +326,9 @@ Vercel deployment steps:
    SUPABASE_SERVICE_ROLE_KEY
    ```
 
-6. If Supabase is not configured on day one, public pages still load and public
-   forms redirect to a safe demo confirmation message instead of crashing.
+6. For live public form submissions, configure Supabase first. Without Supabase
+   env vars, public pages still load and forms redirect to a safe demo
+   confirmation message instead of crashing.
 7. In Vercel, add `stillpartners.net` under Project Settings -> Domains.
 8. Point the domain DNS records at Vercel as instructed:
    - Apex/root domain: use Vercel's recommended A record.
@@ -320,6 +346,21 @@ Vercel deployment steps:
 12. Keep public navigation pointed at the public pages. The login link is
     labelled `Internal Beta`; do not publicly promote the dashboard until the
     beta checklist is complete.
+
+### Verify Public Form Submissions
+
+After deploying with Supabase env vars:
+
+1. Submit `/become-subcontractor`.
+2. In Supabase, open `Table Editor -> subcontractor_applications` and confirm a
+   new row appears.
+3. Submit `/become-client` or the homepage Project Enquiry form.
+4. Confirm a new row appears in `client_requests`.
+5. Submit `/contact`.
+6. Confirm a new row appears in `contact_messages`.
+
+Each successful submit redirects to `/thanks`. If a submit fails, the form page
+shows a safe public error message and logs the detailed error server-side.
 
 ## Email Provider Placeholder
 
@@ -366,6 +407,6 @@ Before real launch, get qualified Australian advice on:
 - sham contracting risk
 - ATO, GST, PAYG, and ABN treatment
 - superannuation obligations
-- workers compensation and public liability insurance
+- statutory compensation insurance and public liability insurance
 - site-control practices and safety obligations
 - invoice GST wording and payment terms
