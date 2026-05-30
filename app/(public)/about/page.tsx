@@ -22,7 +22,7 @@ export default async function AboutPage() {
         </div>
         <div className="overflow-hidden rounded-lg bg-white shadow-panel">
           <Image
-            alt="Still Partners construction labour team"
+            alt="Still Partners subcontract trade coordination"
             className="h-56 w-full object-cover"
             height={360}
             src={publicImages.about}

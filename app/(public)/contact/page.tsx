@@ -53,7 +53,11 @@ export default async function ContactPage({
           <Field label={t.forms.phone} name="phone" />
           <Field label={t.forms.subject} name="subject" />
           <Field label={t.forms.message} name="message" required textarea />
-          {params?.message ? <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-700">{params.message}</p> : null}
+          {params?.message ? (
+            <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-700">
+              {params.message === "submit-error" ? t.forms.submitError : params.message}
+            </p>
+          ) : null}
           <button className="rounded-md bg-blue-950 px-5 py-3 text-sm font-black text-white">
             {t.contact.button}
           </button>

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig, supabaseSetupMessage } from "@/lib/supabase/config";
 
 type SupabaseCookie = {
@@ -27,14 +28,40 @@ export async function createServerSupabaseClient() {
         },
         setAll(cookiesToSet: SupabaseCookie[]) {
           try {
+            console.info("Supabase cookie diagnostic: setting cookies", {
+              count: cookiesToSet.length,
+              names: cookiesToSet.map((cookie) => cookie.name)
+            });
             cookiesToSet.forEach(({ name, value, options }) => {
               cookieStore.set(name, value, options);
             });
-          } catch {
-            // Server Components cannot set cookies. Middleware refreshes sessions.
+          } catch (error) {
+            console.info("Supabase cookie diagnostic: cookie set skipped", {
+              message: error instanceof Error ? error.message : String(error)
+            });
           }
         }
       }
     }
   );
+}
+
+export function createServiceRoleSupabaseClient() {
+  const config = getSupabaseConfig();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!config) {
+    throw new Error(supabaseSetupMessage);
+  }
+
+  if (!serviceRoleKey) {
+    return null;
+  }
+
+  return createClient(config.url, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  });
 }

@@ -86,7 +86,7 @@ describe("permissions", () => {
     ).toBe(false);
   });
 
-  it("non-selected workers cannot enter crew hours", () => {
+  it("non-selected contractors cannot enter project team production", () => {
     const job = {
       id: "job-1",
       siteId: "site-1",
@@ -117,7 +117,7 @@ describe("business rules", () => {
     expect(hoursToTonnes(8)).toBe(0.8);
   });
 
-  it("worker invoice totals are based on tonnes completed, not estimated hours", () => {
+  it("contractor invoice totals are based on tonnes completed, not estimated hours", () => {
     const item = buildInvoiceItem(
       {
         id: "entry",
@@ -132,7 +132,7 @@ describe("business rules", () => {
         status: "approved",
         siteName: "Perth Site"
       },
-      "Approved output completed",
+      "Reinforcement subcontract services",
       600
     );
 
@@ -140,7 +140,7 @@ describe("business rules", () => {
     expect(calculateWorkerInvoiceTotal([item])).toBe(1500);
   });
 
-  it("locked timesheets cannot be edited", () => {
+  it("locked production records cannot be edited", () => {
     expect(
       canTimesheetBeEdited({
         id: "ts",
@@ -204,7 +204,7 @@ describe("business rules", () => {
     expect(profit.netProfit).toBe(600);
   });
 
-  it("worker invoice workflow uses draft approved submitted paid statuses", () => {
+  it("contractor invoice workflow uses draft approved submitted paid statuses", () => {
     expect(getWorkerInvoiceStatusBadge("draft")).toBe("Draft");
     expect(getWorkerInvoiceStatusBadge("approved")).toBe("Approved");
     expect(getWorkerInvoiceStatusBadge("submitted")).toBe("Submitted");

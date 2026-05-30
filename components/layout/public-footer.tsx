@@ -36,7 +36,7 @@ export async function PublicFooter() {
           </h2>
           <div className="mt-4 grid gap-2 text-sm text-gray-300">
             <Link href="/about">{t.nav.about}</Link>
-            <Link href="/become-client">{t.footer.requestLabour}</Link>
+            <Link href="/become-client">{t.footer.projectEnquiry}</Link>
             <Link href="/become-subcontractor">{t.footer.joinContractor}</Link>
             <Link href="/contact">{t.nav.contact}</Link>
           </div>

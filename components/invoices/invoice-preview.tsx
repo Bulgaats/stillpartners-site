@@ -33,8 +33,7 @@ export function InvoicePreview({
       </p>
       {isWorkerInvoice ? (
         <p className="mt-1 text-sm text-gray-700">
-          Worker workflow: review, approve, download PDF, send from own email,
-          then confirm sent.
+          Contractor invoice for reinforcement subcontract services and production delivered.
         </p>
       ) : (
         <p className="mt-1 text-sm text-gray-700">
@@ -48,7 +47,7 @@ export function InvoicePreview({
       <div className="mt-3 rounded-md bg-gray-50 p-3 text-xs text-gray-700">
         {invoice.items.slice(0, 3).map((item) => (
           <p key={item.id}>
-            {item.workDate ?? invoice.periodStart} · {item.siteName ?? "Site"} ·{" "}
+            {item.workDate ?? invoice.periodStart} · {item.siteName ?? "Project"} ·{" "}
             {item.tonnes.toFixed(3)}t · ${item.rate.toFixed(2)}/t
           </p>
         ))}
@@ -69,7 +68,7 @@ export function WorkerInvoiceTemplate({
 }) {
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-4">
-      <h3 className="text-base font-black text-blue-950">Worker invoice template</h3>
+      <h3 className="text-base font-black text-blue-950">Contractor invoice template</h3>
       <p className="mt-2 text-sm text-gray-700">
         {invoice.invoiceNumber} · {worker.fullName} · ABN {worker.abn ?? "Not supplied"}
       </p>
@@ -77,7 +76,7 @@ export function WorkerInvoiceTemplate({
         Period {invoice.periodStart} to {invoice.periodEnd}
       </p>
       <p className="mt-1 text-sm text-gray-700">
-        Includes tonnes completed, site, rate per tonne, GST treatment, bank
+        Includes production delivered, project scope, rate per tonne, GST treatment, bank
         details, and payment status when connected to PDF generation.
       </p>
     </section>
@@ -101,7 +100,7 @@ export function ClientInvoiceTemplate({
         Period {invoice.periodStart} to {invoice.periodEnd}
       </p>
       <p className="mt-1 text-sm text-gray-700">
-        Includes invoice number, client details, tonnes/site summary, client rate,
+        Includes invoice number, client details, production/project summary, client rate,
         GST handling, and payment status when connected to PDF generation.
       </p>
     </section>

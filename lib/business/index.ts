@@ -62,9 +62,11 @@ export function calculateProfit({
 
 export function getInvoiceStatusBadge(status: PaymentStatus) {
   const labels: Record<PaymentStatus, string> = {
+    draft: "Draft",
     pending: "Pending",
     sent: "Sent",
-    paid: "Paid"
+    paid: "Paid",
+    cancelled: "Cancelled"
   };
 
   return labels[status];

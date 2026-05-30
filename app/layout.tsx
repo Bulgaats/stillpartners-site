@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Still Partners",
-  description: "Perth construction labour hire by Still Partners Pty Ltd",
+  description: "Perth construction subcontract services by Still Partners Pty Ltd",
   applicationName: "Still Partners",
   manifest: "/manifest.webmanifest",
   icons: {

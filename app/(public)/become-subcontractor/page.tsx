@@ -55,7 +55,11 @@ export default async function BecomeSubcontractorPage({
             {t.subcontractor.whiteCard}
           </label>
           <Field label={t.forms.availability} name="message" textarea />
-          {params?.message ? <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-700">{params.message}</p> : null}
+          {params?.message ? (
+            <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-700">
+              {params.message === "submit-error" ? t.forms.submitError : params.message}
+            </p>
+          ) : null}
           <button className="rounded-md bg-orange-500 px-5 py-3 text-sm font-black text-white">
             {t.subcontractor.button}
           </button>

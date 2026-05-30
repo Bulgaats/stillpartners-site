@@ -5,6 +5,8 @@ export type InvoicePdfInput = {
   invoiceNumber: string;
   periodStart: string;
   periodEnd: string;
+  issueDate?: string;
+  dueDate?: string;
   businessName: string;
   businessAbn?: string;
   partyName: string;
@@ -22,6 +24,8 @@ export function generateInvoicePdf(input: InvoicePdfInput) {
   const lines = [
     input.title,
     `Invoice number: ${input.invoiceNumber}`,
+    input.issueDate ? `Issue Date: ${input.issueDate}` : "",
+    input.dueDate ? `Due Date: ${input.dueDate}` : "",
     `Invoice period: ${input.periodStart} to ${input.periodEnd}`,
     "",
     `Business: ${input.businessName}`,
@@ -30,12 +34,13 @@ export function generateInvoicePdf(input: InvoicePdfInput) {
     input.partyAbn ? `Party ABN: ${input.partyAbn}` : "Party ABN: not supplied",
     input.bankDetails ? `Bank: ${input.bankDetails}` : "Bank: not supplied",
     "",
-    "Tonnes completed summary",
+    "Project invoice",
+    "Production delivered summary",
     ...input.items.map(
       (item) =>
-        `${item.description} | ${item.workDate ?? "date n/a"} | ${item.siteName ?? "site n/a"} | ${item.tonnes.toFixed(
+        `${item.description} | ${item.siteName ?? "Scope completed"} | Tonnes delivered: ${item.tonnes.toFixed(
           3
-        )}t | $${item.rate.toFixed(2)}/t | $${item.total.toFixed(2)}`
+        )}t | Rate per tonne: $${item.rate.toFixed(2)} | $${item.total.toFixed(2)}`
     ),
     "",
     `Subtotal: $${input.subtotal.toFixed(2)}`,
@@ -46,6 +51,134 @@ export function generateInvoicePdf(input: InvoicePdfInput) {
   ];
 
   return Buffer.from(createPdf(lines));
+}
+
+export type ContractorInvoicePdfInput = {
+  invoiceNumber: string;
+  periodStart: string;
+  periodEnd: string;
+  contractorName: string;
+  contractorAbn?: string;
+  contractorEmail?: string;
+  accountName?: string;
+  bankName?: string;
+  bsb?: string;
+  accountNumber?: string;
+  businessName: string;
+  businessAbn: string;
+  businessEmail?: string;
+  issueDate: string;
+  dueDate: string;
+  status?: string;
+  gstRegistered: boolean;
+  totalTonnes: number;
+  projectSummaries?: {
+    projectName: string;
+    tonnes: number;
+  }[];
+  ratePerTonne?: number;
+  subtotal?: number;
+  gst?: number;
+  totalAmount?: number;
+};
+
+export function generateContractorInvoicePdf(input: ContractorInvoicePdfInput) {
+  const title = input.gstRegistered ? "TAX INVOICE" : "INVOICE";
+  const subtotal = input.subtotal ?? 0;
+  const gst = input.gst ?? 0;
+  const total = input.totalAmount ?? subtotal + gst;
+  const rateLabel =
+    input.ratePerTonne === undefined ? "Pending" : `$${input.ratePerTonne.toFixed(2)}`;
+  const projectSummaries = input.projectSummaries?.length
+    ? input.projectSummaries
+    : [{ projectName: "Project scope", tonnes: input.totalTonnes }];
+  const scopeReference = projectSummaries
+    .map((project) => project.projectName)
+    .slice(0, 3)
+    .join(", ");
+
+  const pdf = new PdfPage();
+  const accent = "0.19 0.27 0.35";
+  const dark = "0.08 0.10 0.12";
+  const muted = "0.38 0.42 0.48";
+
+  pdf.text(title, 50, 786, { size: 30, font: "F2", color: dark });
+  pdf.line(50, 760, 545, 760, accent, 0.8);
+
+  pdf.text("From", 50, 728, { size: 10, font: "F2", color: muted });
+  pdf.text(input.contractorName || "Not provided", 50, 710, {
+    size: 13,
+    font: "F2",
+    color: dark
+  });
+  pdf.text(`ABN: ${valueOrNotProvided(input.contractorAbn)}`, 50, 692);
+  pdf.text(`Email: ${valueOrNotProvided(input.contractorEmail)}`, 50, 676);
+  pdf.text(`Bank: ${valueOrNotProvided(input.bankName)}`, 50, 660);
+
+  pdf.text("Bill To", 335, 728, { size: 10, font: "F2", color: muted });
+  pdf.text(input.businessName, 335, 710, { size: 13, font: "F2", color: dark });
+  pdf.text(`ABN: ${input.businessAbn}`, 335, 692);
+  pdf.text(`Email: ${valueOrNotProvided(input.businessEmail)}`, 335, 676);
+
+  pdf.infoPair("Invoice Number", input.invoiceNumber, 50, 596);
+  pdf.infoPair("Status", input.status ?? "Submitted", 50, 570);
+  pdf.infoPair("Issue Date", input.issueDate, 335, 596);
+  pdf.infoPair("Due Date", input.dueDate, 335, 570);
+
+  pdf.line(50, 532, 545, 532, accent, 0.5);
+  pdf.text("Description", 50, 504, { size: 10, font: "F2", color: muted });
+  pdf.text("Tonnes delivered", 292, 504, { size: 10, font: "F2", color: muted });
+  pdf.text("Rate per tonne", 392, 504, { size: 10, font: "F2", color: muted });
+  pdf.text("Subtotal", 492, 504, { size: 10, font: "F2", color: muted });
+  pdf.line(50, 490, 545, 490, "0.75 0.78 0.82", 0.4);
+  pdf.text("Reinforcement subcontract services", 50, 468, { size: 11, font: "F2", color: dark });
+  pdf.text("Production delivered", 50, 452, { size: 10, color: dark });
+  pdf.text(input.totalTonnes.toFixed(3), 292, 460, { size: 10, color: dark });
+  pdf.text(rateLabel, 392, 460, { size: 10, color: dark });
+  pdf.text(formatMoney(subtotal), 492, 460, { size: 10, color: dark });
+  pdf.line(50, 438, 545, 438, "0.75 0.78 0.82", 0.4);
+
+  pdf.text("Scope / Production Summary", 50, 414, { size: 10, font: "F2", color: muted });
+  pdf.text(`Invoice period: ${input.periodStart} to ${input.periodEnd}`, 50, 394, {
+    size: 9,
+    color: dark
+  });
+  pdf.text(`Scope completed: ${scopeReference || "Project scope"}`, 50, 376, {
+    size: 9,
+    color: dark
+  });
+  pdf.text(`Production delivered: ${input.totalTonnes.toFixed(3)} tonnes`, 50, 358, {
+    size: 9,
+    color: dark
+  });
+
+  const totalsY = input.gstRegistered ? 318 : 302;
+  if (input.gstRegistered) {
+    pdf.totalRow("Subtotal", subtotal, totalsY);
+    pdf.totalRow("GST (10%)", gst, totalsY - 24);
+    pdf.line(375, totalsY - 38, 545, totalsY - 38, accent, 0.5);
+    pdf.totalRow("Total", total, totalsY - 60, true);
+  } else {
+    pdf.line(375, totalsY + 12, 545, totalsY + 12, accent, 0.5);
+    pdf.totalRow("Total", total, totalsY, true);
+  }
+
+  pdf.text("Payment / Bank Details", 50, 220, { size: 12, font: "F2", color: dark });
+  pdf.text(`Account name: ${valueOrNotProvided(input.accountName)}`, 50, 198);
+  pdf.text(`Bank: ${valueOrNotProvided(input.bankName)}`, 50, 180);
+  pdf.text(`BSB: ${valueOrNotProvided(input.bsb)}`, 50, 162);
+  pdf.text(`Account number: ${valueOrNotProvided(input.accountNumber)}`, 50, 144);
+  pdf.text(`Payment reference: ${input.invoiceNumber}`, 50, 126);
+
+  pdf.line(50, 104, 545, 104, accent, 0.5);
+  pdf.text(
+    "Thank you for your business. It's a pleasure to work with you on your project.",
+    50,
+    78,
+    { size: 10, color: muted }
+  );
+
+  return Buffer.from(pdf.render());
 }
 
 function createPdf(lines: string[]) {
@@ -92,4 +225,98 @@ function createPdf(lines: string[]) {
 
 function escapePdfText(value: string) {
   return value.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)");
+}
+
+type TextOptions = {
+  size?: number;
+  font?: "F1" | "F2";
+  color?: string;
+};
+
+class PdfPage {
+  private readonly commands: string[] = [];
+
+  text(value: string, x: number, y: number, options: TextOptions = {}) {
+    const size = options.size ?? 10;
+    const font = options.font ?? "F1";
+    const color = options.color ?? "0.08 0.10 0.12";
+    this.commands.push(
+      "BT",
+      `${color} rg`,
+      `/${font} ${size} Tf`,
+      `${x} ${y} Td`,
+      `(${escapePdfText(value)}) Tj`,
+      "ET"
+    );
+  }
+
+  line(x1: number, y1: number, x2: number, y2: number, color: string, width: number) {
+    this.commands.push(`${color} RG`, `${width} w`, `${x1} ${y1} m`, `${x2} ${y2} l`, "S");
+  }
+
+  infoPair(label: string, value: string, x: number, y: number) {
+    this.text(label, x, y, { size: 9, font: "F2", color: "0.38 0.42 0.48" });
+    this.text(value, x, y - 16, { size: 11 });
+  }
+
+  totalRow(label: string, amount: number, y: number, strong = false) {
+    this.text(label, 375, y, {
+      size: strong ? 12 : 10,
+      font: strong ? "F2" : "F1",
+      color: "0.08 0.10 0.12"
+    });
+    this.text(formatMoney(amount), 470, y, {
+      size: strong ? 12 : 10,
+      font: strong ? "F2" : "F1",
+      color: "0.08 0.10 0.12"
+    });
+  }
+
+  render() {
+    const content = this.commands.join("\n");
+    const objects = [
+      "<< /Type /Catalog /Pages 2 0 R >>",
+      "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+      "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+      `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`
+    ];
+
+    return buildPdf(objects);
+  }
+}
+
+function buildPdf(objects: string[]) {
+  let body = "";
+  const offsets = [0];
+
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(`%PDF-1.4\n${body}`));
+    body += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+
+  const header = "%PDF-1.4\n";
+  const xrefOffset = Buffer.byteLength(header + body);
+  const xref = [
+    "xref",
+    `0 ${objects.length + 1}`,
+    "0000000000 65535 f ",
+    ...offsets.slice(1).map((offset) => `${String(offset).padStart(10, "0")} 00000 n `),
+    "trailer",
+    `<< /Size ${objects.length + 1} /Root 1 0 R >>`,
+    "startxref",
+    String(xrefOffset),
+    "%%EOF"
+  ].join("\n");
+
+  return header + body + xref;
+}
+
+function formatMoney(value: number) {
+  return `$${value.toFixed(2)}`;
+}
+
+function valueOrNotProvided(value?: string) {
+  return value?.trim() ? value : "Not provided";
 }

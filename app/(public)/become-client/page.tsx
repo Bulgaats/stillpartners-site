@@ -26,7 +26,7 @@ export default async function BecomeClientPage({
             {t.client.copy}
           </p>
           <Image
-            alt="Construction labour request visual"
+            alt="Construction project enquiry visual"
             className="mt-6 h-56 w-full rounded-lg object-cover shadow-panel"
             height={360}
             src={publicImages.services}
@@ -48,10 +48,15 @@ export default async function BecomeClientPage({
           <Field label={t.forms.contactName} name="contact_name" required />
           <Field label={t.forms.email} name="email" required type="email" />
           <Field label={t.forms.phone} name="phone" />
-          <Field label={t.forms.requiredTrades} name="required_trades" />
           <Field label={t.forms.projectLocation} name="project_location" />
-          <Field label={t.forms.message} name="message" textarea />
-          {params?.message ? <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-700">{params.message}</p> : null}
+          <Field label={t.forms.projectDescription} name="message" textarea />
+          <Field label={t.forms.requiredTrades} name="required_trades" />
+          <Field label={t.forms.timeframe} name="timeframe" />
+          {params?.message ? (
+            <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-700">
+              {params.message === "submit-error" ? t.forms.submitError : params.message}
+            </p>
+          ) : null}
           <button className="rounded-md bg-orange-500 px-5 py-3 text-sm font-black text-white">
             {t.client.button}
           </button>

@@ -13,69 +13,69 @@ export const publicMessages = {
     nav: {
       about: "About",
       subcontractors: "Subcontractors",
-      clients: "Clients",
+      clients: "Capabilities",
       contact: "Contact",
       internalBeta: "Internal Beta",
       languageLabel: "Language"
     },
     footer: {
       description:
-        "Perth-based construction labour hire for main contractors needing dependable steelfixing, carpentry, and site-ready subcontractor support.",
+        "Perth-based construction subcontract services for commercial projects needing reinforcement support, practical coordination, and clear completion records.",
       publicSite: "Public site",
-      requestLabour: "Request Labour",
-      joinContractor: "Join as Contractor",
+      projectEnquiry: "Project Enquiry",
+      joinContractor: "Join as Subcontractor",
       contact: "Contact",
       location: "Perth, Western Australia",
       copyright:
-        "Still Partners Pty Ltd. Perth, Western Australia construction labour hire."
+        "Still Partners Pty Ltd. Perth, Western Australia construction subcontract services."
     },
     home: {
-      eyebrow: "Perth WA Construction Labour Hire",
-      heroTitle: "Reliable Steelfixing Labour Across WA",
+      eyebrow: "Perth WA Construction Subcontract Services",
+      heroTitle: "Reinforcement Subcontract Services Across WA",
       heroCopy:
-        "Still Partners Pty Ltd supplies subcontracted steelfixers, carpenters, and construction labour for main contractors who need dependable crews, clear site coordination, and quality work.",
-      requestLabour: "Request Labour",
-      joinContractor: "Join as Contractor",
+        "Still Partners Pty Ltd supports commercial construction projects through reinforcement subcontract services, practical project coordination, completion records, and quality workmanship.",
+      projectEnquiry: "Discuss Your Project",
+      joinContractor: "Join as Subcontractor",
       builtForSite: "Built for site delivery",
-      heroCards: ["Steelfixing crews", "Carpentry support", "Subcontractor workforce"],
+      heroCards: ["Reinforcement services", "Carpentry scope support", "Project delivery coordination"],
       widerWa: "Perth and wider WA project support.",
       aboutEyebrow: "Still Partners Pty Ltd",
-      aboutTitle: "Perth-based labour support for commercial construction.",
+      aboutTitle: "Perth-based subcontract support for commercial construction.",
       aboutCopy:
-        "We help main contractors keep projects moving with reliable subcontracted construction workers. Our focus is practical: site-ready people, safety-aware work habits, clear communication, and flexible workforce support when project demand changes.",
+        "We help main contractors keep projects moving through agreed subcontract scopes, site documentation, completion records, safety-aware systems, and practical project support when site demands change.",
       trustBadges: ["Perth based", "Site ready", "Safety aware"],
       servicesEyebrow: "Services",
-      servicesTitle: "Construction workforce support",
+      servicesTitle: "Construction subcontract support",
       services: [
-        ["Steelfixing Labour", "Site-ready steelfixers for reinforcement, tying, placement support, and crew coverage."],
-        ["Reinforcement Solutions", "Flexible labour support for reo packages, slab works, columns, walls, and project peaks."],
-        ["Project Support", "Construction workers who can support site supervisors with practical daily labour needs."],
-        ["Labour Hire for Construction", "Subcontracted workforce support for commercial builders and main contractors across Perth."]
+        ["Reinforcement Services", "Reinforcement subcontract services for tying, placement support, reo packages, and project delivery."],
+        ["Reinforcement Solutions", "Support for reinforcement scope delivery across reo packages, slabs, columns, walls, and changing project demands."],
+        ["Project Support", "Construction subcontract services supporting agreed site packages, daily scope records, and completion tracking."],
+        ["Construction Subcontract Services", "Project coordination and subcontract package support for commercial builders and main contractors across Perth."]
       ],
       whyEyebrow: "Why choose us",
-      whyTitle: "Serious site support with a flexible subcontractor workforce.",
-      reasons: ["Safety First", "Reliable Team", "On Time", "Flexible Workforce", "Quality Workmanship"],
+      whyTitle: "Serious site support for agreed scopes, records, and project outcomes.",
+      reasons: ["Safety First", "Reliable Delivery", "On Time", "Flexible Scope Support", "Quality Workmanship"],
       projectEyebrow: "Project highlights",
       projectTitle: "Visual proof for serious construction sites.",
       projectHighlights: [
         {
           title: "Commercial reinforcement",
-          copy: "Steelfixing labour support for active reo packages, slab preparation, walls, columns, and programme pressure."
+          copy: "Reinforcement package support for active reo works, slab preparation, walls, columns, and programme pressure."
         },
         {
-          title: "Site-ready workforce",
-          copy: "Reliable workers prepared for daily site expectations, inductions, start times, and supervisor coordination."
+          title: "Site-ready project support",
+          copy: "Reliable project support for daily site requirements, inductions, start times, completion records, and agreed scope coordination."
         },
         {
           title: "Perth project coverage",
-          copy: "Flexible subcontractor support for Perth builders needing responsive labour across changing site conditions."
+          copy: "Flexible project support for Perth builders managing changing site conditions and reinforcement programme demands."
         }
       ],
       contractorTitle: "Skilled subcontractor?",
       contractorCopy:
-        "Register your interest for Perth steelfixing, carpentry, and construction labour placements.",
-      contactEyebrow: "Request labour",
-      contactTitle: "Tell us what your site needs.",
+        "Register your interest for Perth steelfixing, carpentry, and construction subcontract opportunities.",
+      contactEyebrow: "Project support enquiry",
+      contactTitle: "Discuss your project.",
       phone: "Phone:",
       email: "Email:",
       location: "Location:",
@@ -83,65 +83,65 @@ export const publicMessages = {
       emailValue: "work@stillpartners.net",
       locationValue: "Perth, Western Australia",
       contactCaption:
-        "For labour requests, contractor applications, and client enquiries, email work@stillpartners.net or use the form.",
-      contactBestFor: "Labour requests, contractor applications, and client enquiries",
-      clientFormButton: "Send labour request"
+        "For project support enquiries, subcontractor applications, and scope coordination, email work@stillpartners.net or use the form.",
+      contactBestFor: "Project support, subcontractor applications, and scope enquiries",
+      clientFormButton: "Submit project enquiry"
     },
     about: {
       eyebrow: "About us",
-      title: "Practical construction labour support for Perth sites.",
+      title: "Practical construction subcontracting for Perth sites.",
       copy:
-        "Still Partners Pty Ltd supplies subcontracted construction labour, including carpenters and steelfixers, to main contractors who need reliable crews, clear communication, and practical site administration.",
+        "Still Partners Pty Ltd supports commercial construction projects through defined subcontract scopes, reinforcement services, clear communication, and practical site administration.",
       focusTrades: "Focus trades",
       trades: [
         "Steelfixers for reinforcement works",
         "Carpenters for formwork and fit-out support",
-        "Construction labourers for site tasks"
+        "Construction subcontract packages"
       ],
       cards: [
-        ["Local coordination", "Perth-focused scheduling and communication for site teams."],
+        ["Local coordination", "Perth-focused project administration, site documentation, and completion reporting."],
         ["Subcontractor records", "ABN, White Card, certificates, and onboarding details handled with clear administration."],
         ["Output tracking", "Work completion records help support cleaner site reporting and invoice preparation."]
       ],
       helpTitle: "How we help",
       helpCopy:
-        "We help main contractors fill labour gaps with subcontracted workers who understand construction site expectations: arriving prepared, following site instructions, and recording completed work clearly.",
+        "We support main contractors through agreed subcontract scopes, site requirements, start-time coordination, completion records, and practical project administration.",
       cta: "Contact Still Partners"
     },
     client: {
       eyebrow: "For main contractors",
-      title: "Request subcontracted workers for your Perth site.",
+      title: "Commercial project enquiry.",
       copy:
-        "Send the trades, site location, start date, and expected duration. We support commercial builders with steelfixers, carpenters, and construction labour.",
+        "Tell us about your project location, scope requirements, expected timeframe, and scope of works. We support commercial builders through subcontract package support, project coordination, and practical site administration.",
       includeTitle: "What to include",
       includeCopy:
-        "Site address, start time, trade mix, estimated crew size, duration, and site contact details.",
+        "Project address, trade mix, estimated timeframe, duration, scope of works, and site contact details.",
       formNote:
-        "This request is directed to work@stillpartners.net for Still Partners follow-up.",
-      button: "Request labour support"
+        "This project enquiry is directed to work@stillpartners.net for Still Partners follow-up. Still Partners supports construction projects through agreed subcontract scopes, project coordination, and site administration. Engagement terms, site requirements, and scope of works are confirmed before work starts.",
+      button: "Submit project enquiry"
     },
     subcontractor: {
       eyebrow: "Subcontractor registration",
       title: "Register for Perth construction subcontracting work.",
       copy:
-        "Tell us your trade, ABN, White Card status, and availability for steelfixing, carpentry, and site labour opportunities.",
-      checklist: ["ABN and trade details", "White Card and certificates", "Perth site availability"],
+        "Tell us your trade, ABN, White Card status, and availability for steelfixing, carpentry, and construction subcontract opportunities.",
+      checklist: ["ABN and trade details", "White Card and certificates", "Perth project availability and preferred trades"],
       whiteCard: "I have a White Card",
       formNote:
-        "Contractor applications are directed to work@stillpartners.net for review.",
-      button: "Register interest"
+        "Subcontractor applications are directed to work@stillpartners.net for review. Still Partners delivers subcontract package support for construction projects. Engagement terms, site requirements, and scope of works are confirmed before work starts.",
+      button: "Register as subcontractor"
     },
     contact: {
       eyebrow: "Contact",
       title: "Contact Still Partners",
       copy:
-        "Send a message about labour availability, subcontractor onboarding, or an upcoming Perth construction site.",
+        "Send a message about project support, subcontractor onboarding, or an upcoming Perth construction project.",
       serviceArea: "Service area:",
       serviceAreaValue: "Perth, Western Australia",
       caption:
-        "For construction labour, steelfixing support, and subcontractor onboarding, contact work@stillpartners.net.",
+        "For reinforcement subcontract services, project support, and subcontractor onboarding, contact work@stillpartners.net.",
       formNote:
-        "Messages submitted here are directed to work@stillpartners.net.",
+        "Messages submitted here are directed to work@stillpartners.net. Still Partners supports construction projects through agreed subcontract scopes, project coordination, and site administration. Engagement terms, site requirements, and scope of works are confirmed before work starts.",
       button: "Send message"
     },
     forms: {
@@ -151,20 +151,24 @@ export const publicMessages = {
       name: "Name",
       email: "Email",
       phone: "Phone",
-      requiredTrades: "Required trades",
+      requiredTrades: "Scope requirements",
       projectLocation: "Project location",
+      projectDescription: "Project description",
+      timeframe: "Estimated timeframe",
       message: "Message",
       trade: "Trade",
       abn: "ABN",
       availability: "Availability or message",
-      subject: "Subject"
+      subject: "Subject",
+      submitError:
+        "We could not submit the form just now. Please email work@stillpartners.net or try again shortly."
     },
     thanks: {
       title: "Message received",
       demo:
         "This local demo captured the form safely without Supabase. Configure Supabase before using the form for live enquiries.",
       live:
-        "Still Partners has received your details. We will review the request and respond through the contact information provided.",
+        "Still Partners has received your details. We will review the enquiry and respond through the contact information provided.",
       back: "Back to site"
     }
   },
@@ -172,69 +176,69 @@ export const publicMessages = {
     nav: {
       about: "Бидний тухай",
       subcontractors: "Гүйцэтгэгчид",
-      clients: "Захиалагчид",
+      clients: "Чадамж",
       contact: "Холбоо барих",
       internalBeta: "Дотоод бета",
       languageLabel: "Хэл"
     },
     footer: {
       description:
-        "Перт хотод төвтэй Still Partners нь үндсэн гүйцэтгэгчдэд найдвартай арматурчин, мужаан болон талбайд ажиллахад бэлэн туслан гүйцэтгэгч ажиллах хүч нийлүүлдэг.",
+        "Перт хотод төвтэй Still Partners нь арилжааны барилгын төслүүдэд арматурын дэмжлэг, практик зохицуулалт, гүйцэтгэлийн тодорхой бүртгэлтэй туслан гүйцэтгэх үйлчилгээ үзүүлдэг.",
       publicSite: "Сайтын цэс",
-      requestLabour: "Ажиллах хүч захиалах",
-      joinContractor: "Гүйцэтгэгчээр бүртгүүлэх",
+      projectEnquiry: "Төслийн лавлагаа",
+      joinContractor: "Туслан гүйцэтгэгчээр бүртгүүлэх",
       contact: "Холбоо барих",
       location: "Перт, Баруун Австрали",
       copyright:
-        "Still Partners Pty Ltd. Перт, Баруун Австралийн барилгын ажиллах хүчний үйлчилгээ."
+        "Still Partners Pty Ltd. Перт, Баруун Австралийн барилгын туслан гүйцэтгэх үйлчилгээ."
     },
     home: {
-      eyebrow: "Перт, WA барилгын ажиллах хүч",
-      heroTitle: "WA даяар найдвартай арматурын ажиллах хүч",
+      eyebrow: "Перт, WA барилгын туслан гүйцэтгэх үйлчилгээ",
+      heroTitle: "WA даяарх арматурын туслан гүйцэтгэх үйлчилгээ",
       heroCopy:
-        "Still Partners Pty Ltd нь үндсэн гүйцэтгэгчдэд арматурчин, мужаан болон барилгын туслан гүйцэтгэгч ажиллах хүч нийлүүлж, талбайн зохион байгуулалт, чанартай ажлыг тогтвортой дэмждэг.",
-      requestLabour: "Ажиллах хүч захиалах",
-      joinContractor: "Гүйцэтгэгчээр бүртгүүлэх",
+        "Still Partners Pty Ltd нь арилжааны барилгын төслүүдэд арматурын туслан гүйцэтгэх үйлчилгээ, төслийн практик зохицуулалт, гүйцэтгэлийн бүртгэл, чанартай гүйцэтгэлээр дэмжлэг үзүүлдэг.",
+      projectEnquiry: "Төслөө ярилцах",
+      joinContractor: "Туслан гүйцэтгэгчээр бүртгүүлэх",
       builtForSite: "Талбайн ажлын хэрэгцээнд",
-      heroCards: ["Арматурын баг", "Мужааны дэмжлэг", "Туслан гүйцэтгэгч ажиллах хүч"],
+      heroCards: ["Арматурын үйлчилгээ", "Мужааны ажлын хүрээний дэмжлэг", "Төслийн гүйцэтгэлийн зохицуулалт"],
       widerWa: "Перт болон WA-ийн төслүүдэд дэмжлэг үзүүлнэ.",
       aboutEyebrow: "Still Partners Pty Ltd",
-      aboutTitle: "Пертэд төвтэй, арилжааны барилгын ажиллах хүчний дэмжлэг.",
+      aboutTitle: "Пертэд төвтэй, арилжааны барилгын туслан гүйцэтгэх дэмжлэг.",
       aboutCopy:
-        "Бид үндсэн гүйцэтгэгчдийн төслийг тасралтгүй урагшлуулахад туслах найдвартай туслан гүйцэтгэгч ажиллах хүчээр хангадаг. Манай арга барил энгийн: талбайд бэлэн хүмүүс, аюулгүй ажиллагаанд анхаарсан хандлага, тодорхой харилцаа, шаардлага өөрчлөгдөхөд уян хатан баг.",
+        "Бид үндсэн гүйцэтгэгчдийн төслийг тохиролцсон туслан гүйцэтгэх ажлын хүрээ, талбайн баримтжуулалт, гүйцэтгэлийн бүртгэл, аюулгүй ажиллагаанд анхаарсан систем, талбайн шаардлага өөрчлөгдөхөд хэрэгтэй практик төслийн дэмжлэгээр урагшлуулахад тусалдаг.",
       trustBadges: ["Пертэд төвтэй", "Талбайд бэлэн", "Аюулгүй ажиллагаа"],
       servicesEyebrow: "Үйлчилгээ",
-      servicesTitle: "Барилгын ажиллах хүчний дэмжлэг",
+      servicesTitle: "Барилгын туслан гүйцэтгэх дэмжлэг",
       services: [
-        ["Арматурын ажиллах хүч", "Арматур зангидах, байрлуулах, бэлтгэл болон багийн нэмэлт хэрэгцээнд талбайд бэлэн арматурчид."],
-        ["Арматурын ажлын шийдэл", "Суурь, хавтан, багана, ханын арматур болон ажлын ачаалал нэмэгдэх үед уян хатан хүний нөөц."],
-        ["Төслийн дэмжлэг", "Талбайн ахлагчийн өдөр тутмын хэрэгцээг дэмжих барилгын ажилчид."],
-        ["Барилгын ажиллах хүч нийлүүлэлт", "Перт дэх арилжааны барилга болон үндсэн гүйцэтгэгчдэд туслан гүйцэтгэгч ажиллах хүчний дэмжлэг."]
+        ["Арматурын үйлчилгээ", "Арматур зангидах, байрлуулах, reo багц ажил болон төслийн гүйцэтгэлд зориулсан арматурын туслан гүйцэтгэх үйлчилгээ."],
+        ["Арматурын ажлын шийдэл", "Reo багц, хавтан, багана, хана болон төслийн шаардлага өөрчлөгдөх үед арматурын ажлын хүрээний гүйцэтгэлийг дэмжинэ."],
+        ["Төслийн дэмжлэг", "Тохиролцсон талбайн багц ажил, өдөр тутмын ажлын хүрээний бүртгэл, гүйцэтгэлийн хяналтыг дэмжих барилгын туслан гүйцэтгэх үйлчилгээ."],
+        ["Барилгын туслан гүйцэтгэх үйлчилгээ", "Перт дэх арилжааны барилга болон үндсэн гүйцэтгэгчдэд төслийн зохицуулалт, туслан гүйцэтгэх багц ажлын дэмжлэг."]
       ],
       whyEyebrow: "Яагаад биднийг сонгох вэ",
-      whyTitle: "Уян хатан туслан гүйцэтгэгч багтай, талбайн ажилд төвлөрсөн дэмжлэг.",
-      reasons: ["Аюулгүй байдал", "Найдвартай баг", "Цаг баримтална", "Уян хатан хүч", "Чанартай гүйцэтгэл"],
+      whyTitle: "Тохиролцсон ажлын хүрээ, бүртгэл, төслийн үр дүнд төвлөрсөн талбайн дэмжлэг.",
+      reasons: ["Аюулгүй байдал", "Найдвартай баг", "Цаг баримтална", "Уян хатан мэргэжлийн дэмжлэг", "Чанартай гүйцэтгэл"],
       projectEyebrow: "Төслийн онцлох ажил",
       projectTitle: "Бодит барилгын талбайд нийцсэн найдвартай дэмжлэг.",
       projectHighlights: [
         {
           title: "Арилжааны арматурын ажил",
-          copy: "Арматурын багц, суурь хавтан, хана, багана болон хугацааны шахалттай ажлуудад арматурчны дэмжлэг."
+          copy: "Идэвхтэй reo ажил, хавтангийн бэлтгэл, хана, багана болон хугацааны шахалттай ажлуудад арматурын багц ажлын дэмжлэг."
         },
         {
-          title: "Талбайд бэлэн ажиллах хүч",
-          copy: "Өдөр тутмын талбайн шаардлага, зааварчилгаа, эхлэх цаг болон ахлагчийн зохион байгуулалтад бэлэн ажилчид."
+          title: "Талбайд бэлэн төслийн дэмжлэг",
+          copy: "Өдөр тутмын талбайн шаардлага, зааварчилгаа, эхлэх цаг, гүйцэтгэлийн бүртгэл болон тохиролцсон ажлын хүрээний зохицуулалтад найдвартай дэмжлэг."
         },
         {
           title: "Перт дэх төслийн хамрах хүрээ",
-          copy: "Талбайн нөхцөл, ажлын ачаалал өөрчлөгдөх үед Перт хотын барилгачдад уян хатан дэмжлэг үзүүлнэ."
+          copy: "Талбайн нөхцөл болон арматурын хөтөлбөрийн шаардлага өөрчлөгдөх үед Перт хотын барилгачдад уян хатан төслийн дэмжлэг үзүүлнэ."
         }
       ],
       contractorTitle: "Ур чадвартай туслан гүйцэтгэгч үү?",
       contractorCopy:
-        "Перт дэх арматур, мужаан болон барилгын ажилд хамрагдах сонирхлоо бүртгүүлээрэй.",
-      contactEyebrow: "Ажиллах хүч захиалах",
-      contactTitle: "Танай талбайд ямар дэмжлэг хэрэгтэй вэ?",
+        "Перт дэх арматур, мужаан болон барилгын туслан гүйцэтгэх боломжид хамрагдах сонирхлоо бүртгүүлээрэй.",
+      contactEyebrow: "Төслийн дэмжлэгийн лавлагаа",
+      contactTitle: "Төслийнхөө талаар ярилцъя.",
       phone: "Утас:",
       email: "Имэйл:",
       location: "Байршил:",
@@ -242,65 +246,65 @@ export const publicMessages = {
       emailValue: "work@stillpartners.net",
       locationValue: "Перт, Баруун Австрали",
       contactCaption:
-        "Ажиллах хүчний захиалга, гүйцэтгэгчийн бүртгэл болон захиалагчийн хүсэлтийг work@stillpartners.net хаягаар эсвэл маягтаар илгээнэ үү.",
-      contactBestFor: "Ажиллах хүчний захиалга, гүйцэтгэгчийн бүртгэл, захиалагчийн хүсэлт",
-      clientFormButton: "Хүсэлт илгээх"
+        "Төслийн дэмжлэг, гүйцэтгэгчийн бүртгэл болон ажлын хүрээний лавлагааны талаар work@stillpartners.net хаягаар эсвэл маягтаар холбогдоно уу.",
+      contactBestFor: "Төслийн дэмжлэг, гүйцэтгэгчийн бүртгэл, ажлын хүрээний лавлагаа",
+      clientFormButton: "Төслийн лавлагаа илгээх"
     },
     about: {
       eyebrow: "Бидний тухай",
-      title: "Перт дэх барилгын талбайд зориулсан практик ажиллах хүчний дэмжлэг.",
+      title: "Перт дэх барилгын талбайд зориулсан практик туслан гүйцэтгэх үйлчилгээ.",
       copy:
-        "Still Partners Pty Ltd нь үндсэн гүйцэтгэгчдэд арматурчин, мужаан болон барилгын туслан гүйцэтгэгч ажиллах хүч нийлүүлж, найдвартай баг, тодорхой харилцаа, талбайн зохион байгуулалтыг дэмждэг.",
+        "Still Partners Pty Ltd нь арилжааны барилгын төслүүдэд тодорхой туслан гүйцэтгэх ажлын хүрээ, арматурын үйлчилгээ, тодорхой харилцаа, талбайн практик удирдлагаар дэмжлэг үзүүлдэг.",
       focusTrades: "Гол мэргэжлүүд",
       trades: [
         "Арматурын ажилд арматурчид",
         "Хэв хашмал болон мужааны дэмжлэг",
-        "Талбайн өдөр тутмын ажилд барилгын ажилчид"
+        "Барилгын туслан гүйцэтгэх багц ажлууд"
       ],
       cards: [
-        ["Орон нутгийн зохицуулалт", "Перт дэх талбайн багуудтай хуваарь, харилцааг тодорхой зохицуулна."],
+        ["Орон нутгийн зохицуулалт", "Перт дэх төслийн удирдлага, талбайн баримтжуулалт, гүйцэтгэлийн тайланг дэмжинэ."],
         ["Гүйцэтгэгчийн бүртгэл", "ABN, White Card, гэрчилгээ болон бүртгэлийн мэдээллийг цэгцтэй удирдана."],
         ["Гүйцэтгэлийн бүртгэл", "Ажлын гүйцэтгэлийн бүртгэл нь талбайн тайлан болон нэхэмжлэх бэлтгэлд тусална."]
       ],
       helpTitle: "Бид хэрхэн тусалдаг вэ",
       helpCopy:
-        "Бид үндсэн гүйцэтгэгчдийн ажиллах хүчний дутагдлыг талбайн шаардлагыг ойлгодог туслан гүйцэтгэгч ажилчдаар нөхдөг: цагтаа ирэх, зааврыг дагах, хийсэн ажлаа тодорхой бүртгэх.",
+        "Бид үндсэн гүйцэтгэгчдэд тохиролцсон туслан гүйцэтгэх ажлын хүрээ, талбайн шаардлага, эхлэх цагийн зохицуулалт, гүйцэтгэлийн бүртгэл, төслийн практик удирдлагаар дэмжлэг үзүүлдэг.",
       cta: "Still Partners-тэй холбогдох"
     },
     client: {
       eyebrow: "Үндсэн гүйцэтгэгчдэд",
-      title: "Перт дэх талбайдаа туслан гүйцэтгэгч ажиллах хүч захиалах.",
+      title: "Арилжааны төслийн лавлагаа.",
       copy:
-        "Шаардлагатай мэргэжил, талбайн байршил, эхлэх огноо болон хугацаагаа илгээнэ үү. Бид арилжааны барилгын компаниудад арматурчин, мужаан болон барилгын ажиллах хүчээр дэмжлэг үзүүлдэг.",
+        "Төслийн байршил, ажлын хүрээний шаардлага, төлөвлөсөн хугацаа болон ажлын хүрээгээ илгээнэ үү. Бид арилжааны барилгын компаниудад туслан гүйцэтгэх багц ажлын дэмжлэг, төслийн зохицуулалт, талбайн практик удирдлагаар дэмжлэг үзүүлдэг.",
       includeTitle: "Юуг оруулах вэ",
       includeCopy:
-        "Талбайн хаяг, эхлэх цаг, шаардлагатай мэргэжил, хүний тоо, хугацаа болон талбайн холбоо барих мэдээлэл.",
+        "Төслийн хаяг, шаардлагатай мэргэжил, тооцоолсон хугацаа, ажлын хүрээ болон талбайн холбоо барих мэдээлэл.",
       formNote:
-        "Энэ хүсэлт work@stillpartners.net хаяг руу чиглэж, Still Partners хариу холбогдоно.",
-      button: "Ажиллах хүчний хүсэлт илгээх"
+        "Энэ төслийн лавлагаа work@stillpartners.net хаяг руу чиглэж, Still Partners хариу холбогдоно. Still Partners нь тохиролцсон туслан гүйцэтгэх ажлын хүрээ, төслийн зохицуулалт, талбайн удирдлагаар барилгын төслүүдийг дэмждэг. Ажил эхлэхээс өмнө нөхцөл, талбайн шаардлага, ажлын хүрээг баталгаажуулна.",
+      button: "Төслийн лавлагаа илгээх"
     },
     subcontractor: {
       eyebrow: "Туслан гүйцэтгэгчийн бүртгэл",
       title: "Перт дэх барилгын туслан гүйцэтгэгчийн ажилд бүртгүүлэх.",
       copy:
-        "Өөрийн мэргэжил, ABN, White Card болон арматур, мужаан, талбайн ажил хийх боломжоо бидэнд илгээнэ үү.",
-      checklist: ["ABN болон мэргэжлийн мэдээлэл", "White Card болон гэрчилгээ", "Перт дэх ажиллах боломж"],
+        "Өөрийн мэргэжил, ABN, White Card болон арматур, мужаан, барилгын туслан гүйцэтгэх боломжоо бидэнд илгээнэ үү.",
+      checklist: ["ABN болон мэргэжлийн мэдээлэл", "White Card болон гэрчилгээ", "Перт дэх төслийн боломж ба илүүд үзэх мэргэжил"],
       whiteCard: "Надад White Card байгаа",
       formNote:
-        "Гүйцэтгэгчийн бүртгэлийн мэдээлэл work@stillpartners.net хаягаар хянагдана.",
-      button: "Сонирхлоо бүртгүүлэх"
+        "Туслан гүйцэтгэгчийн бүртгэлийн мэдээлэл work@stillpartners.net хаягаар хянагдана. Still Partners нь барилгын төслүүдэд туслан гүйцэтгэх багц ажлын дэмжлэг үзүүлдэг. Ажил эхлэхээс өмнө нөхцөл, талбайн шаардлага, ажлын хүрээг баталгаажуулна.",
+      button: "Туслан гүйцэтгэгчээр бүртгүүлэх"
     },
     contact: {
       eyebrow: "Холбоо барих",
       title: "Still Partners-тэй холбогдох",
       copy:
-        "Ажиллах хүчний боломж, туслан гүйцэтгэгчийн бүртгэл эсвэл Перт дэх удахгүй эхлэх барилгын талбайн талаар мессеж илгээнэ үү.",
+        "Төслийн дэмжлэг, туслан гүйцэтгэгчийн бүртгэл эсвэл Перт дэх удахгүй эхлэх барилгын төслийн талаар мессеж илгээнэ үү.",
       serviceArea: "Үйлчлэх бүс:",
       serviceAreaValue: "Перт, Баруун Австрали",
       caption:
-        "Барилгын ажиллах хүч, арматурын дэмжлэг болон гүйцэтгэгчийн бүртгэлийн талаар work@stillpartners.net хаягаар холбогдоно уу.",
+        "Арматурын туслан гүйцэтгэх үйлчилгээ, төслийн дэмжлэг болон гүйцэтгэгчийн бүртгэлийн талаар work@stillpartners.net хаягаар холбогдоно уу.",
       formNote:
-        "Энд илгээсэн мессеж work@stillpartners.net хаяг руу чиглэнэ.",
+        "Энд илгээсэн мессеж work@stillpartners.net хаяг руу чиглэнэ. Still Partners нь тохиролцсон туслан гүйцэтгэх ажлын хүрээ, төслийн зохицуулалт, талбайн удирдлагаар барилгын төслүүдийг дэмждэг. Ажил эхлэхээс өмнө нөхцөл, талбайн шаардлага, ажлын хүрээг баталгаажуулна.",
       button: "Мессеж илгээх"
     },
     forms: {
@@ -310,13 +314,17 @@ export const publicMessages = {
       name: "Нэр",
       email: "Имэйл",
       phone: "Утас",
-      requiredTrades: "Шаардлагатай мэргэжил",
+      requiredTrades: "Ажлын хүрээний шаардлага",
       projectLocation: "Төслийн байршил",
+      projectDescription: "Төслийн тайлбар",
+      timeframe: "Тооцоолсон хугацаа",
       message: "Мессеж",
       trade: "Мэргэжил",
       abn: "ABN",
       availability: "Ажиллах боломж эсвэл мессеж",
-      subject: "Гарчиг"
+      subject: "Гарчиг",
+      submitError:
+        "Маягтыг одоогоор илгээж чадсангүй. work@stillpartners.net хаягаар имэйл илгээх эсвэл түр хүлээгээд дахин оролдоно уу."
     },
     thanks: {
       title: "Мессеж хүлээн авлаа",

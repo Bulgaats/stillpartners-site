@@ -113,27 +113,55 @@ export const mockDashboardData: DashboardData = {
       id: "cert-1",
       workerId: demoUserIds.worker,
       title: "White Card",
-      status: "approved",
+      documentType: "white_card",
+      fileName: "white-card.pdf",
+      issuedOn: "2023-04-26",
+      status: "active",
       expiresOn: "2028-04-26"
     },
     {
       id: "cert-2",
       workerId: "worker-2",
       title: "Working at Heights",
+      documentType: "high_risk_licence",
+      fileName: "working-at-heights.pdf",
       status: "pending"
     },
     {
       id: "cert-3",
       workerId: "worker-3",
       title: "Public liability insurance",
-      status: "approved",
+      documentType: "insurance",
+      fileName: "public-liability.pdf",
+      status: "active",
       expiresOn: "2027-10-01"
     },
     {
       id: "cert-4",
       workerId: "worker-4",
       title: "Trade certificate",
+      documentType: "trade_certificate",
       status: "rejected"
+    },
+    {
+      id: "cert-5",
+      workerId: "admin-worker-1",
+      title: "White Card",
+      documentType: "white_card",
+      fileName: "jack-white-card.pdf",
+      issuedOn: "2022-02-01",
+      status: "active",
+      expiresOn: "2028-02-01"
+    },
+    {
+      id: "cert-6",
+      workerId: "admin-worker-1",
+      title: "Public liability insurance",
+      documentType: "insurance",
+      fileName: "jack-insurance.pdf",
+      issuedOn: today,
+      status: "expiring_soon",
+      expiresOn: tomorrow
     }
   ],
   clients: [
@@ -264,7 +292,7 @@ export const mockDashboardData: DashboardData = {
       lockedAt: `${today}T09:00:00.000Z`,
       approvedAt: `${today}T09:00:00.000Z`,
       siteName: "Elizabeth Quay Tower",
-      notes: "Approved crew entry"
+      notes: "Approved project team production"
     },
     {
       id: "ts-3",
@@ -349,6 +377,20 @@ export const mockDashboardData: DashboardData = {
       ratePerTonne: 575,
       effectiveFrom: week.start,
       status: "approved"
+    },
+    {
+      id: "wr-5",
+      workerId: "admin-worker-1",
+      ratePerTonne: 620,
+      effectiveFrom: week.start,
+      status: "approved"
+    },
+    {
+      id: "wr-6",
+      workerId: "admin-worker-2",
+      ratePerTonne: 590,
+      effectiveFrom: week.start,
+      status: "approved"
     }
   ],
   clientRates: [
@@ -389,7 +431,7 @@ export const mockDashboardData: DashboardData = {
         {
           id: "wi-1",
           timesheetId: "ts-3",
-          description: "Approved output completed",
+          description: "Reinforcement subcontract services",
           workDate: week.start,
           siteName: "Elizabeth Quay Tower",
           hours: 7.5,
@@ -442,7 +484,7 @@ export const mockDashboardData: DashboardData = {
   recurringExpenses: [
     {
       id: "exp-1",
-      name: "Payroll software",
+      name: "Operations software",
       amount: 85,
       frequency: "monthly"
     },
@@ -457,6 +499,217 @@ export const mockDashboardData: DashboardData = {
       name: "Insurance",
       amount: 180,
       frequency: "weekly"
+    }
+  ],
+  publicLeads: [
+    {
+      id: "lead-client-1",
+      source: "client_requests",
+      name: "Grace Miller",
+      companyName: "Northbank Construction",
+      email: "grace@example.com",
+      phone: "0400 900 100",
+      trade: "Steelfixers",
+      projectLocation: "Subiaco WA",
+      message: "Need four steelfixers for a slab pour next week.",
+      preferredLanguage: "en",
+      status: "new",
+      createdAt: `${today}T07:30:00.000Z`
+    },
+    {
+      id: "lead-subcontractor-1",
+      source: "subcontractor_applications",
+      name: "Bat-Erdene Ganbold",
+      email: "bat@example.com",
+      phone: "0400 901 200",
+      trade: "Steelfixer",
+      message: "Available for Perth metro work with White Card.",
+      preferredLanguage: "mn",
+      status: "contacted",
+      createdAt: `${today}T06:45:00.000Z`
+    },
+    {
+      id: "lead-contact-1",
+      source: "contact_messages",
+      name: "Site Coordinator",
+      email: "site@example.com",
+      subject: "Upcoming subcontract availability",
+      message: "Please contact us about subcontract coverage in May.",
+      preferredLanguage: "en",
+      status: "qualified",
+      createdAt: `${today}T05:10:00.000Z`
+    }
+  ],
+  adminJobs: [
+    {
+      id: "admin-job-1",
+      siteName: "East Perth Apartments",
+      clientCompany: "Perth Main Contractors",
+      location: "88 Adelaide Terrace, East Perth WA",
+      startDate: today,
+      endDate: tomorrow,
+      status: "active",
+      scopeSummary: "Reinforcement package support, completion records, and project documentation.",
+      productionTarget: 12,
+      createdAt: `${today}T06:00:00.000Z`
+    }
+  ],
+  adminWorkers: [
+    {
+      id: "admin-worker-1",
+      fullName: "Jack Turner",
+      email: "jack@example.com",
+      phone: "0400 111 222",
+      trade: "Steelfixer",
+      abn: "12 345 678 901",
+      gstRegistered: true,
+      gstRegisteredConfirmedAt: `${today}T06:00:00.000Z`,
+      bankName: "Commonwealth Bank",
+      bsb: "066-000",
+      accountNumber: "123456321",
+      profileComplete: true,
+      profileCompletedAt: `${today}T06:00:00.000Z`,
+      authUserId: demoUserIds.worker,
+      invitedAt: `${today}T05:00:00.000Z`,
+      inviteAcceptedAt: `${today}T05:30:00.000Z`,
+      accountEnabled: true,
+      availabilityStatus: "available",
+      availabilityFrom: today,
+      availabilityNotes: "Available for reinforcement scope participation.",
+      isActive: true,
+      createdAt: `${today}T06:00:00.000Z`
+    },
+    {
+      id: "admin-worker-2",
+      fullName: "Mason Reid",
+      email: "",
+      phone: "0400 333 444",
+      trade: "Carpenter",
+      abn: "",
+      gstRegistered: false,
+      bankName: "",
+      bsb: "",
+      accountNumber: "",
+      profileComplete: false,
+      invitedAt: `${today}T05:00:00.000Z`,
+      accountEnabled: true,
+      availabilityStatus: "limited",
+      availabilityFrom: tomorrow,
+      availabilityNotes: "Limited availability while finishing another project scope.",
+      isActive: true,
+      createdAt: `${today}T06:00:00.000Z`
+    }
+  ],
+  adminAssignments: [
+    {
+      id: "admin-assignment-1",
+      jobId: "admin-job-1",
+      workerId: "admin-worker-1",
+      date: today,
+      startTime: "06:30",
+      role: "leading_hand",
+      createdAt: `${today}T06:00:00.000Z`
+    },
+    {
+      id: "admin-assignment-2",
+      jobId: "admin-job-1",
+      workerId: "admin-worker-2",
+      date: today,
+      startTime: "06:30",
+      role: "worker",
+      createdAt: `${today}T06:00:00.000Z`
+    }
+  ],
+  workEntries: [
+    {
+      id: "work-entry-1",
+      workerId: "admin-worker-1",
+      jobId: "admin-job-1",
+      assignmentId: "admin-assignment-1",
+      workDate: today,
+      hours: 8,
+      tonnes: 0.8,
+      enteredBy: demoUserIds.admin,
+      entryRole: "admin",
+      approved: false,
+      locked: false,
+      createdAt: `${today}T08:00:00.000Z`,
+      updatedAt: `${today}T08:00:00.000Z`
+    }
+  ],
+  workerInvoiceDrafts: [
+    {
+      id: "worker-invoice-draft-1",
+      workerId: "admin-worker-1",
+      periodStart: today,
+      periodEnd: tomorrow,
+      invoiceNumber: "WINV-DEMO-001",
+      totalHours: 8,
+      totalTonnes: 0.8,
+      ratePerTonne: 620,
+      subtotal: 496,
+      gstRegistered: true,
+      gstAmount: 49.6,
+      totalAmount: 545.6,
+      invoiceTitle: "Tax Invoice",
+      status: "draft",
+      pdfUrl: "invoices/worker-invoice-draft-1.pdf",
+      createdAt: `${today}T09:00:00.000Z`,
+      updatedAt: `${today}T09:00:00.000Z`,
+      items: [
+        {
+          id: "worker-invoice-item-1",
+          invoiceId: "worker-invoice-draft-1",
+          workEntryId: "work-entry-1",
+          workerId: "admin-worker-1",
+          jobId: "admin-job-1",
+          workDate: today,
+          hours: 8,
+          tonnes: 0.8,
+          createdAt: `${today}T09:00:00.000Z`
+        }
+      ]
+    }
+  ],
+  projectParticipations: [
+    {
+      id: "participation-1",
+      jobId: "admin-job-1",
+      workerId: "admin-worker-1",
+      status: "confirmed",
+      scopeAcknowledgedAt: `${today}T05:45:00.000Z`,
+      notes: "Scope acknowledged.",
+      createdAt: `${today}T05:45:00.000Z`,
+      updatedAt: `${today}T05:45:00.000Z`
+    }
+  ],
+  projectNotes: [
+    {
+      id: "project-note-1",
+      jobId: "admin-job-1",
+      workerId: "admin-worker-1",
+      authorUserId: demoUserIds.worker,
+      noteType: "completion_note",
+      body: "Reinforcement progress recorded for the current project scope.",
+      createdAt: `${today}T10:00:00.000Z`
+    }
+  ],
+  projectInductions: [
+    {
+      id: "induction-1",
+      jobId: "admin-job-1",
+      workerId: "admin-worker-1",
+      status: "inducted",
+      markedBy: demoUserIds.admin,
+      markedAt: `${today}T06:15:00.000Z`
+    },
+    {
+      id: "induction-2",
+      jobId: "admin-job-1",
+      workerId: "admin-worker-2",
+      status: "pending",
+      markedBy: demoUserIds.admin,
+      markedAt: `${today}T06:15:00.000Z`
     }
   ]
 };

@@ -162,4 +162,8 @@ textarea {
   .dashboard-page button {
     @apply touch-manipulation;
   }
+
+  .dashboard-shell[data-dashboard-busy="true"] button:not([data-allow-during-busy="true"]) {
+    @apply cursor-wait opacity-70;
+  }
 }

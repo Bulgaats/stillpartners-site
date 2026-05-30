@@ -3,8 +3,8 @@
 import { type Role } from "@/lib/auth/roles";
 
 const roleOptions: { label: string; value: Role }[] = [
-  { label: "Worker", value: "worker" },
-  { label: "Daily Leading Hand", value: "leading_hand" },
+  { label: "Contractor", value: "worker" },
+  { label: "Project Lead", value: "leading_hand" },
   { label: "Admin", value: "admin" }
 ];
 
@@ -24,8 +24,8 @@ export function DemoModeBanner({
           </p>
           <p className="mt-1 text-sm leading-6 text-gray-700">
             Supabase is not configured. This dashboard is using local mock data
-            and client-side state. Leading Hand is a daily job assignment, not
-            a permanent worker type.
+            and client-side state. Project Lead is a project/date responsibility,
+            not a permanent contractor type.
           </p>
         </div>
         <label className="grid gap-1 text-sm font-bold text-gray-800 sm:min-w-52">

@@ -7,7 +7,12 @@ import { PublicNav } from "@/components/layout/public-nav";
 import { publicImages } from "@/lib/public-images";
 import { getPublicI18n } from "@/lib/i18n/server";
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams
+}: {
+  searchParams?: Promise<{ message?: string }>;
+}) {
+  const params = await searchParams;
   const { t } = await getPublicI18n();
   const projectImages = [publicImages.projects, publicImages.contractor, publicImages.services];
 
@@ -50,7 +55,7 @@ export default async function HomePage() {
                   className="rounded-md bg-orange-500 px-6 py-4 text-center text-sm font-black uppercase tracking-wide text-white shadow-panel"
                   href="/become-client"
                 >
-                  {t.home.requestLabour}
+                  {t.home.projectEnquiry}
                 </Link>
                 <Link
                   className="rounded-md border border-white/25 bg-white/10 px-6 py-4 text-center text-sm font-black uppercase tracking-wide text-white backdrop-blur"
@@ -62,7 +67,7 @@ export default async function HomePage() {
             </div>
             <div className="overflow-hidden rounded-lg border border-white/15 bg-white/10 shadow-2xl backdrop-blur">
               <Image
-                alt="Steelfixing and construction workforce detail"
+                alt="Steelfixing and construction subcontract trade detail"
                 className="h-48 w-full object-cover opacity-95"
                 height={360}
                 src={publicImages.services}
@@ -129,7 +134,7 @@ export default async function HomePage() {
                 </h2>
               </div>
               <Link className="text-sm font-black uppercase tracking-wide text-orange-600" href="/become-client">
-                {t.home.requestLabour}
+                {t.home.projectEnquiry}
               </Link>
             </div>
             <div className="mt-8 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
@@ -221,7 +226,7 @@ export default async function HomePage() {
           <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div className="overflow-hidden rounded-lg bg-[#11181d] shadow-panel">
               <Image
-                alt="Construction workforce ready for subcontractor placements"
+                alt="Construction subcontractors ready for project opportunities"
                 className="h-72 w-full object-cover opacity-95"
                 height={420}
                 src={publicImages.contractor}
@@ -281,9 +286,15 @@ export default async function HomePage() {
             <Field label={t.forms.contactName} name="contact_name" required />
             <Field label={t.forms.email} name="email" required type="email" />
             <Field label={t.forms.phone} name="phone" />
-            <Field label={t.forms.requiredTrades} name="required_trades" />
             <Field label={t.forms.projectLocation} name="project_location" />
-            <Field label={t.forms.message} name="message" textarea />
+            <Field label={t.forms.projectDescription} name="message" textarea />
+            <Field label={t.forms.requiredTrades} name="required_trades" />
+            <Field label={t.forms.timeframe} name="timeframe" />
+            {params?.message ? (
+              <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-700">
+                {params.message === "submit-error" ? t.forms.submitError : params.message}
+              </p>
+            ) : null}
             <button className="rounded-md bg-blue-950 px-5 py-3 text-sm font-black text-white">
               {t.home.clientFormButton}
             </button>

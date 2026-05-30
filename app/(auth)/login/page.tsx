@@ -4,7 +4,7 @@ import Image from "next/image";
 export default async function LoginPage({
   searchParams
 }: {
-  searchParams?: Promise<{ message?: string }>;
+  searchParams?: Promise<{ message?: string; reason?: string }>;
 }) {
   const params = await searchParams;
 
@@ -21,8 +21,8 @@ export default async function LoginPage({
         />
         <h1 className="mt-3 text-3xl font-bold text-ink">Internal Beta</h1>
         <p className="mt-2 text-sm leading-6 text-steel">
-          Private beta access for approved Still Partners workers and admins.
-          Daily Leading Hand access is assigned per job/day.
+          Private beta access for approved Still Partners contractors and admins.
+          Project Lead access is assigned per project/day.
         </p>
         <form action={login} className="mt-6 grid gap-4">
           <label className="grid gap-2 text-sm font-medium text-ink">
@@ -48,6 +48,11 @@ export default async function LoginPage({
           {params?.message ? (
             <p className="rounded-md bg-safety/15 px-3 py-2 text-sm text-ink">
               {params.message}
+              {params.reason ? (
+                <span className="mt-1 block text-xs text-steel">
+                  Reference: {params.reason}
+                </span>
+              ) : null}
             </p>
           ) : null}
           <button
