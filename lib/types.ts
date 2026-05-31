@@ -30,6 +30,11 @@ export type ProjectParticipationStatus =
   | "confirmed"
   | "declined"
   | "completed";
+export type ProjectParticipationRequestStatus =
+  | "proposed"
+  | "contractor_confirmed"
+  | "unable_to_participate"
+  | "withdrawn";
 export type ProjectNoteType = "admin_update" | "participation_note" | "completion_note";
 export type ComplianceDocumentStatus =
   | "active"
@@ -362,6 +367,23 @@ export type ProjectParticipation = {
   updatedAt?: string;
 };
 
+export type ProjectParticipationRequest = {
+  id: string;
+  jobId: string;
+  workerId: string;
+  participationDate: string;
+  siteAccessTime: string;
+  scopeNote?: string;
+  status: ProjectParticipationRequestStatus;
+  confirmationSource?: "contractor_app" | "admin_recorded_verbal";
+  confirmedAt?: string;
+  confirmedBy?: string;
+  projectLeadWorkerId?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
 export type ProjectNote = {
   id: string;
   jobId: string;
@@ -414,6 +436,7 @@ export type DashboardData = {
   workEntries: WorkEntry[];
   workerInvoiceDrafts: WorkerInvoiceDraft[];
   projectParticipations: ProjectParticipation[];
+  projectParticipationRequests: ProjectParticipationRequest[];
   projectNotes: ProjectNote[];
   projectInductions: ProjectInduction[];
 };

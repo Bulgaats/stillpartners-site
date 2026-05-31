@@ -23,6 +23,8 @@ import {
   type ProjectInduction,
   type ProjectInductionStatus,
   type ProjectParticipation,
+  type ProjectParticipationRequest,
+  type ProjectParticipationRequestStatus,
   type ProjectParticipationStatus,
   type RecurringExpense,
   type Timesheet,
@@ -69,6 +71,7 @@ export async function getSupabaseDashboardData(
     workEntriesResult,
     workerInvoiceDraftsResult,
     projectParticipationsResult,
+    projectParticipationRequestsResult,
     projectNotesResult,
     projectInductionsResult
   ] = await Promise.all([
@@ -93,6 +96,7 @@ export async function getSupabaseDashboardData(
     getWorkEntriesForDashboard(supabase, sessionProfile),
     getWorkerInvoiceDraftsForDashboard(supabase, sessionProfile),
     getProjectParticipationsForDashboard(supabase, sessionProfile),
+    getProjectParticipationRequestsForDashboard(supabase, sessionProfile),
     getProjectNotesForDashboard(supabase, sessionProfile),
     getProjectInductionsForDashboard(supabase, sessionProfile)
   ]);
@@ -168,6 +172,7 @@ export async function getSupabaseDashboardData(
     workEntries: mapWorkEntries(workEntriesResult),
     workerInvoiceDrafts: workerInvoiceDraftsResult,
     projectParticipations: projectParticipationsResult,
+    projectParticipationRequests: projectParticipationRequestsResult,
     projectNotes: projectNotesResult,
     projectInductions: projectInductionsResult
   };
@@ -280,6 +285,61 @@ async function getProjectParticipationsForDashboard(
   }
 
   return mapProjectParticipations(fallback.data);
+}
+
+async function getProjectParticipationRequestsForDashboard(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  sessionProfile: SessionProfile
+): Promise<ProjectParticipationRequest[]> {
+  const dataSupabase = createServiceRoleSupabaseClient() ?? supabase;
+  let query = dataSupabase
+    .from("project_participation_requests")
+    .select("id, job_id, worker_id, participation_date, site_access_time, scope_note, status, confirmation_source, confirmed_at, confirmed_by, project_lead_worker_id, created_by, created_at, updated_at")
+    .order("participation_date", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (sessionProfile.profile.role !== "admin") {
+    query = query.eq("worker_id", sessionProfile.workerId ?? sessionProfile.userId);
+  }
+
+  const { data, error } = await query.limit(300);
+  if (error) {
+    console.warn("Project participation requests fetch skipped", {
+      code: error.code,
+      message: error.message
+    });
+    return [];
+  }
+
+  return mapProjectParticipationRequests(data);
+}
+
+function mapProjectParticipationRequests(rows: unknown[] | null): ProjectParticipationRequest[] {
+  return (rows ?? []).map((row) => {
+    const request = row as Record<string, unknown>;
+    return {
+      id: String(request.id),
+      jobId: String(request.job_id),
+      workerId: String(request.worker_id),
+      participationDate: String(request.participation_date),
+      siteAccessTime: request.site_access_time ? String(request.site_access_time).slice(0, 5) : "06:30",
+      scopeNote: request.scope_note ? String(request.scope_note) : undefined,
+      status: parseProjectParticipationRequestStatus(String(request.status ?? "proposed")),
+      confirmationSource:
+        request.confirmation_source === "contractor_app" ||
+        request.confirmation_source === "admin_recorded_verbal"
+          ? request.confirmation_source
+          : undefined,
+      confirmedAt: request.confirmed_at ? String(request.confirmed_at) : undefined,
+      confirmedBy: request.confirmed_by ? String(request.confirmed_by) : undefined,
+      projectLeadWorkerId: request.project_lead_worker_id
+        ? String(request.project_lead_worker_id)
+        : undefined,
+      createdBy: request.created_by ? String(request.created_by) : undefined,
+      createdAt: String(request.created_at),
+      updatedAt: request.updated_at ? String(request.updated_at) : undefined
+    };
+  });
 }
 
 async function getProjectNotesForDashboard(
@@ -1407,6 +1467,19 @@ function parseProjectParticipationStatus(status: string): ProjectParticipationSt
   }
 
   return "requested";
+}
+
+function parseProjectParticipationRequestStatus(status: string): ProjectParticipationRequestStatus {
+  if (
+    status === "proposed" ||
+    status === "contractor_confirmed" ||
+    status === "unable_to_participate" ||
+    status === "withdrawn"
+  ) {
+    return status;
+  }
+
+  return "proposed";
 }
 
 function parseProjectNoteType(noteType: string): ProjectNoteType {

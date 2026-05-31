@@ -24,6 +24,7 @@ import {
   approveWorkEntryAction,
   addProjectNoteAction,
   bulkUpsertWorkEntriesAction,
+  confirmProjectParticipationRequestAction,
   createWorkerInvoiceDraftFromWorkEntriesAction,
   createAdminJobAction,
   createAdminWorkerAction,
@@ -41,8 +42,8 @@ import {
   markInvoiceSentAction,
   markWorkerInvoiceDraftPaidAction,
   markInvoicePaidAction,
-  saveProjectParticipantsAction,
-  saveDailySiteScheduleAction,
+  markProjectParticipationRequestUnableAction,
+  publishProjectParticipationRequestAction,
   sendContractorInviteAction,
   setContractorAccountEnabledAction,
   signAgreementAction,
@@ -50,7 +51,6 @@ import {
   updateAdminWorkerProfileAction,
   updateContractorAvailabilityAction,
   updateProjectProgressAction,
-  updateProjectInductionAction,
   updateProjectParticipationAction,
   updatePublicLeadStatusAction,
   uploadCertificateAction,
@@ -78,17 +78,17 @@ import {
 } from "@/lib/permissions";
 import {
   type ClientInvoice,
-  type AdminAssignment,
   type AdminJob,
   type AdminWorker,
   type DashboardData,
-  type ProjectParticipation,
+  type ProjectParticipationRequest,
   type PublicLead,
   type PublicLeadSource,
   type PublicLeadStatus,
   type RecurringExpense,
   type ScheduleDraft,
   type Timesheet,
+  type WorkEntry,
   type WorkerInvoiceDraft
 } from "@/lib/types";
 import { DemoModeBanner } from "@/components/demo/demo-mode-banner";
@@ -131,10 +131,13 @@ type ContractorProfileDraft = {
   isActive: boolean;
 };
 
-type SiteScheduleDraft = {
-  startTime: string;
+type ParticipationRequestDraft = {
+  jobId: string;
+  participationDate: string;
+  siteAccessTime: string;
+  scopeNote: string;
   workerIds: string[];
-  leadingHandWorkerId: string;
+  projectLeadWorkerId: string;
 };
 
 type ActionFeedback = {
@@ -230,18 +233,15 @@ export function DashboardShell({
       data.adminWorkers.map((worker) => [worker.id, contractorProfileDraftFromWorker(worker)])
     )
   );
-  const [siteScheduleDate, setSiteScheduleDate] = useState(initialPerthTomorrow);
-  const [siteScheduleDrafts, setSiteScheduleDrafts] = useState<
-    Record<string, SiteScheduleDraft>
-  >(() =>
-    buildSiteScheduleDrafts(
-      data.adminJobs,
-      data.adminAssignments,
-      data.projectParticipations,
-      initialPerthTomorrow
-    )
-  );
-  const [contractorSearchBySite, setContractorSearchBySite] = useState<Record<string, string>>({});
+  const [participationRequestDraft, setParticipationRequestDraft] =
+    useState<ParticipationRequestDraft>({
+      jobId: data.adminJobs.find((job) => isProjectSelectableForAllocation(job))?.id ?? data.adminJobs[0]?.id ?? "",
+      participationDate: initialPerthTomorrow,
+      siteAccessTime: "06:30",
+      scopeNote: "",
+      workerIds: [],
+      projectLeadWorkerId: ""
+    });
   const [workEntryDraft, setWorkEntryDraft] = useState({
     assignmentId: data.adminAssignments[0]?.id ?? "",
     jobId: data.adminAssignments[0]?.jobId ?? data.adminJobs[0]?.id ?? "",
@@ -326,17 +326,6 @@ export function DashboardShell({
       )
     );
   }, [initialData]);
-
-  useEffect(() => {
-    setSiteScheduleDrafts(
-      buildSiteScheduleDrafts(
-        data.adminJobs,
-        data.adminAssignments,
-        data.projectParticipations,
-        siteScheduleDate
-      )
-    );
-  }, [data.adminAssignments, data.adminJobs, data.projectParticipations, siteScheduleDate]);
 
   const currentUserId = demoMode ? roleToDemoUserId(role) : data.currentUserId;
   const currentUser =
@@ -534,23 +523,30 @@ export function DashboardShell({
   const activeScheduleJobs = data.adminJobs.filter(
     (job) => isProjectSelectableForAllocation(job)
   );
-  const scheduledWorkerSiteById = new Map<string, string>();
-  activeScheduleJobs.forEach((job) => {
-    const draft = siteScheduleDrafts[job.id];
-    draft?.workerIds.forEach((workerId) => {
-      scheduledWorkerSiteById.set(workerId, job.id);
-    });
-  });
-  const siteScheduleReview = activeScheduleJobs
-    .map((job) => ({
-      job,
-      draft: siteScheduleDrafts[job.id] ?? {
-        startTime: "06:30",
-        workerIds: [],
-        leadingHandWorkerId: ""
-      }
-    }))
-    .filter((item) => item.draft.workerIds.length > 0);
+  const selectedParticipationRequestJob = data.adminJobs.find(
+    (job) => job.id === participationRequestDraft.jobId
+  );
+  const participationRequestsForSelectedDate = data.projectParticipationRequests.filter(
+    (request) => request.participationDate === participationRequestDraft.participationDate
+  );
+  const participationRequestGroups = groupParticipationRequestsByProjectDate(
+    participationRequestsForSelectedDate,
+    data.workEntries
+  );
+  const contractorParticipationRequests = data.projectParticipationRequests.filter(
+    (request) =>
+      request.workerId === workSystemUserWorkerId &&
+      request.status !== "withdrawn" &&
+      request.participationDate >= today
+  );
+  const contractorConfirmedRequestByDate = new Map(
+    contractorParticipationRequests
+      .filter((request) => request.status === "contractor_confirmed")
+      .map((request) => [request.participationDate, request])
+  );
+  const contractorConfirmedParticipationRequests = contractorParticipationRequests.filter(
+    (request) => request.status === "contractor_confirmed"
+  );
   const contractorInvoicedWorkEntryIds = new Set(
     data.workerInvoiceDrafts.flatMap((invoice) =>
       invoice.items.map((item) => item.workEntryId)
@@ -623,19 +619,38 @@ export function DashboardShell({
   const contractorTodayAssignments = contractorAssignments.filter(
     (assignment) => assignment.date === today
   );
+  const contractorTodayConfirmedRequests = data.projectParticipationRequests.filter(
+    (request) =>
+      request.workerId === workSystemUserWorkerId &&
+      request.participationDate === today &&
+      request.status === "contractor_confirmed"
+  );
   const contractorProductionItems = [
+    ...contractorTodayConfirmedRequests.map((request) => ({
+      id: `participation-request-${request.id}`,
+      assignmentId: undefined,
+      requestId: request.id,
+      jobId: request.jobId,
+      workerId: request.workerId,
+      date: request.participationDate,
+      startTime: request.siteAccessTime
+    })),
     ...contractorTodayAssignments.map((assignment) => ({
       id: assignment.id,
       assignmentId: assignment.id,
+      requestId: undefined,
       jobId: assignment.jobId,
       workerId: assignment.workerId,
       date: assignment.date,
       startTime: assignment.startTime
-    })),
+    })).filter((assignment) =>
+      !contractorTodayConfirmedRequests.some((request) => request.jobId === assignment.jobId)
+    ),
     ...data.adminJobs
       .filter((job) => {
         const participation = currentParticipationByJobId.get(job.id);
         return (
+          contractorTodayConfirmedRequests.length === 0 &&
           isProjectSelectableForAllocation(job) &&
           participation?.status === "confirmed" &&
           !contractorTodayAssignments.some((assignment) => assignment.jobId === job.id)
@@ -644,6 +659,7 @@ export function DashboardShell({
       .map((job) => ({
         id: `participation-${job.id}`,
         assignmentId: undefined,
+        requestId: undefined,
         jobId: job.id,
         workerId: workSystemUserWorkerId,
         date: today,
@@ -1748,59 +1764,6 @@ export function DashboardShell({
     setActionMessage(`Compliance document ${status}.`);
   }
 
-  function updateProjectInduction(
-    jobId: string,
-    workerId: string,
-    status: "pending" | "inducted" | "expired"
-  ) {
-    const feedbackKey = `induction:${jobId}:${workerId}`;
-    setData((current) => {
-      const existing = current.projectInductions.find(
-        (induction) => induction.jobId === jobId && induction.workerId === workerId
-      );
-      const nextInduction = {
-        id: existing?.id ?? `induction-${Date.now()}`,
-        jobId,
-        workerId,
-        status,
-        markedBy: currentUserId,
-        markedAt: new Date().toISOString(),
-        expiresOn: existing?.expiresOn,
-        notes: existing?.notes
-      };
-
-      return {
-        ...current,
-        projectParticipations: current.projectParticipations.map((participation) =>
-          participation.jobId === jobId && participation.workerId === workerId
-            ? {
-                ...participation,
-                inductionStatus: status === "inducted" ? "inducted" : "pending",
-                inductedAt: status === "inducted" ? new Date().toISOString() : undefined,
-                updatedAt: new Date().toISOString()
-              }
-            : participation
-        ),
-        projectInductions: existing
-          ? current.projectInductions.map((induction) =>
-              induction.id === existing.id ? nextInduction : induction
-            )
-          : [...current.projectInductions, nextInduction]
-      };
-    });
-
-    if (!demoMode) {
-      runSupabaseAction(
-        () => updateProjectInductionAction({ jobId, workerId, status }),
-        "Updating project induction",
-        feedbackKey
-      );
-      return;
-    }
-
-    setLocalFeedback(feedbackKey, "success", "Project induction updated in demo mode.");
-  }
-
   function updatePublicLeadStatus(
     source: PublicLeadSource,
     id: string,
@@ -2279,235 +2242,155 @@ export function DashboardShell({
     setActionMessage("Project note saved in demo mode.");
   }
 
-  function updateSiteScheduleDraft(
-    jobId: string,
-    updater: (draft: SiteScheduleDraft) => SiteScheduleDraft
-  ) {
-    setSiteScheduleDrafts((drafts) => {
-      const current = drafts[jobId] ?? {
-        startTime: "06:30",
-        workerIds: [],
-        leadingHandWorkerId: ""
-      };
-      return {
-        ...drafts,
-        [jobId]: updater(current)
-      };
-    });
-  }
-
-  function toggleSiteScheduleContractor(jobId: string, workerId: string, checked: boolean) {
-    updateSiteScheduleDraft(jobId, (draft) => {
+  function toggleParticipationRequestContractor(workerId: string, checked: boolean) {
+    setParticipationRequestDraft((draft) => {
       const workerIds = checked
         ? [...new Set([...draft.workerIds, workerId])]
         : draft.workerIds.filter((id) => id !== workerId);
-      const leadingHandWorkerId = workerIds.includes(draft.leadingHandWorkerId)
-        ? draft.leadingHandWorkerId
-        : "";
-
       return {
         ...draft,
         workerIds,
-        leadingHandWorkerId
+        projectLeadWorkerId: workerIds.includes(draft.projectLeadWorkerId)
+          ? draft.projectLeadWorkerId
+          : ""
       };
     });
   }
 
-  function saveProjectParticipants(jobId: string) {
-    const feedbackKey = `project-participants:${jobId}`;
-    const draft = siteScheduleDrafts[jobId] ?? {
-      startTime: "06:30",
-      workerIds: [],
-      leadingHandWorkerId: ""
-    };
-
-    if (
-      draft.workerIds.length > 0 &&
-      (!draft.leadingHandWorkerId || !draft.workerIds.includes(draft.leadingHandWorkerId))
-    ) {
-      setLocalFeedback(
-        feedbackKey,
-        "error",
-        "Choose one Project Lead from the selected participants."
-      );
+  function publishParticipationRequest() {
+    const feedbackKey = "participation-request";
+    if (!participationRequestDraft.jobId || participationRequestDraft.workerIds.length === 0) {
+      setLocalFeedback(feedbackKey, "error", "Choose a project and at least one contractor.");
       return;
     }
 
     if (!demoMode) {
       runSupabaseAction(
         () =>
-          saveProjectParticipantsAction({
-            jobId,
-            startTime: draft.startTime,
-            workerIds: draft.workerIds,
-            leadingHandWorkerId: draft.leadingHandWorkerId || undefined
+          publishProjectParticipationRequestAction({
+            jobId: participationRequestDraft.jobId,
+            participationDate: participationRequestDraft.participationDate,
+            siteAccessTime: participationRequestDraft.siteAccessTime,
+            scopeNote: participationRequestDraft.scopeNote,
+            workerIds: participationRequestDraft.workerIds,
+            projectLeadWorkerId: participationRequestDraft.projectLeadWorkerId || undefined
           }),
-        "Saving participants",
+        "Publishing Project Participation Request",
         feedbackKey
       );
       return;
     }
 
     setData((current) => {
-      const selectedWorkerIds = new Set(draft.workerIds);
-      const retainedParticipations = current.projectParticipations.map((participation) => {
-        if (
-          participation.jobId === jobId &&
-          participation.status === "confirmed" &&
-          !selectedWorkerIds.has(participation.workerId)
-        ) {
-          return {
-            ...participation,
-            status: "declined" as const,
-            updatedAt: new Date().toISOString()
-          };
-        }
-
-        return participation;
-      });
-      const nextParticipations = draft.workerIds.map((workerId) => {
-        const existing = retainedParticipations.find(
-          (participation) => participation.jobId === jobId && participation.workerId === workerId
+      const nextRequests = participationRequestDraft.workerIds.map((workerId) => {
+        const existing = current.projectParticipationRequests.find(
+          (request) =>
+            request.jobId === participationRequestDraft.jobId &&
+            request.workerId === workerId &&
+            request.participationDate === participationRequestDraft.participationDate
         );
         return {
-          id: existing?.id ?? `participation-${jobId}-${workerId}`,
-          jobId,
+          id: existing?.id ?? `participation-request-${Date.now()}-${workerId}`,
+          jobId: participationRequestDraft.jobId,
           workerId,
-          status: "confirmed" as const,
-          inductionStatus: existing?.inductionStatus ?? ("pending" as const),
-          inductedAt: existing?.inductedAt,
-          scopeAcknowledgedAt: existing?.scopeAcknowledgedAt ?? new Date().toISOString(),
-          notes: existing?.notes,
+          participationDate: participationRequestDraft.participationDate,
+          siteAccessTime: participationRequestDraft.siteAccessTime,
+          scopeNote: participationRequestDraft.scopeNote || undefined,
+          status: existing?.status ?? ("proposed" as const),
+          confirmationSource: existing?.confirmationSource,
+          confirmedAt: existing?.confirmedAt,
+          confirmedBy: existing?.confirmedBy,
+          projectLeadWorkerId: participationRequestDraft.projectLeadWorkerId || undefined,
+          createdBy: currentUserId,
           createdAt: existing?.createdAt ?? new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
       });
-      const withoutSelected = retainedParticipations.filter(
-        (participation) =>
-          !nextParticipations.some(
-            (next) =>
-              next.jobId === participation.jobId && next.workerId === participation.workerId
-          )
-      );
-
       return {
         ...current,
-        projectParticipations: [...withoutSelected, ...nextParticipations]
+        projectParticipationRequests: [
+          ...current.projectParticipationRequests.filter(
+            (request) =>
+              !nextRequests.some(
+                (next) =>
+                  next.jobId === request.jobId &&
+                  next.workerId === request.workerId &&
+                  next.participationDate === request.participationDate
+              )
+          ),
+          ...nextRequests
+        ]
       };
     });
-    setLocalFeedback(feedbackKey, "success", "Project participants saved in demo mode.");
+    setLocalFeedback(feedbackKey, "success", "Project Participation Request published in demo mode.");
   }
 
-  function saveDailySiteSchedule() {
-    const feedbackKey = "project-allocation";
-    const scheduledSites = activeScheduleJobs.map((job) => {
-      const draft = siteScheduleDrafts[job.id] ?? {
-        startTime: "06:30",
-        workerIds: [],
-        leadingHandWorkerId: ""
-      };
-      return {
-        jobId: job.id,
-        startTime: draft.startTime,
-        workerIds: draft.workerIds,
-        leadingHandWorkerId: draft.leadingHandWorkerId || undefined
-      };
-    });
-    const invalidSite = scheduledSites.find(
-      (site) =>
-        site.workerIds.length > 0 &&
-        (!site.leadingHandWorkerId || !site.workerIds.includes(site.leadingHandWorkerId))
-    );
-
-    if (invalidSite) {
-      setLocalFeedback(feedbackKey, "error", "Choose a Project Lead from active project participants for each project.");
-      return;
-    }
-
+  function confirmParticipationRequest(requestId: string) {
+    const feedbackKey = `participation-request:${requestId}`;
     if (!demoMode) {
       runSupabaseAction(
-        () =>
-          saveDailySiteScheduleAction({
-            date: siteScheduleDate,
-            sites: scheduledSites
-          }),
-        "Saving project allocation",
+        () => confirmProjectParticipationRequestAction(requestId),
+        "Confirming project participation",
         feedbackKey
       );
       return;
     }
 
     setData((current) => {
-      const jobIds = new Set(scheduledSites.map((site) => site.jobId));
-      const selectedWorkerIds = new Set(scheduledSites.flatMap((site) => site.workerIds));
-      const retainedAssignments = current.adminAssignments.filter(
-        (assignment) =>
-          assignment.date !== siteScheduleDate ||
-          (!jobIds.has(assignment.jobId) && !selectedWorkerIds.has(assignment.workerId))
+      const request = current.projectParticipationRequests.find((item) => item.id === requestId);
+      if (!request) {
+        return current;
+      }
+      const alreadyConfirmed = current.projectParticipationRequests.some(
+        (item) =>
+          item.id !== requestId &&
+          item.workerId === request.workerId &&
+          item.participationDate === request.participationDate &&
+          item.status === "contractor_confirmed"
       );
-      const nextAssignments = scheduledSites.flatMap((site) =>
-        site.workerIds.map((workerId) => ({
-          id: `admin-assignment-${site.jobId}-${workerId}-${siteScheduleDate}`,
-          jobId: site.jobId,
-          workerId,
-          date: siteScheduleDate,
-          startTime: site.startTime,
-          role: workerId === site.leadingHandWorkerId ? "leading_hand" as const : "worker" as const,
-          createdAt: new Date().toISOString()
-        }))
-      );
-      const nextParticipations = scheduledSites.flatMap((site) =>
-        site.workerIds.map((workerId) => {
-          const existing = current.projectParticipations.find(
-            (participation) =>
-              participation.jobId === site.jobId && participation.workerId === workerId
-          );
-          return {
-            id: existing?.id ?? `participation-${site.jobId}-${workerId}`,
-            jobId: site.jobId,
-            workerId,
-            status: "confirmed" as const,
-            scopeAcknowledgedAt: existing?.scopeAcknowledgedAt ?? new Date().toISOString(),
-            notes: existing?.notes,
-            createdAt: existing?.createdAt ?? new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-        })
-      );
-      const retainedParticipations = current.projectParticipations.filter(
-        (participation) =>
-          !nextParticipations.some(
-            (next) =>
-              next.jobId === participation.jobId && next.workerId === participation.workerId
-          )
-      );
-      const selectedByJob = new Map(
-        scheduledSites.map((site) => [site.jobId, new Set(site.workerIds)])
-      );
-      const declinedRemovedParticipations = retainedParticipations.map((participation) => {
-        const selectedWorkerIds = selectedByJob.get(participation.jobId);
-        if (
-          selectedWorkerIds &&
-          participation.status === "confirmed" &&
-          !selectedWorkerIds.has(participation.workerId)
-        ) {
-          return {
-            ...participation,
-            status: "declined" as const,
-            updatedAt: new Date().toISOString()
-          };
-        }
-
-        return participation;
-      });
-
+      if (alreadyConfirmed) {
+        setLocalFeedback(feedbackKey, "error", "You have already confirmed project participation for this date.");
+        return current;
+      }
       return {
         ...current,
-        adminAssignments: [...retainedAssignments, ...nextAssignments],
-        projectParticipations: [...declinedRemovedParticipations, ...nextParticipations]
+        projectParticipationRequests: current.projectParticipationRequests.map((item) =>
+          item.id === requestId
+            ? {
+                ...item,
+                status: "contractor_confirmed" as const,
+                confirmationSource: "contractor_app" as const,
+                confirmedAt: new Date().toISOString(),
+                confirmedBy: currentUserId,
+                updatedAt: new Date().toISOString()
+              }
+            : item
+        )
       };
     });
-    setLocalFeedback(feedbackKey, "success", "Project allocation board saved in demo mode.");
+    setLocalFeedback(feedbackKey, "success", "Confirmed project participation.");
+  }
+
+  function markParticipationRequestUnable(requestId: string) {
+    const feedbackKey = `participation-request:${requestId}`;
+    if (!demoMode) {
+      runSupabaseAction(
+        () => markProjectParticipationRequestUnableAction(requestId),
+        "Updating project participation",
+        feedbackKey
+      );
+      return;
+    }
+
+    setData((current) => ({
+      ...current,
+      projectParticipationRequests: current.projectParticipationRequests.map((request) =>
+        request.id === requestId
+          ? { ...request, status: "unable_to_participate" as const, updatedAt: new Date().toISOString() }
+          : request
+      )
+    }));
+    setLocalFeedback(feedbackKey, "success", "Project participation marked unavailable.");
   }
 
   function saveWorkEntryFromDraft() {
@@ -2607,6 +2490,27 @@ export function DashboardShell({
 
     if (existingEntry?.locked || existingEntry?.approved) {
       setLocalFeedback(feedbackKey, "error", "Approved production records are locked.");
+      return;
+    }
+
+    const sameDateRequests = data.projectParticipationRequests.filter(
+      (request) =>
+        request.workerId === assignment.workerId &&
+        request.participationDate === assignment.date &&
+        request.status !== "withdrawn"
+    );
+    const confirmedRequest = sameDateRequests.find(
+      (request) =>
+        request.jobId === assignment.jobId &&
+        request.status === "contractor_confirmed"
+    );
+
+    if (sameDateRequests.length > 0 && !confirmedRequest) {
+      setLocalFeedback(
+        feedbackKey,
+        "error",
+        "Confirm your project participation to continue with production entry."
+      );
       return;
     }
 
@@ -3365,10 +3269,101 @@ export function DashboardShell({
                   </button>
                 </div>
               </InfoCard>
-            ) : null}
+	            ) : null}
 
-            {availableProjectCards.length > 0 ? (
-              <InfoCard icon={BriefcaseBusiness} title="Available Projects">
+	            <InfoCard icon={CalendarDays} title="Project Participation Requests">
+	              {contractorParticipationRequests.length > 0 ? (
+	                <div className="grid gap-3">
+	                  {contractorParticipationRequests.slice(0, 6).map((request) => {
+	                    const job = data.adminJobs.find((item) => item.id === request.jobId);
+	                    const confirmedForDate = contractorConfirmedRequestByDate.get(request.participationDate);
+	                    const confirmedElsewhere = Boolean(
+	                      confirmedForDate && confirmedForDate.id !== request.id
+	                    );
+	                    const canConfirm =
+	                      request.status === "proposed" && !confirmedElsewhere;
+	                    return (
+	                      <article className="rounded-lg border border-gray-200 bg-gray-50 p-4" key={request.id}>
+	                        <div className="flex flex-wrap items-start justify-between gap-2">
+	                          <div>
+	                            <p className="text-lg font-black text-blue-950">
+	                              {job?.siteName ?? adminJobName(data, request.jobId)}
+	                            </p>
+	                            <p className="mt-1 text-sm text-gray-700">
+	                              Project date: {request.participationDate} · Site access time: {request.siteAccessTime}
+	                            </p>
+	                          </div>
+	                          <StatusBadge tone={participationRequestStatusTone(request.status)}>
+	                            {formatParticipationRequestStatus(request.status)}
+	                          </StatusBadge>
+	                        </div>
+	                        <div className="mt-3 grid gap-2 text-sm text-gray-700">
+	                          <p>{request.scopeNote || job?.scopeSummary || "Project participation opportunity."}</p>
+	                          <p>
+	                            Project lead for this date:{" "}
+	                            {request.projectLeadWorkerId
+	                              ? adminWorkerName(data, request.projectLeadWorkerId)
+	                              : "To be confirmed"}
+	                          </p>
+	                          {confirmedElsewhere ? (
+	                            <p className="rounded-md bg-orange-50 p-3 font-bold text-orange-800">
+	                              You have already confirmed project participation for this date.
+	                            </p>
+	                          ) : null}
+	                        </div>
+	                        <div className="mt-3 flex flex-wrap gap-2">
+	                          {canConfirm ? (
+	                            <button
+	                              className="dashboard-button dashboard-button-primary"
+	                              disabled={isActionPending(`participation-request:${request.id}`)}
+	                              onClick={() => confirmParticipationRequest(request.id)}
+	                              type="button"
+	                            >
+	                              Confirm participation
+	                            </button>
+	                          ) : null}
+	                          {request.status === "proposed" ? (
+	                            <button
+	                              className="dashboard-button dashboard-button-outline"
+	                              disabled={isActionPending(`participation-request:${request.id}`)}
+	                              onClick={() => markParticipationRequestUnable(request.id)}
+	                              type="button"
+	                            >
+	                              Unable to participate
+	                            </button>
+	                          ) : null}
+	                        </div>
+	                        <ActionFeedbackMessage feedback={actionFeedbacks[`participation-request:${request.id}`]} />
+	                      </article>
+	                    );
+	                  })}
+	                </div>
+	              ) : (
+	                <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
+	                  No project participation requests are available yet.
+	                </p>
+	              )}
+	            </InfoCard>
+
+	            {contractorConfirmedParticipationRequests.length > 0 ? (
+	              <InfoCard icon={CheckCircle2} title="Confirmed project participation">
+	                <div className="grid gap-3">
+	                  {contractorConfirmedParticipationRequests.slice(0, 4).map((request) => (
+	                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4" key={request.id}>
+	                      <p className="font-black text-blue-950">
+	                        {adminJobName(data, request.jobId)}
+	                      </p>
+	                      <p className="mt-1 text-sm font-bold text-emerald-800">
+	                        {request.participationDate} · Site access time {request.siteAccessTime}
+	                      </p>
+	                    </div>
+	                  ))}
+	                </div>
+	              </InfoCard>
+	            ) : null}
+
+	            {availableProjectCards.length > 0 ? (
+	              <InfoCard icon={BriefcaseBusiness} title="Available Projects">
                 <div className="grid gap-3">
                   {availableProjectCards.slice(0, 3).map((job) => {
                     const participation = currentParticipationByJobId.get(job.id);
@@ -3605,9 +3600,91 @@ export function DashboardShell({
         )
       ) : null}
 
-      {activeTab === "jobs" ? (
-        <DashboardGrid>
-          {contractorVisibleProjectCards.map((job) => {
+	      {activeTab === "jobs" ? (
+	        <DashboardGrid>
+	          {role !== "admin" ? (
+	            <InfoCard icon={CalendarDays} title="Project Participation Requests">
+	              {contractorParticipationRequests.length > 0 ? (
+	                <div className="grid gap-3">
+	                  {contractorParticipationRequests.slice(0, 6).map((request) => {
+	                    const job = data.adminJobs.find((item) => item.id === request.jobId);
+	                    const confirmedForDate = contractorConfirmedRequestByDate.get(request.participationDate);
+	                    const confirmedElsewhere = Boolean(
+	                      confirmedForDate && confirmedForDate.id !== request.id
+	                    );
+	                    const canConfirm = request.status === "proposed" && !confirmedElsewhere;
+	                    return (
+	                      <article className="rounded-lg border border-gray-200 bg-gray-50 p-4" key={request.id}>
+	                        <div className="flex flex-wrap items-start justify-between gap-2">
+	                          <div>
+	                            <p className="text-lg font-black text-blue-950">
+	                              {job?.siteName ?? adminJobName(data, request.jobId)}
+	                            </p>
+	                            <p className="mt-1 text-sm text-gray-700">
+	                              Project date: {request.participationDate} · Site access time: {request.siteAccessTime}
+	                            </p>
+	                          </div>
+	                          <StatusBadge tone={participationRequestStatusTone(request.status)}>
+	                            {formatParticipationRequestStatus(request.status)}
+	                          </StatusBadge>
+	                        </div>
+	                        <p className="mt-3 text-sm text-gray-700">
+	                          {request.scopeNote || job?.scopeSummary || "Project participation opportunity."}
+	                        </p>
+	                        {confirmedElsewhere ? (
+	                          <p className="mt-3 rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-800">
+	                            You have already confirmed project participation for this date.
+	                          </p>
+	                        ) : null}
+	                        <div className="mt-3 flex flex-wrap gap-2">
+	                          {canConfirm ? (
+	                            <button
+	                              className="dashboard-button dashboard-button-primary"
+	                              disabled={isActionPending(`participation-request:${request.id}`)}
+	                              onClick={() => confirmParticipationRequest(request.id)}
+	                              type="button"
+	                            >
+	                              Confirm participation
+	                            </button>
+	                          ) : null}
+	                          {request.status === "proposed" ? (
+	                            <button
+	                              className="dashboard-button dashboard-button-outline"
+	                              disabled={isActionPending(`participation-request:${request.id}`)}
+	                              onClick={() => markParticipationRequestUnable(request.id)}
+	                              type="button"
+	                            >
+	                              Unable to participate
+	                            </button>
+	                          ) : null}
+	                        </div>
+	                        <ActionFeedbackMessage feedback={actionFeedbacks[`participation-request:${request.id}`]} />
+	                      </article>
+	                    );
+	                  })}
+	                </div>
+	              ) : (
+	                <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
+	                  No project participation requests are available yet.
+	                </p>
+	              )}
+	            </InfoCard>
+	          ) : null}
+	          {role !== "admin" && contractorConfirmedParticipationRequests.length > 0 ? (
+	            <InfoCard icon={CheckCircle2} title="Confirmed project participation">
+	              <div className="grid gap-3">
+	                {contractorConfirmedParticipationRequests.slice(0, 4).map((request) => (
+	                  <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4" key={request.id}>
+	                    <p className="font-black text-blue-950">{adminJobName(data, request.jobId)}</p>
+	                    <p className="mt-1 text-sm font-bold text-emerald-800">
+	                      {request.participationDate} · Site access time {request.siteAccessTime}
+	                    </p>
+	                  </div>
+	                ))}
+	              </div>
+	            </InfoCard>
+	          ) : null}
+	          {contractorVisibleProjectCards.map((job) => {
               const participation = currentParticipationByJobId.get(job.id);
               const induction = data.projectInductions.find(
                 (item) =>
@@ -3646,9 +3723,45 @@ export function DashboardShell({
         </DashboardGrid>
       ) : null}
 
-      {activeTab === "workEntries" && role !== "admin" ? (
-        <section className="grid gap-4">
-          <InfoCard icon={Hammer} title="Production Records">
+	      {activeTab === "workEntries" && role !== "admin" ? (
+	        <section className="grid gap-4">
+	          {contractorParticipationRequests
+	            .filter(
+	              (request) =>
+	                request.participationDate === today &&
+	                request.status === "proposed" &&
+	                !contractorConfirmedRequestByDate.get(today)
+	            )
+	            .map((request) => (
+	              <InfoCard icon={CalendarDays} key={request.id} title="Project Participation Requests">
+	                <p className="text-sm font-bold text-gray-700">
+	                  Confirm your project participation to continue with production entry.
+	                </p>
+	                <p className="mt-2 text-sm text-gray-700">
+	                  {adminJobName(data, request.jobId)} · Project date {request.participationDate} · Site access time {request.siteAccessTime}
+	                </p>
+	                <div className="mt-3 flex flex-wrap gap-2">
+	                  <button
+	                    className="dashboard-button dashboard-button-primary"
+	                    disabled={isActionPending(`participation-request:${request.id}`)}
+	                    onClick={() => confirmParticipationRequest(request.id)}
+	                    type="button"
+	                  >
+	                    Confirm participation
+	                  </button>
+	                  <button
+	                    className="dashboard-button dashboard-button-outline"
+	                    disabled={isActionPending(`participation-request:${request.id}`)}
+	                    onClick={() => markParticipationRequestUnable(request.id)}
+	                    type="button"
+	                  >
+	                    Unable to participate
+	                  </button>
+	                </div>
+	                <ActionFeedbackMessage feedback={actionFeedbacks[`participation-request:${request.id}`]} />
+	              </InfoCard>
+	            ))}
+	          <InfoCard icon={Hammer} title="Production Records">
             {contractorProductionItems.length > 0 ? (
               <div className="grid gap-3">
                 {contractorProductionItems.map((assignment) => {
@@ -5929,300 +6042,183 @@ export function DashboardShell({
 
       {activeTab === "adminJobs" && role === "admin" ? (
         <section className="grid gap-4">
-          <InfoCard icon={CalendarDays} title="Project Allocation Board">
-            <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
-              <label className="dashboard-label">
-                Project activity date
-                <input
-                  className="dashboard-field"
-                  onChange={(event) => setSiteScheduleDate(event.target.value)}
-                  type="date"
-                  value={siteScheduleDate}
-                />
-              </label>
-              <div className="rounded-lg bg-orange-50 p-3 text-sm font-bold text-orange-800">
-                Project-first allocation keeps each subcontractor linked to one active project
-                for the date. Project Lead is selected per project/date only.
-              </div>
-            </div>
-          </InfoCard>
+	          <InfoCard icon={CalendarDays} title="Project Participation Coordination">
+	            <div className="grid gap-3 md:grid-cols-3">
+	              <label className="dashboard-label">
+	                Project date
+	                <input
+	                  className="dashboard-field"
+	                  onChange={(event) =>
+	                    setParticipationRequestDraft((draft) => ({
+	                      ...draft,
+	                      participationDate: event.target.value
+	                    }))
+	                  }
+	                  type="date"
+	                  value={participationRequestDraft.participationDate}
+	                />
+	              </label>
+	              <AdminSelect
+	                label="Project / subcontract scope"
+	                onChange={(value) =>
+	                  setParticipationRequestDraft((draft) => ({
+	                    ...draft,
+	                    jobId: value
+	                  }))
+	                }
+	                options={[
+	                  { label: "Choose project", value: "" },
+	                  ...activeScheduleJobs.map((job) => ({
+	                    label: job.siteName,
+	                    value: job.id
+	                  }))
+	                ]}
+	                value={participationRequestDraft.jobId}
+	              />
+	              <label className="dashboard-label">
+	                Site access time
+	                <input
+	                  className="dashboard-field"
+	                  onChange={(event) =>
+	                    setParticipationRequestDraft((draft) => ({
+	                      ...draft,
+	                      siteAccessTime: event.target.value
+	                    }))
+	                  }
+	                  type="time"
+	                  value={participationRequestDraft.siteAccessTime}
+	                />
+	              </label>
+	            </div>
+	            <label className="dashboard-label mt-3">
+	              Optional scope/site note
+	              <textarea
+	                className="dashboard-field min-h-20"
+	                onChange={(event) =>
+	                  setParticipationRequestDraft((draft) => ({
+	                    ...draft,
+	                    scopeNote: event.target.value
+	                  }))
+	                }
+	                value={participationRequestDraft.scopeNote}
+	              />
+	            </label>
+	            {selectedParticipationRequestJob ? (
+	              <p className="mt-3 rounded-md bg-gray-50 p-3 text-sm font-bold text-gray-700">
+	                {selectedParticipationRequestJob.clientCompany} · {selectedParticipationRequestJob.location}
+	              </p>
+	            ) : null}
+	            <div className="mt-4 grid max-h-80 gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
+	              {data.adminWorkers.filter((worker) => worker.isActive).map((worker) => {
+	                const checked = participationRequestDraft.workerIds.includes(worker.id);
+	                const confirmedElsewhere = participationRequestsForSelectedDate.some(
+	                  (request) =>
+	                    request.workerId === worker.id &&
+	                    request.jobId !== participationRequestDraft.jobId &&
+	                    request.status === "contractor_confirmed"
+	                );
+	                return (
+	                  <label
+	                    className={cn(
+	                      "flex items-start gap-3 rounded-md border bg-white p-3 text-sm font-bold",
+	                      confirmedElsewhere ? "border-gray-200 text-gray-400" : "border-gray-200 text-gray-800"
+	                    )}
+	                    key={worker.id}
+	                  >
+	                    <input
+	                      checked={checked}
+	                      className="mt-1 size-5 accent-blue-950"
+	                      disabled={confirmedElsewhere}
+	                      onChange={(event) => toggleParticipationRequestContractor(worker.id, event.target.checked)}
+	                      type="checkbox"
+	                    />
+	                    <span>
+	                      {worker.fullName}
+	                      {worker.trade ? <span className="block text-xs text-gray-500">{worker.trade}</span> : null}
+	                      {confirmedElsewhere ? (
+	                        <span className="block text-xs font-bold text-orange-700">
+	                          Already confirmed for another project on this date
+	                        </span>
+	                      ) : null}
+	                    </span>
+	                  </label>
+	                );
+	              })}
+	            </div>
+	            <AdminSelect
+	              label="Project lead for this date"
+	              onChange={(value) =>
+	                setParticipationRequestDraft((draft) => ({
+	                  ...draft,
+	                  projectLeadWorkerId: value
+	                }))
+	              }
+	              options={[
+	                { label: "Choose from requested contractors", value: "" },
+	                ...participationRequestDraft.workerIds.map((workerId) => ({
+	                  label: adminWorkerName(data, workerId),
+	                  value: workerId
+	                }))
+	              ]}
+	              value={participationRequestDraft.projectLeadWorkerId}
+	            />
+	            <button
+	              className="dashboard-button dashboard-button-primary mt-4 w-full"
+	              disabled={isActionPending("participation-request")}
+	              onClick={publishParticipationRequest}
+	              type="button"
+	            >
+	              {isActionPending("participation-request")
+	                ? "Publishing participation request..."
+	                : "Publish participation request"}
+	            </button>
+	            <ActionFeedbackMessage feedback={actionFeedbacks["participation-request"]} />
+	          </InfoCard>
 
-          {activeScheduleJobs.map((job) => {
-            const draft = siteScheduleDrafts[job.id] ?? {
-              startTime: "06:30",
-              workerIds: [],
-              leadingHandWorkerId: ""
-            };
-            const search = contractorSearchBySite[job.id]?.toLowerCase() ?? "";
-            const activeContractors = data.adminWorkers.filter((worker) => worker.isActive);
-            const filteredContractors = activeContractors.filter((worker) => {
-              const label = `${worker.fullName} ${worker.trade ?? ""}`.toLowerCase();
-              return !search || label.includes(search);
-            });
-
-            return (
-              <InfoCard icon={BriefcaseBusiness} key={job.id} title={job.siteName}>
-                <div className="grid gap-3 md:grid-cols-[180px_1fr]">
-                  <label className="dashboard-label">
-                    Start time
-                    <input
-                      className="dashboard-field"
-                      onChange={(event) =>
-                        updateSiteScheduleDraft(job.id, (current) => ({
-                          ...current,
-                          startTime: event.target.value
-                        }))
-                      }
-                      type="time"
-                      value={draft.startTime}
-                    />
-                  </label>
-                  <div className="text-sm text-gray-700">
-                    <p className="font-bold text-blue-950">{job.clientCompany}</p>
-                    <p>{job.location}</p>
-                    <p>
-                      Estimated dates: {job.startDate} to {job.endDate}
-                    </p>
-                    {isActiveBeyondEstimate(job, today) ? (
-                      <span className="mt-1 inline-flex">
-                        <StatusBadge tone="info">Active beyond estimate</StatusBadge>
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <label className="dashboard-label mt-4">
-                  Search available subcontractors
-                  <input
-                    className="dashboard-field"
-                    onChange={(event) =>
-                      setContractorSearchBySite((current) => ({
-                        ...current,
-                        [job.id]: event.target.value
-                      }))
-                    }
-                    placeholder="Name or trade"
-                    value={contractorSearchBySite[job.id] ?? ""}
-                  />
-                </label>
-
-                <div className="mt-4 grid max-h-80 gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  {filteredContractors.map((worker) => {
-                    const assignedSiteId = scheduledWorkerSiteById.get(worker.id);
-                    const selectedHere = draft.workerIds.includes(worker.id);
-                    const unavailable = Boolean(assignedSiteId && assignedSiteId !== job.id);
-                    const assignedSiteName = unavailable
-                      ? data.adminJobs.find((item) => item.id === assignedSiteId)?.siteName
-                      : undefined;
-
-                    return (
-                      <label
-                        className={cn(
-                          "flex items-start gap-3 rounded-md border bg-white p-3 text-sm font-bold",
-                          unavailable
-                            ? "border-gray-200 text-gray-400"
-                            : "border-gray-200 text-gray-800"
-                        )}
-                        key={worker.id}
-                      >
-                        <input
-                          checked={selectedHere}
-                          className="mt-1 size-5 accent-blue-950"
-                          disabled={unavailable}
-                          onChange={(event) =>
-                            toggleSiteScheduleContractor(
-                              job.id,
-                              worker.id,
-                              event.target.checked
-                            )
-                          }
-                          type="checkbox"
-                        />
-                        <span>
-                          {worker.fullName}
-                          {worker.trade ? (
-                            <span className="block text-xs font-bold text-gray-500">
-                              {worker.trade}
-                            </span>
-                          ) : null}
-                          <span className="mt-1 inline-flex">
-                            <StatusBadge tone={availabilityTone(worker.availabilityStatus)}>
-                              {formatAvailabilityStatus(worker.availabilityStatus)}
-                            </StatusBadge>
-                          </span>
-                          {unavailable ? (
-                            <span className="block text-xs font-bold text-orange-700">
-                              Already participating in {assignedSiteName ?? "another project"}
-                            </span>
-                          ) : null}
-                        </span>
-                      </label>
-                    );
-                  })}
-                  {filteredContractors.length === 0 ? (
-                    <p className="rounded-md bg-white p-3 text-sm font-bold text-gray-600">
-                      No available subcontractors match this search.
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
-                  <p className="text-sm font-black text-blue-950">Active Project Participants</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {draft.workerIds.map((workerId) => (
-                      <span
-                        className="rounded-full bg-white px-3 py-2 text-xs font-black text-blue-950 shadow-sm"
-                        key={workerId}
-                      >
-                        {adminWorkerName(data, workerId)}
-                      </span>
-                    ))}
-                    {draft.workerIds.length === 0 ? (
-                      <span className="text-sm font-bold text-gray-600">
-                        No active participants selected for this project.
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                {draft.workerIds.length > 0 ? (
-                  <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-sm font-black text-blue-950">
-                      Project induction status
-                    </p>
-                    <div className="mt-3 grid gap-2">
-                      {draft.workerIds.map((workerId) => {
-                        const induction = data.projectInductions.find(
-                          (item) => item.jobId === job.id && item.workerId === workerId
-                        );
-                        return (
-                          <div
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white p-3"
-                            key={workerId}
-                          >
-                            <div>
-                              <p className="text-sm font-black text-blue-950">
-                                {adminWorkerName(data, workerId)}
-                              </p>
-                              <StatusBadge tone={inductionTone(induction?.status ?? "pending")}>
-                                {formatInductionStatus(induction?.status ?? "pending")}
-                              </StatusBadge>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                className="dashboard-button dashboard-button-outline"
-                                disabled={isActionPending(`induction:${job.id}:${workerId}`)}
-                                onClick={() => updateProjectInduction(job.id, workerId, "pending")}
-                                type="button"
-                              >
-                                {isActionPending(`induction:${job.id}:${workerId}`) ? "Saving..." : "Pending"}
-                              </button>
-                              <button
-                                className="dashboard-button dashboard-button-primary"
-                                disabled={isActionPending(`induction:${job.id}:${workerId}`)}
-                                onClick={() => updateProjectInduction(job.id, workerId, "inducted")}
-                                type="button"
-                              >
-                                {isActionPending(`induction:${job.id}:${workerId}`) ? "Saving..." : "Mark inducted"}
-                              </button>
-                            </div>
-                            <ActionFeedbackMessage feedback={actionFeedbacks[`induction:${job.id}:${workerId}`]} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : null}
-
-                <AdminSelect
-                  label="Project Lead"
-                  onChange={(value) =>
-                    updateSiteScheduleDraft(job.id, (current) => ({
-                      ...current,
-                      leadingHandWorkerId: value
-                    }))
-                  }
-                  options={[
-                    { label: "Choose from active project participants", value: "" },
-                    ...draft.workerIds.map((workerId) => ({
-                      label: adminWorkerName(data, workerId),
-                      value: workerId
-                    }))
-                  ]}
-                  value={draft.leadingHandWorkerId}
-                />
-                {draft.workerIds.length > 0 && !draft.leadingHandWorkerId ? (
-                  <p className="mt-2 rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-800">
-                    Choose one active project participant as Project Lead.
-                  </p>
-                ) : null}
-                <button
-                  className="dashboard-button dashboard-button-primary mt-4 w-full"
-                  disabled={isActionPending(`project-participants:${job.id}`)}
-                  onClick={() => saveProjectParticipants(job.id)}
-                  type="button"
-                >
-                  {isActionPending(`project-participants:${job.id}`)
-                    ? "Saving participants..."
-                    : "Save participants"}
-                </button>
-                <ActionFeedbackMessage feedback={actionFeedbacks[`project-participants:${job.id}`]} />
-              </InfoCard>
-            );
-          })}
-
-          {activeScheduleJobs.length === 0 ? (
-            <InfoCard icon={CalendarDays} title="No active sites">
-              <p className="text-sm font-bold text-gray-600">
-                No active projects are available for {siteScheduleDate}.
-              </p>
-            </InfoCard>
-          ) : null}
-
-          <InfoCard icon={CheckCircle2} title="Review and save">
-            <div className="grid gap-3">
-              {siteScheduleReview.map(({ job, draft }) => (
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4" key={job.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <p className="font-black text-blue-950">{job.siteName}</p>
-                      <p className="mt-1 text-sm text-gray-700">
-                        {siteScheduleDate} · Start {draft.startTime}
-                      </p>
-                    </div>
-                    <StatusBadge tone={draft.leadingHandWorkerId ? "good" : "warning"}>
-                      {draft.leadingHandWorkerId ? "ready" : "needs project lead"}
-                    </StatusBadge>
-                  </div>
-                  <p className="mt-3 text-sm font-bold text-gray-700">
-                    Project Lead:{" "}
-                    {draft.leadingHandWorkerId
-                      ? adminWorkerName(data, draft.leadingHandWorkerId)
-                      : "Not selected"}
-                  </p>
-                  <p className="mt-1 text-sm text-gray-700">
-                    Project Team: {draft.workerIds.map((id) => adminWorkerName(data, id)).join(", ")}
-                  </p>
-                </div>
-              ))}
-              {siteScheduleReview.length === 0 ? (
-                <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
-                  Select active project participants under one or more projects before saving.
-                </p>
-              ) : null}
-            </div>
-            <button
-              className="dashboard-button dashboard-button-primary mt-4 w-full"
-              disabled={isActionPending("project-allocation")}
-              onClick={saveDailySiteSchedule}
-              type="button"
-            >
-              {isActionPending("project-allocation")
-                ? "Saving allocation..."
-                : "Save project allocation board"}
-            </button>
-            <ActionFeedbackMessage feedback={actionFeedbacks["project-allocation"]} />
-          </InfoCard>
+	          <InfoCard icon={CheckCircle2} title="Project date request summary">
+	            <div className="grid gap-3">
+	              {participationRequestGroups.map((group) => {
+	                const job = data.adminJobs.find((item) => item.id === group.jobId);
+	                return (
+	                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4" key={`${group.jobId}:${group.participationDate}`}>
+	                  <div className="flex flex-wrap items-start justify-between gap-2">
+	                    <div>
+	                      <p className="font-black text-blue-950">{job?.siteName ?? adminJobName(data, group.jobId)}</p>
+	                      <p className="mt-1 text-sm text-gray-700">
+	                        Project date {group.participationDate} · Site access time {group.siteAccessTime}
+	                      </p>
+	                    </div>
+	                    <StatusBadge tone="info">
+	                      {group.requests.length} requested
+	                    </StatusBadge>
+	                  </div>
+	                  <div className="mt-3 grid gap-2">
+	                    {group.requests.map((request) => (
+	                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white p-3" key={request.id}>
+	                        <p className="text-sm font-black text-blue-950">
+	                          {adminWorkerName(data, request.workerId)}
+	                        </p>
+	                        <div className="flex flex-wrap gap-2">
+	                          <StatusBadge tone={participationRequestStatusTone(request.status)}>
+	                            {formatParticipationRequestStatus(request.status)}
+	                          </StatusBadge>
+	                          {group.productionSubmittedWorkerIds.has(request.workerId) ? (
+	                            <StatusBadge tone="info">Production submitted</StatusBadge>
+	                          ) : null}
+	                        </div>
+	                      </div>
+	                    ))}
+	                  </div>
+	                </div>
+	              );
+	              })}
+	              {participationRequestGroups.length === 0 ? (
+	                <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
+	                  No Project Participation Requests are published for the selected project date.
+	                </p>
+	              ) : null}
+	            </div>
+	          </InfoCard>
         </section>
       ) : null}
 
@@ -7383,6 +7379,27 @@ function formatParticipationStatus(status: string) {
   return labels[status] ?? status;
 }
 
+function formatParticipationRequestStatus(status: string) {
+  const labels: Record<string, string> = {
+    proposed: "Pending confirmation",
+    contractor_confirmed: "Confirmed by contractor",
+    unable_to_participate: "Unable to participate",
+    withdrawn: "Withdrawn"
+  };
+
+  return labels[status] ?? status;
+}
+
+function participationRequestStatusTone(status: string) {
+  if (status === "contractor_confirmed") {
+    return "good" as const;
+  }
+  if (status === "unable_to_participate" || status === "withdrawn") {
+    return "neutral" as const;
+  }
+  return "warning" as const;
+}
+
 function formatDocumentType(documentType?: string) {
   const labels: Record<string, string> = {
     white_card: "White Card",
@@ -7600,45 +7617,44 @@ function getPerthDate(offsetDays = 0) {
   return formatter.format(date);
 }
 
-function buildSiteScheduleDrafts(
-  jobs: AdminJob[],
-  assignments: AdminAssignment[],
-  participations: ProjectParticipation[],
-  date: string
-): Record<string, SiteScheduleDraft> {
-  return Object.fromEntries(
-    jobs.map((job) => {
-      const jobAssignments = assignments.filter(
-        (assignment) => assignment.jobId === job.id && assignment.date === date
-      );
-      const confirmedParticipantIds = participations
-        .filter(
-          (participation) =>
-            participation.jobId === job.id && participation.status === "confirmed"
-        )
-        .map((participation) => participation.workerId);
-      const leadingHand = jobAssignments.find(
-        (assignment) => assignment.role === "leading_hand"
-      );
-      const workerIds = [
-        ...new Set([
-          ...confirmedParticipantIds,
-          ...jobAssignments.map((assignment) => assignment.workerId)
-        ])
-      ];
-      return [
-        job.id,
-        {
-          startTime: jobAssignments[0]?.startTime ?? "06:30",
-          workerIds,
-          leadingHandWorkerId:
-            leadingHand && workerIds.includes(leadingHand.workerId)
-              ? leadingHand.workerId
-              : (workerIds[0] ?? "")
-        }
-      ];
-    })
-  );
+function groupParticipationRequestsByProjectDate(
+  requests: ProjectParticipationRequest[],
+  workEntries: WorkEntry[]
+) {
+  const groups = new Map<
+    string,
+    {
+      jobId: string;
+      participationDate: string;
+      siteAccessTime: string;
+      requests: ProjectParticipationRequest[];
+      productionSubmittedWorkerIds: Set<string>;
+    }
+  >();
+
+  requests.forEach((request) => {
+    const key = `${request.jobId}:${request.participationDate}`;
+    const group =
+      groups.get(key) ??
+      {
+        jobId: request.jobId,
+        participationDate: request.participationDate,
+        siteAccessTime: request.siteAccessTime,
+        requests: [],
+        productionSubmittedWorkerIds: new Set<string>()
+      };
+    group.requests.push(request);
+    workEntries
+      .filter(
+        (entry) =>
+          entry.jobId === request.jobId &&
+          entry.workDate === request.participationDate
+      )
+      .forEach((entry) => group.productionSubmittedWorkerIds.add(entry.workerId));
+    groups.set(key, group);
+  });
+
+  return [...groups.values()].sort((a, b) => a.jobId.localeCompare(b.jobId));
 }
 
 function formatPublicLeadStatus(status: PublicLeadStatus) {

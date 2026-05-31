@@ -1285,6 +1285,197 @@ export async function saveDailySiteScheduleAction(payload: {
   return { ok: true, message: "Project allocation board saved." };
 }
 
+export async function publishProjectParticipationRequestAction(payload: {
+  jobId: string;
+  participationDate: string;
+  siteAccessTime: string;
+  scopeNote?: string;
+  workerIds: string[];
+  projectLeadWorkerId?: string;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+
+  if (session.profile.role !== "admin") {
+    return { ok: false, error: "Admin role required." };
+  }
+
+  if (!payload.jobId || !payload.participationDate || payload.workerIds.length === 0) {
+    return {
+      ok: false,
+      error: "Choose a project date, project, and at least one contractor."
+    };
+  }
+
+  const workerIds = [...new Set(payload.workerIds.map((id) => id.trim()).filter(Boolean))];
+  if (payload.projectLeadWorkerId && !workerIds.includes(payload.projectLeadWorkerId)) {
+    return {
+      ok: false,
+      error: "Project lead for this date must be one of the requested contractors."
+    };
+  }
+
+  const supabase = createServiceRoleSupabaseClient() ?? (await createServerSupabaseClient());
+  const { data: existingConfirmed, error: existingConfirmedError } = await supabase
+    .from("project_participation_requests")
+    .select("worker_id, job_id")
+    .eq("participation_date", payload.participationDate)
+    .eq("status", "contractor_confirmed")
+    .in("worker_id", workerIds);
+
+  if (existingConfirmedError) {
+    return projectParticipationRequestSchemaError(existingConfirmedError);
+  }
+
+  const conflictingConfirmed = (existingConfirmed ?? []).find(
+    (request) => String(request.job_id) !== payload.jobId
+  );
+  if (conflictingConfirmed) {
+    return {
+      ok: false,
+      error: "A contractor has already confirmed another project participation for this date."
+    };
+  }
+
+  const now = new Date().toISOString();
+  const rows = workerIds.map((workerId) => ({
+    job_id: payload.jobId,
+    worker_id: workerId,
+    participation_date: payload.participationDate,
+    site_access_time: payload.siteAccessTime || "06:30",
+    scope_note: payload.scopeNote?.trim() || null,
+    status: "proposed",
+    project_lead_worker_id: payload.projectLeadWorkerId || null,
+    created_by: session.userId,
+    updated_at: now
+  }));
+
+  const { error } = await supabase
+    .from("project_participation_requests")
+    .upsert(rows, { onConflict: "job_id,worker_id,participation_date" });
+
+  if (error) {
+    return projectParticipationRequestSchemaError(error);
+  }
+
+  await writeAuditLog({
+    action: "project_participation_request.published",
+    actorId: session.userId,
+    entityId: payload.jobId,
+    entityTable: "project_participation_requests",
+    metadata: {
+      participationDate: payload.participationDate,
+      requestedCount: workerIds.length,
+      projectLeadWorkerId: payload.projectLeadWorkerId
+    }
+  });
+
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Project Participation Request published." };
+}
+
+export async function confirmProjectParticipationRequestAction(
+  requestId: string
+): Promise<ActionResult> {
+  return updateOwnProjectParticipationRequestStatus(requestId, "contractor_confirmed");
+}
+
+export async function markProjectParticipationRequestUnableAction(
+  requestId: string
+): Promise<ActionResult> {
+  return updateOwnProjectParticipationRequestStatus(requestId, "unable_to_participate");
+}
+
+async function updateOwnProjectParticipationRequestStatus(
+  requestId: string,
+  status: "contractor_confirmed" | "unable_to_participate"
+): Promise<ActionResult> {
+  const session = await requireSession();
+  const workerId = session.workerId ?? session.userId;
+
+  if (session.profile.role === "admin") {
+    return { ok: false, error: "Contractor account required." };
+  }
+
+  const supabase = createServiceRoleSupabaseClient() ?? (await createServerSupabaseClient());
+  const { data: request, error: requestError } = await supabase
+    .from("project_participation_requests")
+    .select("id, job_id, worker_id, participation_date, status")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (requestError) {
+    return projectParticipationRequestSchemaError(requestError);
+  }
+
+  if (!request || String(request.worker_id) !== workerId) {
+    return { ok: false, error: "Project Participation Request was not found for your contractor profile." };
+  }
+
+  if (String(request.status) === "withdrawn") {
+    return { ok: false, error: "This project participation opportunity is no longer available." };
+  }
+
+  if (status === "contractor_confirmed") {
+    const { data: existingConfirmed, error: existingConfirmedError } = await supabase
+      .from("project_participation_requests")
+      .select("id, job_id")
+      .eq("worker_id", workerId)
+      .eq("participation_date", request.participation_date)
+      .eq("status", "contractor_confirmed");
+
+    if (existingConfirmedError) {
+      return projectParticipationRequestSchemaError(existingConfirmedError);
+    }
+
+    const conflict = (existingConfirmed ?? []).find((item) => String(item.id) !== requestId);
+    if (conflict) {
+      return {
+        ok: false,
+        error: "You have already confirmed project participation for this date."
+      };
+    }
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("project_participation_requests")
+    .update({
+      status,
+      confirmation_source: status === "contractor_confirmed" ? "contractor_app" : null,
+      confirmed_at: status === "contractor_confirmed" ? now : null,
+      confirmed_by: status === "contractor_confirmed" ? session.userId : null,
+      updated_at: now
+    })
+    .eq("id", requestId);
+
+  if (error) {
+    return projectParticipationRequestSchemaError(error);
+  }
+
+  await writeAuditLog({
+    action:
+      status === "contractor_confirmed"
+        ? "project_participation_request.confirmed_by_contractor"
+        : "project_participation_request.unable_to_participate",
+    actorId: session.userId,
+    entityId: requestId,
+    entityTable: "project_participation_requests",
+    metadata: {
+      jobId: request.job_id,
+      participationDate: request.participation_date
+    }
+  });
+
+  revalidatePath("/dashboard");
+  return {
+    ok: true,
+    message:
+      status === "contractor_confirmed"
+        ? "Confirmed project participation."
+        : "Project participation marked unavailable."
+  };
+}
+
 export async function saveProjectParticipantsAction(payload: {
   jobId: string;
   startTime: string;
@@ -3670,6 +3861,28 @@ async function hasActiveProductionProjectAccess({
   workDate: string;
 }) {
   const supabase = createServiceRoleSupabaseClient() ?? (await createServerSupabaseClient());
+  const { data: sameDateRequests, error: requestsError } = await supabase
+    .from("project_participation_requests")
+    .select("id, job_id, status")
+    .eq("worker_id", workerId)
+    .eq("participation_date", workDate)
+    .in("status", ["proposed", "contractor_confirmed"]);
+
+  if (!requestsError && sameDateRequests && sameDateRequests.length > 0) {
+    return sameDateRequests.some(
+      (request) =>
+        String(request.job_id) === jobId &&
+        String(request.status) === "contractor_confirmed"
+    );
+  }
+
+  if (requestsError && !isProjectParticipationRequestMissingError(requestsError)) {
+    console.warn("Project participation request gate skipped", {
+      code: requestsError.code,
+      message: requestsError.message
+    });
+  }
+
   const { data: assignment } = await supabase
     .from("assignments")
     .select("id")
@@ -3691,4 +3904,28 @@ async function hasActiveProductionProjectAccess({
     .limit(1);
 
   return Boolean(participation?.length);
+}
+
+function projectParticipationRequestSchemaError(error: { code?: string; message: string }) {
+  if (isProjectParticipationRequestMissingError(error)) {
+    return {
+      ok: false,
+      error:
+        "Project Participation Request schema is not available yet. Apply the source-controlled migration after the Supabase migration baseline is repaired."
+    };
+  }
+
+  return { ok: false, error: error.message };
+}
+
+function isProjectParticipationRequestMissingError(error: { code?: string; message: string }) {
+  const message = error.message.toLowerCase();
+  const missingSchemaCodes = new Set(["42P01", "42703", "PGRST204", "PGRST205"]);
+
+  return (
+    (error.code ? missingSchemaCodes.has(error.code) : false) ||
+    message.includes("could not find the table") ||
+    (message.includes("could not find") && message.includes("schema cache")) ||
+    (message.includes("column") && message.includes("does not exist"))
+  );
 }

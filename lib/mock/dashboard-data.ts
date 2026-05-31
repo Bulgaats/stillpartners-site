@@ -683,6 +683,21 @@ export const mockDashboardData: DashboardData = {
       updatedAt: `${today}T05:45:00.000Z`
     }
   ],
+  projectParticipationRequests: [
+    {
+      id: "participation-request-1",
+      jobId: "admin-job-1",
+      workerId: "admin-worker-1",
+      participationDate: tomorrow,
+      siteAccessTime: "06:30",
+      scopeNote: "Reinforcement scope participation opportunity.",
+      status: "proposed",
+      projectLeadWorkerId: "admin-worker-1",
+      createdBy: demoUserIds.admin,
+      createdAt: `${today}T05:30:00.000Z`,
+      updatedAt: `${today}T05:30:00.000Z`
+    }
+  ],
   projectNotes: [
     {
       id: "project-note-1",
