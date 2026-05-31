@@ -8,7 +8,6 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   CheckCircle2,
-  Download,
   FileCheck2,
   Hammer,
   Lock,
@@ -2998,14 +2997,14 @@ export function DashboardShell({
                 </button>
               </form>
             ) : null}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Tonnes" value={weekTonnes.toFixed(2)} />
-              <Stat label="Entries" value={String(visibleTimesheets.length)} />
-              {role === "admin" ? (
-                <Stat label="Internal site activity" value={weekEstimatedHours.toFixed(1)} />
-              ) : null}
-              <Stat label="Invoices" value={String(data.workerInvoices.length + data.clientInvoices.length)} />
-            </div>
+	            <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-4", role === "admin" ? "hidden md:grid" : "")}>
+	              <Stat label="Tonnes" value={weekTonnes.toFixed(2)} />
+	              <Stat label="Entries" value={String(visibleTimesheets.length)} />
+	              {role === "admin" ? (
+	                <Stat label="Production measure" value={weekEstimatedHours.toFixed(1)} />
+	              ) : null}
+	              <Stat label="Invoices" value={String(data.workerInvoices.length + data.clientInvoices.length)} />
+	            </div>
           </div>
         </div>
       </section>
@@ -3140,60 +3139,71 @@ export function DashboardShell({
 	            </DashboardGrid>
 
 	            <DashboardGrid>
-	              <InfoCard icon={BriefcaseBusiness} title="Active project status">
-	                <div className="grid gap-3 text-sm">
-	                  <AlertRow
-	                    label="Active projects"
-	                    tone={activeProjects.length > 0 ? "info" : "neutral"}
-	                    value={String(activeProjects.length)}
-	                  />
-	                  <AlertRow
-	                    label="Awaiting participation"
-	                    tone={awaitingParticipationProjects.length > 0 ? "warning" : "good"}
-	                    value={String(awaitingParticipationProjects.length)}
-	                  />
-	                  <AlertRow
-	                    label="Projects nearing completion"
-	                    tone={nearingCompletionProjects.length > 0 ? "info" : "neutral"}
-	                    value={String(nearingCompletionProjects.length)}
-	                  />
-	                  <AlertRow
-	                    label="Projects without participants"
-	                    tone={projectsWithNoParticipants.length > 0 ? "warning" : "good"}
-	                    value={String(projectsWithNoParticipants.length)}
-	                  />
+	              <InfoCard icon={CheckCircle2} title="Key metrics">
+	                <div className="grid grid-cols-2 gap-3">
+	                  <Stat label="Active projects" value={String(activeProjects.length)} />
+	                  <Stat label="Pending approvals" value={String(pendingProductionApprovals)} />
+	                  <Stat label="Production delivered" value={`${totalProductionDelivered.toFixed(2)}t`} />
+	                  <Stat label="Open invoices" value={String(overdueClientInvoices.length + overdueContractorInvoices.length)} />
 	                </div>
+	                <details className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+	                  <summary className="cursor-pointer text-sm font-black text-blue-950">
+	                    More project and compliance metrics
+	                  </summary>
+	                  <div className="mt-3 grid gap-3 text-sm">
+	                    <AlertRow
+	                      label="Awaiting participation"
+	                      tone={awaitingParticipationProjects.length > 0 ? "warning" : "good"}
+	                      value={String(awaitingParticipationProjects.length)}
+	                    />
+	                    <AlertRow
+	                      label="Projects nearing completion"
+	                      tone={nearingCompletionProjects.length > 0 ? "info" : "neutral"}
+	                      value={String(nearingCompletionProjects.length)}
+	                    />
+	                    <AlertRow
+	                      label="Projects without participants"
+	                      tone={projectsWithNoParticipants.length > 0 ? "warning" : "good"}
+	                      value={String(projectsWithNoParticipants.length)}
+	                    />
+	                    <AlertRow
+	                      label="Active contractors"
+	                      tone={activeContractors > 0 ? "good" : "neutral"}
+	                      value={String(activeContractors)}
+	                    />
+	                    <AlertRow
+	                      label="Compliance warnings"
+	                      tone={complianceWarnings > 0 ? "warning" : "good"}
+	                      value={String(complianceWarnings)}
+	                    />
+	                    <AlertRow
+	                      label="Expiring documents"
+	                      tone={expiringSoonDocuments.length > 0 ? "warning" : "good"}
+	                      value={String(expiringSoonDocuments.length)}
+	                    />
+	                  </div>
+	                </details>
 	              </InfoCard>
 
-	              <InfoCard icon={BadgeDollarSign} title="Invoice and payable status">
+	              <InfoCard icon={BadgeDollarSign} title="Receivables and payables">
 	                <div className="grid gap-3 text-sm">
 	                  <FinancialLine
 	                    label="Receivables unpaid"
 	                    value={formatCurrency(outstandingClientInvoiceTotal)}
-                  />
-                  <FinancialLine label="Receivables paid" value={formatCurrency(paidClientInvoices)} />
-                  <FinancialLine
-                    label="Payables unpaid"
-                    value={formatCurrency(outstandingContractorInvoiceTotal)}
-                  />
+	                  />
+	                  <FinancialLine label="Receivables paid" value={formatCurrency(paidClientInvoices)} />
+	                  <FinancialLine
+	                    label="Payables unpaid"
+	                    value={formatCurrency(outstandingContractorInvoiceTotal)}
+	                  />
 	                  <FinancialLine label="Payables paid" value={formatCurrency(paidWorkerInvoices)} />
 	                  <FinancialLine label="Estimated margin" value={formatCurrency(estimatedMargin)} strong />
 	                </div>
 	              </InfoCard>
-
-	              <InfoCard icon={CheckCircle2} title="Key metrics">
-	                <div className="grid grid-cols-2 gap-3">
-	                  <Stat label="Production delivered" value={`${totalProductionDelivered.toFixed(2)}t`} />
-	                  <Stat label="Active contractors" value={String(activeContractors)} />
-	                  <Stat label="Compliance warnings" value={String(complianceWarnings)} />
-	                  <Stat label="Expiring documents" value={String(expiringSoonDocuments.length)} />
-	                </div>
-	              </InfoCard>
 	            </DashboardGrid>
 
-	            <InfoCard icon={Download} title="Secondary detail">
-	              <div className="grid gap-3">
-	                <details className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+	            <section className="grid gap-4">
+	                <details className="dashboard-card">
 	                  <summary className="cursor-pointer text-sm font-black text-blue-950">
 	                    Lightweight reporting
 	                  </summary>
@@ -3236,7 +3246,7 @@ export function DashboardShell({
 	                  </div>
 	                </details>
 
-	                <details className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+	                <details className="dashboard-card">
 	                  <summary className="cursor-pointer text-sm font-black text-blue-950">
 	                    Project financial snapshot
 	                  </summary>
@@ -3274,8 +3284,7 @@ export function DashboardShell({
 	                    ) : null}
 	                  </div>
 	                </details>
-	              </div>
-	            </InfoCard>
+	            </section>
 	          </section>
         ) : (
           <section className="grid gap-4">
