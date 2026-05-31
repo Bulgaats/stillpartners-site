@@ -92,10 +92,10 @@ export const publicMessages = {
       title: "Practical construction subcontracting for Perth sites.",
       copy:
         "Still Partners Pty Ltd supports commercial construction projects through defined subcontract scopes, reinforcement services, clear communication, and practical site administration.",
-      focusTrades: "Focus trades",
+      focusTrades: "Focus scopes",
       trades: [
-        "Steelfixers for reinforcement works",
-        "Carpenters for formwork and fit-out support",
+        "Reinforcement fixing works",
+        "Formwork and fit-out support",
         "Construction subcontract packages"
       ],
       cards: [
