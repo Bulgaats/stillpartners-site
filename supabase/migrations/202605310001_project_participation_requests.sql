@@ -89,7 +89,7 @@ using (
 drop policy if exists "Contractors update own project participation requests"
   on public.project_participation_requests;
 
-revoke insert, update, delete on public.project_participation_requests from authenticated;
+revoke all privileges on public.project_participation_requests from authenticated;
 grant select on public.project_participation_requests to authenticated;
 
 notify pgrst, 'reload schema';
