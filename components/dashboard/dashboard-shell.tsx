@@ -664,11 +664,28 @@ export function DashboardShell({
         workerId: workSystemUserWorkerId,
         date: today,
         startTime: "06:30"
-      }))
-  ];
-  const contractorTomorrowAssignments = contractorAssignments.filter(
-    (assignment) => assignment.date === tomorrow
+	      }))
+	  ];
+  const contractorPendingParticipationRequests = contractorParticipationRequests.filter(
+    (request) => request.status === "proposed"
   );
+  const contractorConfirmedDailyParticipation = contractorParticipationRequests.filter(
+    (request) =>
+      request.status === "contractor_confirmed" &&
+      (request.participationDate === today || request.participationDate === tomorrow)
+  );
+  const contractorTodayProductionRequired = contractorProductionItems.filter(
+    (item) =>
+      !data.workEntries.some(
+        (entry) =>
+          entry.workerId === item.workerId &&
+          entry.jobId === item.jobId &&
+          entry.workDate === item.date
+      )
+  );
+	  const contractorTomorrowAssignments = contractorAssignments.filter(
+	    (assignment) => assignment.date === tomorrow
+	  );
   const contractorWeekEntries = visibleWorkEntries.filter(
     (entry) =>
       entry.workerId === workSystemUserWorkerId &&
@@ -738,6 +755,19 @@ export function DashboardShell({
   const pendingProductionApprovals = data.workEntries.filter(
     (entry) => !entry.approved || !entry.locked
   ).length;
+  const adminPendingParticipationConfirmations = data.projectParticipationRequests.filter(
+    (request) => request.status === "proposed" && request.participationDate >= today
+  );
+  const adminConfirmedDailyParticipation = data.projectParticipationRequests.filter(
+    (request) =>
+      request.status === "contractor_confirmed" &&
+      (request.participationDate === today || request.participationDate === tomorrow)
+  );
+  const adminUnableDailyParticipation = data.projectParticipationRequests.filter(
+    (request) =>
+      request.status === "unable_to_participate" &&
+      request.participationDate >= today
+  );
   const activeContractors = data.adminWorkers.filter(
     (worker) => worker.isActive && worker.accountEnabled
   ).length;
@@ -832,6 +862,10 @@ export function DashboardShell({
       };
     })
     .filter((suggestion) => suggestion.entries.length > 0 && suggestion.client);
+  const adminInvoiceReadyProductionCount = clientInvoiceSuggestions.reduce(
+    (sum, suggestion) => sum + suggestion.entries.length,
+    0
+  );
   const selectedClient = data.clients.find((client) => client.id === clientInvoiceDraft.clientId);
   const selectedClientProjects = data.adminJobs.filter((job) => {
     const client = findClientForJob(data, job);
@@ -2952,9 +2986,52 @@ export function DashboardShell({
       </nav>
 
       {activeTab === "overview" ? (
-	        role === "admin" ? (
-	          <section className="grid gap-4">
-	            <DashboardGrid>
+		        role === "admin" ? (
+		          <section className="grid gap-4">
+		            <InfoCard icon={AlertTriangle} title="Daily action required">
+		              <div className="grid gap-3 text-sm md:grid-cols-2">
+		                <AlertRow
+		                  label="Pending participation confirmations"
+		                  tone={adminPendingParticipationConfirmations.length > 0 ? "warning" : "good"}
+		                  value={String(adminPendingParticipationConfirmations.length)}
+		                />
+		                <AlertRow
+		                  label="Confirmed participation today/tomorrow"
+		                  tone={adminConfirmedDailyParticipation.length > 0 ? "good" : "neutral"}
+		                  value={String(adminConfirmedDailyParticipation.length)}
+		                />
+		                <AlertRow
+		                  label="Unable to participate"
+		                  tone={adminUnableDailyParticipation.length > 0 ? "warning" : "good"}
+		                  value={String(adminUnableDailyParticipation.length)}
+		                />
+		                <AlertRow
+		                  label="Submitted production awaiting approval"
+		                  tone={pendingProductionApprovals > 0 ? "warning" : "good"}
+		                  value={String(pendingProductionApprovals)}
+		                />
+		                <AlertRow
+		                  label="Invoice-ready production"
+		                  tone={adminInvoiceReadyProductionCount > 0 ? "info" : "neutral"}
+		                  value={String(adminInvoiceReadyProductionCount)}
+		                />
+		              </div>
+		              {smartNextActions.length > 0 ? (
+		                <div className="mt-3 grid gap-3">
+		                  {smartNextActions.slice(0, 3).map((item, index) => (
+		                    <SmartActionRow
+		                      buttonLabel={item.buttonLabel}
+		                      detail={item.detail}
+		                      key={`daily-action-${item.label}-${index}`}
+		                      label={item.label}
+		                      onClick={item.action}
+		                      tone={item.tone}
+		                    />
+		                  ))}
+		                </div>
+		              ) : null}
+		            </InfoCard>
+		            <DashboardGrid>
 	              <InfoCard icon={AlertTriangle} title="Operational alerts">
 	                <div className="grid gap-3 text-sm">
 	                  <AlertRow
@@ -3190,10 +3267,68 @@ export function DashboardShell({
 	                </details>
 	            </section>
 	          </section>
-        ) : (
-          <section className="grid gap-4">
-            {currentContractor && currentAvailabilityDraft ? (
-              <InfoCard icon={CheckCircle2} title="Project Availability">
+	        ) : (
+	          <section className="grid gap-4">
+	            <InfoCard icon={AlertTriangle} title="Action required">
+	              <div className="grid gap-3 text-sm md:grid-cols-2">
+	                <AlertRow
+	                  label="New project participation requests"
+	                  tone={contractorPendingParticipationRequests.length > 0 ? "warning" : "good"}
+	                  value={String(contractorPendingParticipationRequests.length)}
+	                />
+	                <AlertRow
+	                  label="Pending confirmation"
+	                  tone={contractorPendingParticipationRequests.length > 0 ? "warning" : "good"}
+	                  value={String(contractorPendingParticipationRequests.length)}
+	                />
+	                <AlertRow
+	                  label="Confirmed participation today/tomorrow"
+	                  tone={contractorConfirmedDailyParticipation.length > 0 ? "good" : "neutral"}
+	                  value={String(contractorConfirmedDailyParticipation.length)}
+	                />
+	                <AlertRow
+	                  label="Today's production entry requirement"
+	                  tone={contractorTodayProductionRequired.length > 0 ? "warning" : "good"}
+	                  value={String(contractorTodayProductionRequired.length)}
+	                />
+	                <AlertRow
+	                  label="Invoice-ready approved production"
+	                  tone={contractorEligibleInvoiceEntries.length > 0 ? "info" : "neutral"}
+	                  value={String(contractorEligibleInvoiceEntries.length)}
+	                />
+	              </div>
+	              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+	                {contractorPendingParticipationRequests.length > 0 ? (
+	                  <button
+	                    className="dashboard-button dashboard-button-primary"
+	                    onClick={() => setActiveTab("jobs")}
+	                    type="button"
+	                  >
+	                    Review participation requests
+	                  </button>
+	                ) : null}
+	                {contractorTodayProductionRequired.length > 0 ? (
+	                  <button
+	                    className="dashboard-button dashboard-button-orange"
+	                    onClick={() => setActiveTab("workEntries")}
+	                    type="button"
+	                  >
+	                    Enter production
+	                  </button>
+	                ) : null}
+	                {contractorEligibleInvoiceEntries.length > 0 ? (
+	                  <button
+	                    className="dashboard-button dashboard-button-outline"
+	                    onClick={() => setActiveTab("workerInvoices")}
+	                    type="button"
+	                  >
+	                    Create contractor invoice
+	                  </button>
+	                ) : null}
+	              </div>
+	            </InfoCard>
+	            {currentContractor && currentAvailabilityDraft ? (
+	              <InfoCard icon={CheckCircle2} title="Project Availability">
                 <div className="grid gap-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <StatusBadge tone={availabilityTone(currentAvailabilityDraft.status)}>
@@ -3720,8 +3855,8 @@ export function DashboardShell({
               No active project participation yet. Projects confirmed by Still Partners will appear here.
             </p>
           ) : null}
-        </DashboardGrid>
-      ) : null}
+		          </DashboardGrid>
+		      ) : null}
 
 	      {activeTab === "workEntries" && role !== "admin" ? (
 	        <section className="grid gap-4">
@@ -5169,11 +5304,190 @@ export function DashboardShell({
             </InfoCard>
           </DashboardGrid>
         </section>
-      ) : null}
+	      ) : null}
 
-      {activeTab === "adminJobs" && role === "admin" ? (
-        <DashboardGrid>
-          <InfoCard icon={BriefcaseBusiness} title="Create project">
+	      {activeTab === "adminJobs" && role === "admin" ? (
+	        <section className="grid gap-4">
+	          <InfoCard icon={CalendarDays} title="Project Participation Coordination">
+	            <div className="grid gap-3 md:grid-cols-3">
+	              <label className="dashboard-label">
+	                Project date
+	                <input
+	                  className="dashboard-field"
+	                  onChange={(event) =>
+	                    setParticipationRequestDraft((draft) => ({
+	                      ...draft,
+	                      participationDate: event.target.value
+	                    }))
+	                  }
+	                  type="date"
+	                  value={participationRequestDraft.participationDate}
+	                />
+	              </label>
+	              <AdminSelect
+	                label="Project / subcontract scope"
+	                onChange={(value) =>
+	                  setParticipationRequestDraft((draft) => ({
+	                    ...draft,
+	                    jobId: value
+	                  }))
+	                }
+	                options={[
+	                  { label: "Choose project", value: "" },
+	                  ...activeScheduleJobs.map((job) => ({
+	                    label: job.siteName,
+	                    value: job.id
+	                  }))
+	                ]}
+	                value={participationRequestDraft.jobId}
+	              />
+	              <label className="dashboard-label">
+	                Site access time
+	                <input
+	                  className="dashboard-field"
+	                  onChange={(event) =>
+	                    setParticipationRequestDraft((draft) => ({
+	                      ...draft,
+	                      siteAccessTime: event.target.value
+	                    }))
+	                  }
+	                  type="time"
+	                  value={participationRequestDraft.siteAccessTime}
+	                />
+	              </label>
+	            </div>
+	            <label className="dashboard-label mt-3">
+	              Optional scope/site note
+	              <textarea
+	                className="dashboard-field min-h-20"
+	                onChange={(event) =>
+	                  setParticipationRequestDraft((draft) => ({
+	                    ...draft,
+	                    scopeNote: event.target.value
+	                  }))
+	                }
+	                value={participationRequestDraft.scopeNote}
+	              />
+	            </label>
+	            {selectedParticipationRequestJob ? (
+	              <p className="mt-3 rounded-md bg-gray-50 p-3 text-sm font-bold text-gray-700">
+	                {selectedParticipationRequestJob.clientCompany} · {selectedParticipationRequestJob.location}
+	              </p>
+	            ) : null}
+	            <div className="mt-4 grid max-h-80 gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
+	              {data.adminWorkers.filter((worker) => worker.isActive).map((worker) => {
+	                const checked = participationRequestDraft.workerIds.includes(worker.id);
+	                const confirmedElsewhere = participationRequestsForSelectedDate.some(
+	                  (request) =>
+	                    request.workerId === worker.id &&
+	                    request.jobId !== participationRequestDraft.jobId &&
+	                    request.status === "contractor_confirmed"
+	                );
+	                return (
+	                  <label
+	                    className={cn(
+	                      "flex items-start gap-3 rounded-md border bg-white p-3 text-sm font-bold",
+	                      confirmedElsewhere ? "border-gray-200 text-gray-400" : "border-gray-200 text-gray-800"
+	                    )}
+	                    key={worker.id}
+	                  >
+	                    <input
+	                      checked={checked}
+	                      className="mt-1 size-5 accent-blue-950"
+	                      disabled={confirmedElsewhere}
+	                      onChange={(event) => toggleParticipationRequestContractor(worker.id, event.target.checked)}
+	                      type="checkbox"
+	                    />
+	                    <span>
+	                      {worker.fullName}
+	                      {worker.trade ? <span className="block text-xs text-gray-500">{worker.trade}</span> : null}
+	                      {confirmedElsewhere ? (
+	                        <span className="block text-xs font-bold text-orange-700">
+	                          Already confirmed for another project on this date
+	                        </span>
+	                      ) : null}
+	                    </span>
+	                  </label>
+	                );
+	              })}
+	            </div>
+	            <AdminSelect
+	              label="Project lead for this date"
+	              onChange={(value) =>
+	                setParticipationRequestDraft((draft) => ({
+	                  ...draft,
+	                  projectLeadWorkerId: value
+	                }))
+	              }
+	              options={[
+	                { label: "Choose from requested contractors", value: "" },
+	                ...participationRequestDraft.workerIds.map((workerId) => ({
+	                  label: adminWorkerName(data, workerId),
+	                  value: workerId
+	                }))
+	              ]}
+	              value={participationRequestDraft.projectLeadWorkerId}
+	            />
+	            <button
+	              className="dashboard-button dashboard-button-primary mt-4 w-full"
+	              disabled={isActionPending("participation-request")}
+	              onClick={publishParticipationRequest}
+	              type="button"
+	            >
+	              {isActionPending("participation-request")
+	                ? "Publishing participation request..."
+	                : "Publish participation request"}
+	            </button>
+	            <ActionFeedbackMessage feedback={actionFeedbacks["participation-request"]} />
+	          </InfoCard>
+
+	          <InfoCard icon={CheckCircle2} title="Project date request summary">
+	            <div className="grid gap-3">
+	              {participationRequestGroups.map((group) => {
+	                const job = data.adminJobs.find((item) => item.id === group.jobId);
+	                return (
+	                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4" key={`${group.jobId}:${group.participationDate}`}>
+	                    <div className="flex flex-wrap items-start justify-between gap-2">
+	                      <div>
+	                        <p className="font-black text-blue-950">{job?.siteName ?? adminJobName(data, group.jobId)}</p>
+	                        <p className="mt-1 text-sm text-gray-700">
+	                          Project date {group.participationDate} · Site access time {group.siteAccessTime}
+	                        </p>
+	                      </div>
+	                      <StatusBadge tone="info">
+	                        {group.requests.length} requested
+	                      </StatusBadge>
+	                    </div>
+	                    <div className="mt-3 grid gap-2">
+	                      {group.requests.map((request) => (
+	                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white p-3" key={request.id}>
+	                          <p className="text-sm font-black text-blue-950">
+	                            {adminWorkerName(data, request.workerId)}
+	                          </p>
+	                          <div className="flex flex-wrap gap-2">
+	                            <StatusBadge tone={participationRequestStatusTone(request.status)}>
+	                              {formatParticipationRequestStatus(request.status)}
+	                            </StatusBadge>
+	                            {group.productionSubmittedWorkerIds.has(request.workerId) ? (
+	                              <StatusBadge tone="info">Production submitted</StatusBadge>
+	                            ) : null}
+	                          </div>
+	                        </div>
+	                      ))}
+	                    </div>
+	                  </div>
+	                );
+	              })}
+	              {participationRequestGroups.length === 0 ? (
+	                <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
+	                  No Project Participation Requests are published for the selected project date.
+	                </p>
+	              ) : null}
+	            </div>
+	          </InfoCard>
+
+	          <DashboardGrid>
+	          <InfoCard icon={BriefcaseBusiness} title="Create project">
             <label className="dashboard-label">
               Site name
               <input
@@ -5474,9 +5788,10 @@ export function DashboardShell({
                 </p>
               ) : null}
             </div>
-          </InfoCard>
-        </DashboardGrid>
-      ) : null}
+	          </InfoCard>
+	          </DashboardGrid>
+	        </section>
+	      ) : null}
 
       {activeTab === "workers" && role === "admin" ? (
         <DashboardGrid>
@@ -6038,188 +6353,6 @@ export function DashboardShell({
             </div>
           </InfoCard>
         </DashboardGrid>
-      ) : null}
-
-      {activeTab === "adminJobs" && role === "admin" ? (
-        <section className="grid gap-4">
-	          <InfoCard icon={CalendarDays} title="Project Participation Coordination">
-	            <div className="grid gap-3 md:grid-cols-3">
-	              <label className="dashboard-label">
-	                Project date
-	                <input
-	                  className="dashboard-field"
-	                  onChange={(event) =>
-	                    setParticipationRequestDraft((draft) => ({
-	                      ...draft,
-	                      participationDate: event.target.value
-	                    }))
-	                  }
-	                  type="date"
-	                  value={participationRequestDraft.participationDate}
-	                />
-	              </label>
-	              <AdminSelect
-	                label="Project / subcontract scope"
-	                onChange={(value) =>
-	                  setParticipationRequestDraft((draft) => ({
-	                    ...draft,
-	                    jobId: value
-	                  }))
-	                }
-	                options={[
-	                  { label: "Choose project", value: "" },
-	                  ...activeScheduleJobs.map((job) => ({
-	                    label: job.siteName,
-	                    value: job.id
-	                  }))
-	                ]}
-	                value={participationRequestDraft.jobId}
-	              />
-	              <label className="dashboard-label">
-	                Site access time
-	                <input
-	                  className="dashboard-field"
-	                  onChange={(event) =>
-	                    setParticipationRequestDraft((draft) => ({
-	                      ...draft,
-	                      siteAccessTime: event.target.value
-	                    }))
-	                  }
-	                  type="time"
-	                  value={participationRequestDraft.siteAccessTime}
-	                />
-	              </label>
-	            </div>
-	            <label className="dashboard-label mt-3">
-	              Optional scope/site note
-	              <textarea
-	                className="dashboard-field min-h-20"
-	                onChange={(event) =>
-	                  setParticipationRequestDraft((draft) => ({
-	                    ...draft,
-	                    scopeNote: event.target.value
-	                  }))
-	                }
-	                value={participationRequestDraft.scopeNote}
-	              />
-	            </label>
-	            {selectedParticipationRequestJob ? (
-	              <p className="mt-3 rounded-md bg-gray-50 p-3 text-sm font-bold text-gray-700">
-	                {selectedParticipationRequestJob.clientCompany} · {selectedParticipationRequestJob.location}
-	              </p>
-	            ) : null}
-	            <div className="mt-4 grid max-h-80 gap-2 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-3">
-	              {data.adminWorkers.filter((worker) => worker.isActive).map((worker) => {
-	                const checked = participationRequestDraft.workerIds.includes(worker.id);
-	                const confirmedElsewhere = participationRequestsForSelectedDate.some(
-	                  (request) =>
-	                    request.workerId === worker.id &&
-	                    request.jobId !== participationRequestDraft.jobId &&
-	                    request.status === "contractor_confirmed"
-	                );
-	                return (
-	                  <label
-	                    className={cn(
-	                      "flex items-start gap-3 rounded-md border bg-white p-3 text-sm font-bold",
-	                      confirmedElsewhere ? "border-gray-200 text-gray-400" : "border-gray-200 text-gray-800"
-	                    )}
-	                    key={worker.id}
-	                  >
-	                    <input
-	                      checked={checked}
-	                      className="mt-1 size-5 accent-blue-950"
-	                      disabled={confirmedElsewhere}
-	                      onChange={(event) => toggleParticipationRequestContractor(worker.id, event.target.checked)}
-	                      type="checkbox"
-	                    />
-	                    <span>
-	                      {worker.fullName}
-	                      {worker.trade ? <span className="block text-xs text-gray-500">{worker.trade}</span> : null}
-	                      {confirmedElsewhere ? (
-	                        <span className="block text-xs font-bold text-orange-700">
-	                          Already confirmed for another project on this date
-	                        </span>
-	                      ) : null}
-	                    </span>
-	                  </label>
-	                );
-	              })}
-	            </div>
-	            <AdminSelect
-	              label="Project lead for this date"
-	              onChange={(value) =>
-	                setParticipationRequestDraft((draft) => ({
-	                  ...draft,
-	                  projectLeadWorkerId: value
-	                }))
-	              }
-	              options={[
-	                { label: "Choose from requested contractors", value: "" },
-	                ...participationRequestDraft.workerIds.map((workerId) => ({
-	                  label: adminWorkerName(data, workerId),
-	                  value: workerId
-	                }))
-	              ]}
-	              value={participationRequestDraft.projectLeadWorkerId}
-	            />
-	            <button
-	              className="dashboard-button dashboard-button-primary mt-4 w-full"
-	              disabled={isActionPending("participation-request")}
-	              onClick={publishParticipationRequest}
-	              type="button"
-	            >
-	              {isActionPending("participation-request")
-	                ? "Publishing participation request..."
-	                : "Publish participation request"}
-	            </button>
-	            <ActionFeedbackMessage feedback={actionFeedbacks["participation-request"]} />
-	          </InfoCard>
-
-	          <InfoCard icon={CheckCircle2} title="Project date request summary">
-	            <div className="grid gap-3">
-	              {participationRequestGroups.map((group) => {
-	                const job = data.adminJobs.find((item) => item.id === group.jobId);
-	                return (
-	                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4" key={`${group.jobId}:${group.participationDate}`}>
-	                  <div className="flex flex-wrap items-start justify-between gap-2">
-	                    <div>
-	                      <p className="font-black text-blue-950">{job?.siteName ?? adminJobName(data, group.jobId)}</p>
-	                      <p className="mt-1 text-sm text-gray-700">
-	                        Project date {group.participationDate} · Site access time {group.siteAccessTime}
-	                      </p>
-	                    </div>
-	                    <StatusBadge tone="info">
-	                      {group.requests.length} requested
-	                    </StatusBadge>
-	                  </div>
-	                  <div className="mt-3 grid gap-2">
-	                    {group.requests.map((request) => (
-	                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-white p-3" key={request.id}>
-	                        <p className="text-sm font-black text-blue-950">
-	                          {adminWorkerName(data, request.workerId)}
-	                        </p>
-	                        <div className="flex flex-wrap gap-2">
-	                          <StatusBadge tone={participationRequestStatusTone(request.status)}>
-	                            {formatParticipationRequestStatus(request.status)}
-	                          </StatusBadge>
-	                          {group.productionSubmittedWorkerIds.has(request.workerId) ? (
-	                            <StatusBadge tone="info">Production submitted</StatusBadge>
-	                          ) : null}
-	                        </div>
-	                      </div>
-	                    ))}
-	                  </div>
-	                </div>
-	              );
-	              })}
-	              {participationRequestGroups.length === 0 ? (
-	                <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
-	                  No Project Participation Requests are published for the selected project date.
-	                </p>
-	              ) : null}
-	            </div>
-	          </InfoCard>
-        </section>
       ) : null}
 
       {activeTab === "admin" && role === "admin" ? (
