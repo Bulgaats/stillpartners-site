@@ -3406,13 +3406,13 @@ export function DashboardShell({
               </InfoCard>
 	            ) : null}
 
-	            <InfoCard icon={CalendarDays} title="Project Participation Requests">
-	              {contractorParticipationRequests.length > 0 ? (
-	                <div className="grid gap-3">
-	                  {contractorParticipationRequests.slice(0, 6).map((request) => {
-	                    const job = data.adminJobs.find((item) => item.id === request.jobId);
-	                    const confirmedForDate = contractorConfirmedRequestByDate.get(request.participationDate);
-	                    const confirmedElsewhere = Boolean(
+		            <InfoCard icon={CalendarDays} title="Project Participation Requests">
+		              {contractorPendingParticipationRequests.length > 0 ? (
+		                <div className="grid gap-3">
+		                  {contractorPendingParticipationRequests.slice(0, 6).map((request) => {
+		                    const job = data.adminJobs.find((item) => item.id === request.jobId);
+		                    const confirmedForDate = contractorConfirmedRequestByDate.get(request.participationDate);
+		                    const confirmedElsewhere = Boolean(
 	                      confirmedForDate && confirmedForDate.id !== request.id
 	                    );
 	                    const canConfirm =
@@ -3480,22 +3480,35 @@ export function DashboardShell({
 	              )}
 	            </InfoCard>
 
-	            {contractorConfirmedParticipationRequests.length > 0 ? (
-	              <InfoCard icon={CheckCircle2} title="Confirmed project participation">
-	                <div className="grid gap-3">
-	                  {contractorConfirmedParticipationRequests.slice(0, 4).map((request) => (
-	                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4" key={request.id}>
-	                      <p className="font-black text-blue-950">
-	                        {adminJobName(data, request.jobId)}
-	                      </p>
-	                      <p className="mt-1 text-sm font-bold text-emerald-800">
-	                        {request.participationDate} · Site access time {request.siteAccessTime}
-	                      </p>
-	                    </div>
-	                  ))}
-	                </div>
-	              </InfoCard>
-	            ) : null}
+		            {contractorConfirmedParticipationRequests.length > 0 ? (
+		              <InfoCard icon={CheckCircle2} title="Confirmed project participation">
+		                <div className="grid gap-3">
+		                  {contractorConfirmedParticipationRequests.slice(0, 4).map((request) => {
+		                    const job = data.adminJobs.find((item) => item.id === request.jobId);
+		                    return (
+		                      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4" key={request.id}>
+		                        <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+		                          Project / subcontract scope
+		                        </p>
+		                        <p className="mt-1 font-black text-blue-950">
+		                          {job?.siteName ?? adminJobName(data, request.jobId)}
+		                        </p>
+		                        <div className="mt-2 grid gap-1 text-sm font-bold text-emerald-800">
+		                          <p>Project date: {request.participationDate}</p>
+		                          <p>Site access time: {request.siteAccessTime}</p>
+		                          {request.scopeNote ? <p>{request.scopeNote}</p> : null}
+		                          {request.projectLeadWorkerId ? (
+		                            <p>
+		                              Project lead: {adminWorkerName(data, request.projectLeadWorkerId)}
+		                            </p>
+		                          ) : null}
+		                        </div>
+		                      </div>
+		                    );
+		                  })}
+		                </div>
+		              </InfoCard>
+		            ) : null}
 
 	            {availableProjectCards.length > 0 ? (
 	              <InfoCard icon={BriefcaseBusiness} title="Available Projects">
@@ -3737,14 +3750,14 @@ export function DashboardShell({
 
 	      {activeTab === "jobs" ? (
 	        <DashboardGrid>
-	          {role !== "admin" ? (
-	            <InfoCard icon={CalendarDays} title="Project Participation Requests">
-	              {contractorParticipationRequests.length > 0 ? (
-	                <div className="grid gap-3">
-	                  {contractorParticipationRequests.slice(0, 6).map((request) => {
-	                    const job = data.adminJobs.find((item) => item.id === request.jobId);
-	                    const confirmedForDate = contractorConfirmedRequestByDate.get(request.participationDate);
-	                    const confirmedElsewhere = Boolean(
+		          {role !== "admin" ? (
+		            <InfoCard icon={CalendarDays} title="Project Participation Requests">
+		              {contractorPendingParticipationRequests.length > 0 ? (
+		                <div className="grid gap-3">
+		                  {contractorPendingParticipationRequests.slice(0, 6).map((request) => {
+		                    const job = data.adminJobs.find((item) => item.id === request.jobId);
+		                    const confirmedForDate = contractorConfirmedRequestByDate.get(request.participationDate);
+		                    const confirmedElsewhere = Boolean(
 	                      confirmedForDate && confirmedForDate.id !== request.id
 	                    );
 	                    const canConfirm = request.status === "proposed" && !confirmedElsewhere;
@@ -3805,20 +3818,35 @@ export function DashboardShell({
 	              )}
 	            </InfoCard>
 	          ) : null}
-	          {role !== "admin" && contractorConfirmedParticipationRequests.length > 0 ? (
-	            <InfoCard icon={CheckCircle2} title="Confirmed project participation">
-	              <div className="grid gap-3">
-	                {contractorConfirmedParticipationRequests.slice(0, 4).map((request) => (
-	                  <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4" key={request.id}>
-	                    <p className="font-black text-blue-950">{adminJobName(data, request.jobId)}</p>
-	                    <p className="mt-1 text-sm font-bold text-emerald-800">
-	                      {request.participationDate} · Site access time {request.siteAccessTime}
-	                    </p>
-	                  </div>
-	                ))}
-	              </div>
-	            </InfoCard>
-	          ) : null}
+		          {role !== "admin" && contractorConfirmedParticipationRequests.length > 0 ? (
+		            <InfoCard icon={CheckCircle2} title="Confirmed project participation">
+		              <div className="grid gap-3">
+		                {contractorConfirmedParticipationRequests.slice(0, 4).map((request) => {
+		                  const job = data.adminJobs.find((item) => item.id === request.jobId);
+		                  return (
+		                    <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4" key={request.id}>
+		                      <p className="text-xs font-black uppercase tracking-wide text-emerald-700">
+		                        Project / subcontract scope
+		                      </p>
+		                      <p className="mt-1 font-black text-blue-950">
+		                        {job?.siteName ?? adminJobName(data, request.jobId)}
+		                      </p>
+		                      <div className="mt-2 grid gap-1 text-sm font-bold text-emerald-800">
+		                        <p>Project date: {request.participationDate}</p>
+		                        <p>Site access time: {request.siteAccessTime}</p>
+		                        {request.scopeNote ? <p>{request.scopeNote}</p> : null}
+		                        {request.projectLeadWorkerId ? (
+		                          <p>
+		                            Project lead: {adminWorkerName(data, request.projectLeadWorkerId)}
+		                          </p>
+		                        ) : null}
+		                      </div>
+		                    </div>
+		                  );
+		                })}
+		              </div>
+		            </InfoCard>
+		          ) : null}
 	          {contractorVisibleProjectCards.map((job) => {
               const participation = currentParticipationByJobId.get(job.id);
               const induction = data.projectInductions.find(
