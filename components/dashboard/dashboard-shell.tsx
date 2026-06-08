@@ -235,9 +235,9 @@ export function DashboardShell({
   );
   const [participationRequestDraft, setParticipationRequestDraft] =
     useState<ParticipationRequestDraft>({
-      jobId: data.adminJobs.find((job) => isProjectSelectableForAllocation(job))?.id ?? data.adminJobs[0]?.id ?? "",
+      jobId: "",
       participationDate: initialPerthTomorrow,
-      siteAccessTime: "06:30",
+      siteAccessTime: "07:00",
       scopeNote: "",
       workerIds: [],
       projectLeadWorkerId: ""
@@ -1007,7 +1007,8 @@ export function DashboardShell({
   function runSupabaseAction(
     action: () => Promise<{ ok: boolean; error?: string; message?: string }>,
     pendingLabel = "Saving",
-    feedbackKey?: string
+    feedbackKey?: string,
+    onSuccess?: () => void
   ) {
     setPendingAction(`${pendingLabel}...`);
     setPendingActionKey(feedbackKey ?? null);
@@ -1028,6 +1029,7 @@ export function DashboardShell({
           setActionMessage(message);
         }
         if (result.ok) {
+          onSuccess?.();
           router.refresh();
         }
       } catch (error) {
@@ -2291,6 +2293,17 @@ export function DashboardShell({
     });
   }
 
+  function resetParticipationRequestDraft() {
+    setParticipationRequestDraft({
+      jobId: "",
+      participationDate: initialPerthTomorrow,
+      siteAccessTime: "07:00",
+      scopeNote: "",
+      workerIds: [],
+      projectLeadWorkerId: ""
+    });
+  }
+
   function publishParticipationRequest() {
     const feedbackKey = "participation-request";
     if (!participationRequestDraft.jobId || participationRequestDraft.workerIds.length === 0) {
@@ -2310,7 +2323,8 @@ export function DashboardShell({
             projectLeadWorkerId: participationRequestDraft.projectLeadWorkerId || undefined
           }),
         "Publishing Project Participation Request",
-        feedbackKey
+        feedbackKey,
+        resetParticipationRequestDraft
       );
       return;
     }
@@ -2356,6 +2370,7 @@ export function DashboardShell({
         ]
       };
     });
+    resetParticipationRequestDraft();
     setLocalFeedback(feedbackKey, "success", "Project Participation Request published in demo mode.");
   }
 
