@@ -83,7 +83,10 @@ export async function getSupabaseDashboardData(
     supabase.from("job_assignments").select("id, job_id, worker_id, leading_hand_id"),
     supabase.from("timesheets").select("id, job_id, worker_id, submitted_by, work_date, hours, estimated_hours, tonnes_completed, break_minutes, status, locked_at, approved_at, notes, jobs(site_id, sites(name))"),
     supabase.from("timesheet_correction_requests").select("id, timesheet_id, worker_id, requested_hours, requested_tonnes, reason, status"),
-    supabase.from("worker_rates").select("id, worker_id, pay_rate, effective_from, approval_status"),
+    supabase
+      .from("worker_rates")
+      .select("id, worker_id, kind, pay_rate, effective_from, approval_status")
+      .order("effective_from", { ascending: false }),
     supabase.from("client_rates").select("id, client_id, trade, charge_rate, effective_from"),
     supabase.from("rate_change_requests").select("id, worker_id, proposed_rate, status, agreement_addendum_id"),
     supabase.from("worker_invoices").select("id, invoice_number, worker_id, period_start, period_end, payment_status, total_amount, storage_path, sent_at, approved_at, submitted_at, email_status, due_on, notes"),
@@ -103,6 +106,7 @@ export async function getSupabaseDashboardData(
   const workerRates = (workerRatesResult.data ?? []).map((rate) => ({
     id: String(rate.id),
     workerId: String(rate.worker_id),
+    kind: rate.kind ? String(rate.kind) : undefined,
     ratePerTonne: Number(rate.pay_rate ?? 0),
     effectiveFrom: String(rate.effective_from),
     status:
@@ -450,7 +454,7 @@ async function getWorkerInvoiceDraftsForDashboard(
     invoiceQuery.limit(100),
     supabase
       .from("worker_invoice_items")
-      .select("id, invoice_id, work_entry_id, worker_id, job_id, work_date, hours, tonnes, created_at")
+      .select("id, invoice_id, work_entry_id, worker_id, job_id, work_date, hours, tonnes, rate, total, created_at")
       .order("work_date", { ascending: true })
   ]);
 
@@ -1265,7 +1269,11 @@ function mapAdminWorkers(rows: unknown[] | null, workerRates: WorkerRate[] = [])
   return (rows ?? []).map((row) => {
     const worker = row as Record<string, unknown>;
     const approvedRate = workerRates.find(
-      (rate) => rate.workerId === String(worker.id) && rate.ratePerTonne > 0
+      (rate) =>
+        rate.workerId === String(worker.id) &&
+        (rate.kind === undefined || rate.kind === "tonne") &&
+        rate.status === "approved" &&
+        rate.ratePerTonne > 0
     );
     return {
       id: String(worker.id),
@@ -1400,6 +1408,14 @@ function mapWorkerInvoiceDrafts(
             workDate: String(invoiceItem.work_date ?? ""),
             hours: Number(invoiceItem.hours ?? 0),
             tonnes: Number(invoiceItem.tonnes ?? 0),
+            rate:
+              invoiceItem.rate === null || invoiceItem.rate === undefined
+                ? undefined
+                : Number(invoiceItem.rate),
+            total:
+              invoiceItem.total === null || invoiceItem.total === undefined
+                ? undefined
+                : Number(invoiceItem.total),
             createdAt: String(invoiceItem.created_at ?? "")
           };
         })

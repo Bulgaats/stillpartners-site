@@ -147,6 +147,7 @@ export type TimesheetCorrectionRequest = {
 export type WorkerRate = {
   id: string;
   workerId: string;
+  kind?: string;
   ratePerTonne: number;
   effectiveFrom: string;
   status: RateChangeStatus;
@@ -327,6 +328,8 @@ export type WorkerInvoiceDraftItem = {
   workDate: string;
   hours: number;
   tonnes: number;
+  rate?: number;
+  total?: number;
   createdAt: string;
 };
 

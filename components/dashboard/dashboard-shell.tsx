@@ -89,7 +89,8 @@ import {
   type ScheduleDraft,
   type Timesheet,
   type WorkEntry,
-  type WorkerInvoiceDraft
+  type WorkerInvoiceDraft,
+  type WorkerRate
 } from "@/lib/types";
 import { DemoModeBanner } from "@/components/demo/demo-mode-banner";
 import {
@@ -573,15 +574,38 @@ export function DashboardShell({
     (sum, entry) => sum + entry.tonnes,
     0
   );
-  const contractorApprovedRatePerTonne =
-    data.workerRates.find(
-      (rate) =>
-        rate.workerId === workSystemUserWorkerId &&
-        rate.status === "approved" &&
-        rate.ratePerTonne > 0
-    )?.ratePerTonne ?? currentContractor?.approvedRatePerTonne ?? 0;
-  const selectedContractorInvoiceSubtotal =
-    Math.round(selectedContractorInvoiceTonnes * contractorApprovedRatePerTonne * 100) / 100;
+  const selectedContractorInvoiceRateRows = selectedContractorInvoiceEntries.map((entry) => {
+    const rate = findEffectiveApprovedTonneRate(
+      data.workerRates,
+      entry.workerId,
+      entry.workDate
+    );
+    const subtotal = rate ? Math.round(entry.tonnes * rate.ratePerTonne * 100) / 100 : 0;
+    return { entry, rate, subtotal };
+  });
+  const selectedContractorInvoiceMissingRateCount = selectedContractorInvoiceRateRows.filter(
+    (row) => !row.rate
+  ).length;
+  const selectedContractorInvoiceRates = [
+    ...new Set(
+      selectedContractorInvoiceRateRows
+        .map((row) => row.rate?.ratePerTonne)
+        .filter((rate): rate is number => rate !== undefined)
+    )
+  ];
+  const contractorInvoiceRateLabel =
+    selectedContractorInvoiceEntries.length === 0
+      ? "Select approved production records to calculate invoice."
+      : selectedContractorInvoiceMissingRateCount > 0
+        ? "Approved tonne rate missing"
+        : selectedContractorInvoiceRates.length > 1
+          ? "Multiple approved rates"
+          : selectedContractorInvoiceRates[0] === undefined
+            ? "Approved tonne rate missing"
+            : formatCurrency(selectedContractorInvoiceRates[0]);
+  const selectedContractorInvoiceSubtotal = Math.round(
+    selectedContractorInvoiceRateRows.reduce((sum, row) => sum + row.subtotal, 0) * 100
+  ) / 100;
   const selectedContractorInvoiceGst = currentContractor?.gstRegistered
     ? Math.round(selectedContractorInvoiceSubtotal * 10) / 100
     : 0;
@@ -2745,12 +2769,20 @@ export function DashboardShell({
     const contractor = data.adminWorkers.find(
       (worker) => worker.id === workSystemUserWorkerId
     );
-    const ratePerTonne =
-      data.workerRates.find((rate) => rate.workerId === workSystemUserWorkerId)
-        ?.ratePerTonne ?? 0;
+    const demoInvoiceRateRows = selectedContractorInvoiceEntries.map((entry) => {
+      const rate = findEffectiveApprovedTonneRate(data.workerRates, entry.workerId, entry.workDate);
+      return {
+        ratePerTonne: rate?.ratePerTonne ?? 0,
+        subtotal: rate ? Math.round(entry.tonnes * rate.ratePerTonne * 100) / 100 : 0
+      };
+    });
+    const demoInvoiceRates = [...new Set(demoInvoiceRateRows.map((row) => row.ratePerTonne))].filter(
+      (rate) => rate > 0
+    );
+    const ratePerTonne = demoInvoiceRates.length === 1 ? demoInvoiceRates[0] : undefined;
     const selectedTonnes = selectedContractorInvoiceEntries.reduce((sum, entry) => sum + entry.tonnes, 0);
     const selectedHours = selectedContractorInvoiceEntries.reduce((sum, entry) => sum + entry.hours, 0);
-    const subtotal = Math.round(selectedTonnes * ratePerTonne * 100) / 100;
+    const subtotal = Math.round(demoInvoiceRateRows.reduce((sum, row) => sum + row.subtotal, 0) * 100) / 100;
     const gstAmount = contractor?.gstRegistered ? Math.round(subtotal * 10) / 100 : 0;
     const totalAmount = Math.round((subtotal + gstAmount) * 100) / 100;
     const periodStart = selectedContractorInvoiceEntries[0]?.workDate ?? today;
@@ -4603,15 +4635,16 @@ export function DashboardShell({
                   <Stat label="Selected tonnes delivered" value={`${selectedContractorInvoiceTonnes.toFixed(3)}t`} />
                   <Stat
                     label="Rate per tonne"
-                    value={
-                      contractorApprovedRatePerTonne > 0
-                        ? formatCurrency(contractorApprovedRatePerTonne)
-                        : "Rate missing"
-                    }
+                    value={contractorInvoiceRateLabel}
                   />
                   <Stat label="GST" value={formatCurrency(selectedContractorInvoiceGst)} />
                   <Stat label="Total" value={formatCurrency(selectedContractorInvoiceTotal)} />
                 </div>
+                {selectedContractorInvoiceMissingRateCount > 0 ? (
+                  <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-800">
+                    One or more selected production records has no approved tonne rate effective on its project date.
+                  </p>
+                ) : null}
                 {contractorEligibleInvoiceEntries.map((entry) => {
                   const checked = selectedContractorInvoiceEntryIds.includes(entry.id);
                   const job = data.adminJobs.find((item) => item.id === entry.jobId);
@@ -7856,6 +7889,23 @@ function formatCurrency(value: number) {
     maximumFractionDigits: 0,
     style: "currency"
   }).format(value);
+}
+
+function findEffectiveApprovedTonneRate(
+  rates: WorkerRate[],
+  workerId: string,
+  workDate: string
+) {
+  return rates
+    .filter(
+      (rate) =>
+        rate.workerId === workerId &&
+        rate.status === "approved" &&
+        (rate.kind === undefined || rate.kind === "tonne") &&
+        rate.ratePerTonne > 0 &&
+        rate.effectiveFrom <= workDate
+    )
+    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
 }
 
 function getProjectCompletionPercent(data: DashboardData, job: AdminJob) {

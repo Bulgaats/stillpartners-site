@@ -76,6 +76,11 @@ export type ContractorInvoicePdfInput = {
     projectName: string;
     tonnes: number;
   }[];
+  rateSummaries?: {
+    ratePerTonne: number;
+    tonnes: number;
+    subtotal: number;
+  }[];
   ratePerTonne?: number;
   subtotal?: number;
   gst?: number;
@@ -92,6 +97,17 @@ export function generateContractorInvoicePdf(input: ContractorInvoicePdfInput) {
   const projectSummaries = input.projectSummaries?.length
     ? input.projectSummaries
     : [{ projectName: "Project scope", tonnes: input.totalTonnes }];
+  const rateSummaries = input.rateSummaries?.length
+    ? input.rateSummaries
+    : input.ratePerTonne === undefined
+      ? []
+      : [
+          {
+            ratePerTonne: input.ratePerTonne,
+            tonnes: input.totalTonnes,
+            subtotal
+          }
+        ];
   const scopeReference = projectSummaries
     .map((project) => project.projectName)
     .slice(0, 3)
@@ -131,12 +147,28 @@ export function generateContractorInvoicePdf(input: ContractorInvoicePdfInput) {
   pdf.text("Rate per tonne", 392, 504, { size: 10, font: "F2", color: muted });
   pdf.text("Subtotal", 492, 504, { size: 10, font: "F2", color: muted });
   pdf.line(50, 490, 545, 490, "0.75 0.78 0.82", 0.4);
-  pdf.text("Reinforcement subcontract services", 50, 468, { size: 11, font: "F2", color: dark });
-  pdf.text("Production delivered", 50, 452, { size: 10, color: dark });
-  pdf.text(input.totalTonnes.toFixed(3), 292, 460, { size: 10, color: dark });
-  pdf.text(rateLabel, 392, 460, { size: 10, color: dark });
-  pdf.text(formatMoney(subtotal), 492, 460, { size: 10, color: dark });
-  pdf.line(50, 438, 545, 438, "0.75 0.78 0.82", 0.4);
+  if (rateSummaries.length > 1) {
+    rateSummaries.slice(0, 5).forEach((summary, index) => {
+      const y = 468 - index * 24;
+      pdf.text(index === 0 ? "Reinforcement subcontract services" : "Production delivered", 50, y, {
+        size: index === 0 ? 11 : 10,
+        font: index === 0 ? "F2" : "F1",
+        color: dark
+      });
+      pdf.text(summary.tonnes.toFixed(3), 292, y, { size: 10, color: dark });
+      pdf.text(`$${summary.ratePerTonne.toFixed(2)}`, 392, y, { size: 10, color: dark });
+      pdf.text(formatMoney(summary.subtotal), 492, y, { size: 10, color: dark });
+    });
+    const rateTableBottom = 438 - (Math.min(rateSummaries.length, 5) - 1) * 24;
+    pdf.line(50, rateTableBottom, 545, rateTableBottom, "0.75 0.78 0.82", 0.4);
+  } else {
+    pdf.text("Reinforcement subcontract services", 50, 468, { size: 11, font: "F2", color: dark });
+    pdf.text("Production delivered", 50, 452, { size: 10, color: dark });
+    pdf.text(input.totalTonnes.toFixed(3), 292, 460, { size: 10, color: dark });
+    pdf.text(rateLabel, 392, 460, { size: 10, color: dark });
+    pdf.text(formatMoney(subtotal), 492, 460, { size: 10, color: dark });
+    pdf.line(50, 438, 545, 438, "0.75 0.78 0.82", 0.4);
+  }
 
   pdf.text("Scope / Production Summary", 50, 414, { size: 10, font: "F2", color: muted });
   pdf.text(`Invoice period: ${input.periodStart} to ${input.periodEnd}`, 50, 394, {

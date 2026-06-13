@@ -684,19 +684,62 @@ export async function updateAdminWorkerProfileAction(payload: {
       return { ok: false, error: "Approved rate per tonne must be greater than zero." };
     }
 
-    const { error: rateError } = await supabase.from("worker_rates").insert({
+    const rateEffectiveFrom = new Date().toISOString().slice(0, 10);
+    const rateRow = {
       worker_id: payload.workerId,
       trade: payload.trade || "Subcontract services",
       kind: "tonne",
       pay_rate: approvedRatePerTonne,
-      effective_from: new Date().toISOString().slice(0, 10),
+      effective_from: rateEffectiveFrom,
       approval_status: "approved",
       approved_by_worker_at: new Date().toISOString(),
       created_by: session.userId
-    });
+    };
 
-    if (rateError) {
-      return { ok: false, error: rateError.message };
+    const { data: existingRate, error: existingRateError } = await supabase
+      .from("worker_rates")
+      .select("id")
+      .eq("worker_id", payload.workerId)
+      .eq("kind", "tonne")
+      .eq("effective_from", rateEffectiveFrom)
+      .maybeSingle();
+
+    if (existingRateError) {
+      return { ok: false, error: existingRateError.message };
+    }
+
+    const rateResult = existingRate
+      ? await supabase
+          .from("worker_rates")
+          .update({
+            trade: rateRow.trade,
+            pay_rate: rateRow.pay_rate,
+            approval_status: rateRow.approval_status,
+            approved_by_worker_at: rateRow.approved_by_worker_at
+          })
+          .eq("id", existingRate.id)
+      : await supabase.from("worker_rates").insert(rateRow);
+
+    if (rateResult.error) {
+      if (!existingRate && rateResult.error.code === "23505") {
+        const duplicateUpdate = await supabase
+          .from("worker_rates")
+          .update({
+            trade: rateRow.trade,
+            pay_rate: rateRow.pay_rate,
+            approval_status: rateRow.approval_status,
+            approved_by_worker_at: rateRow.approved_by_worker_at
+          })
+          .eq("worker_id", payload.workerId)
+          .eq("kind", "tonne")
+          .eq("effective_from", rateEffectiveFrom);
+
+        if (duplicateUpdate.error) {
+          return { ok: false, error: duplicateUpdate.error.message };
+        }
+      } else {
+        return { ok: false, error: rateResult.error.message };
+      }
     }
   }
 
@@ -2128,13 +2171,33 @@ export async function createWorkerInvoiceDraftFromWorkEntriesAction(payload: {
     .select("gst_registered")
     .eq("id", workerId)
     .maybeSingle();
-  const ratePerTonne = await getApprovedWorkerRatePerTonne(supabase, workerId);
+  const rateResolution = await resolveApprovedTonneRatesForWorkEntries(
+    supabase,
+    workEntries.map((entry) => ({
+      id: String(entry.id),
+      workerId: String(entry.worker_id),
+      workDate: String(entry.work_date)
+    }))
+  );
 
-  if (ratePerTonne === null || ratePerTonne <= 0) {
-    return { ok: false, error: "No approved contractor rate has been configured yet." };
+  if (!rateResolution.ok) {
+    return { ok: false, error: rateResolution.error };
   }
 
-  const subtotal = roundMoney(totalTonnes * ratePerTonne);
+  const invoiceItems = workEntries.map((entry) => {
+    const tonnes = Number(entry.tonnes ?? Number(entry.hours ?? 0) / 10);
+    const rate = rateResolution.ratesByWorkEntryId.get(String(entry.id));
+    const ratePerTonne = rate?.ratePerTonne ?? 0;
+    return {
+      entry,
+      tonnes,
+      ratePerTonne,
+      total: roundMoney(tonnes * ratePerTonne)
+    };
+  });
+  const uniqueItemRates = [...new Set(invoiceItems.map((item) => item.ratePerTonne))];
+  const ratePerTonne = uniqueItemRates.length === 1 ? uniqueItemRates[0] : null;
+  const subtotal = roundMoney(invoiceItems.reduce((sum, item) => sum + item.total, 0));
   if (subtotal <= 0) {
     return { ok: false, error: "Cannot create a blank contractor invoice." };
   }
@@ -2175,14 +2238,17 @@ export async function createWorkerInvoiceDraftFromWorkEntriesAction(payload: {
   }
 
   const { error: itemError } = await supabase.from("worker_invoice_items").insert(
-    workEntries.map((entry) => ({
+    invoiceItems.map((item) => ({
+      worker_invoice_id: invoice.id,
       invoice_id: invoice.id,
-      work_entry_id: entry.id,
-      worker_id: entry.worker_id,
-      job_id: entry.job_id,
-      work_date: entry.work_date,
-      hours: entry.hours,
-      tonnes: entry.tonnes ?? Number(entry.hours ?? 0) / 10
+      work_entry_id: item.entry.id,
+      worker_id: item.entry.worker_id,
+      job_id: item.entry.job_id,
+      work_date: item.entry.work_date,
+      hours: item.entry.hours,
+      tonnes: item.tonnes,
+      rate: item.ratePerTonne,
+      total: item.total
     }))
   );
 
@@ -2356,7 +2422,7 @@ export async function getOrCreateWorkerInvoiceDraftPdfAction(
     .maybeSingle();
   const { data: invoiceItems, error: itemError } = await supabase
     .from("worker_invoice_items")
-    .select("job_id, tonnes")
+    .select("job_id, tonnes, rate, total")
     .eq("invoice_id", invoiceId)
     .limit(1000);
 
@@ -2387,6 +2453,34 @@ export async function getOrCreateWorkerInvoiceDraftPdfAction(
     projectName: projectNameById.get(projectId) ?? "Project scope",
     tonnes
   }));
+  const fallbackRate =
+    invoice.rate_per_tonne === null || invoice.rate_per_tonne === undefined
+      ? undefined
+      : Number(invoice.rate_per_tonne);
+  const rateSummaryByRate = new Map<string, { ratePerTonne: number; tonnes: number; subtotal: number }>();
+  (invoiceItems ?? []).forEach((item) => {
+    const itemRate =
+      item.rate === null || item.rate === undefined ? fallbackRate : Number(item.rate);
+    if (itemRate === undefined || itemRate <= 0) {
+      return;
+    }
+
+    const tonnes = Number(item.tonnes ?? 0);
+    const subtotal =
+      item.total === null || item.total === undefined
+        ? roundMoney(tonnes * itemRate)
+        : Number(item.total);
+    const key = itemRate.toFixed(2);
+    const existing = rateSummaryByRate.get(key);
+    rateSummaryByRate.set(key, {
+      ratePerTonne: itemRate,
+      tonnes: (existing?.tonnes ?? 0) + tonnes,
+      subtotal: roundMoney((existing?.subtotal ?? 0) + subtotal)
+    });
+  });
+  const rateSummaries = [...rateSummaryByRate.values()].sort(
+    (a, b) => b.ratePerTonne - a.ratePerTonne
+  );
 
   const issueDate = invoice.submitted_at
     ? new Date(String(invoice.submitted_at)).toISOString().slice(0, 10)
@@ -2437,9 +2531,8 @@ export async function getOrCreateWorkerInvoiceDraftPdfAction(
     totalTonnes: Number(invoice.total_tonnes ?? 0),
     projectSummaries,
     ratePerTonne:
-      invoice.rate_per_tonne === null || invoice.rate_per_tonne === undefined
-        ? undefined
-        : Number(invoice.rate_per_tonne),
+      fallbackRate ?? (rateSummaries.length === 1 ? rateSummaries[0]?.ratePerTonne : undefined),
+    rateSummaries,
     totalAmount:
       invoice.total_amount === null || invoice.total_amount === undefined
         ? undefined
@@ -3722,27 +3815,84 @@ function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
 }
 
-async function getApprovedWorkerRatePerTonne(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  workerId: string
-) {
-  const { data: rates } = await supabase
-    .from("worker_rates")
-    .select("pay_rate, approval_status, effective_from")
-    .eq("worker_id", workerId)
-    .order("effective_from", { ascending: false });
-  const validRates = (rates ?? [])
-    .map((rate) => ({
-      amount: Number(rate.pay_rate ?? 0),
-      status: String(rate.approval_status ?? "approved")
-    }))
-    .filter((rate) => rate.amount > 0);
-  const approvedRate =
-    validRates.find((rate) => rate.status === "approved") ??
-    validRates.find((rate) => rate.status === "" || rate.status === "active") ??
-    null;
+type WorkEntryRateInput = {
+  id: string;
+  workerId: string;
+  workDate: string;
+};
 
-  return approvedRate?.amount ?? null;
+type WorkEntryRateResolution =
+  | {
+      ok: true;
+      ratesByWorkEntryId: Map<
+        string,
+        {
+          ratePerTonne: number;
+          effectiveFrom: string;
+        }
+      >;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
+async function resolveApprovedTonneRatesForWorkEntries(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  workEntries: WorkEntryRateInput[]
+): Promise<WorkEntryRateResolution> {
+  if (workEntries.length === 0) {
+    return { ok: true, ratesByWorkEntryId: new Map() };
+  }
+
+  const workerIds = [...new Set(workEntries.map((entry) => entry.workerId))];
+  const latestWorkDate = workEntries.reduce(
+    (latest, entry) => (entry.workDate > latest ? entry.workDate : latest),
+    workEntries[0]?.workDate ?? ""
+  );
+  const { data: rates, error } = await supabase
+    .from("worker_rates")
+    .select("worker_id, pay_rate, effective_from")
+    .in("worker_id", workerIds)
+    .eq("kind", "tonne")
+    .eq("approval_status", "approved")
+    .lte("effective_from", latestWorkDate)
+    .order("effective_from", { ascending: false });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  const ratesByWorkEntryId = new Map<string, { ratePerTonne: number; effectiveFrom: string }>();
+  const approvedRates = (rates ?? [])
+    .map((rate) => ({
+      workerId: String(rate.worker_id),
+      ratePerTonne: Number(rate.pay_rate ?? 0),
+      effectiveFrom: String(rate.effective_from ?? "")
+    }))
+    .filter((rate) => rate.ratePerTonne > 0 && rate.effectiveFrom);
+
+  for (const entry of workEntries) {
+    const rate = approvedRates.find(
+      (candidate) =>
+        candidate.workerId === entry.workerId &&
+        candidate.effectiveFrom <= entry.workDate
+    );
+
+    if (!rate) {
+      return {
+        ok: false,
+        error: `No approved tonne rate is effective for selected production on ${entry.workDate}.`
+      };
+    }
+
+    ratesByWorkEntryId.set(entry.id, {
+      ratePerTonne: rate.ratePerTonne,
+      effectiveFrom: rate.effectiveFrom
+    });
+  }
+
+  return { ok: true, ratesByWorkEntryId };
 }
 
 function contractorProfileCompletion(payload: {
