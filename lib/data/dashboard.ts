@@ -477,7 +477,7 @@ async function getAdminJobSystemData(
   const dataSupabase = createServiceRoleSupabaseClient() ?? supabase;
   if (sessionProfile.profile.role !== "admin") {
     const workerId = sessionProfile.workerId ?? sessionProfile.userId;
-    const [assignments, worker, participations] = await Promise.all([
+    const [assignments, worker, participations, participationRequests] = await Promise.all([
       dataSupabase
         .from("assignments")
         .select("id, job_id, worker_id, date, start_time, role, created_at")
@@ -492,7 +492,11 @@ async function getAdminJobSystemData(
         .from("project_participations")
         .select("job_id")
         .eq("worker_id", workerId)
-        .in("status", ["confirmed", "interested"])
+        .in("status", ["confirmed", "interested"]),
+      dataSupabase
+        .from("project_participation_requests")
+        .select("job_id")
+        .eq("worker_id", workerId)
     ]);
 
     if (assignments.error) {
@@ -503,6 +507,9 @@ async function getAdminJobSystemData(
     }
     if (participations.error) {
       console.error("Worker project participation fetch failed", participations.error);
+    }
+    if (participationRequests.error) {
+      console.error("Worker project participation request fetch failed", participationRequests.error);
     }
 
     const ownAssignments = mapAdminAssignments(assignments.data);
@@ -532,7 +539,8 @@ async function getAdminJobSystemData(
     const jobIds = [
       ...new Set([
         ...allAssignments.map((assignment) => assignment.jobId),
-        ...(participations.data ?? []).map((participation) => String(participation.job_id))
+        ...(participations.data ?? []).map((participation) => String(participation.job_id)),
+        ...(participationRequests.data ?? []).map((request) => String(request.job_id))
       ])
     ];
     const workerIds = [...new Set(allAssignments.map((assignment) => assignment.workerId))];
