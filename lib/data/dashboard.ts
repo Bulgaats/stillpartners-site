@@ -116,6 +116,7 @@ export async function getSupabaseDashboardData(
           ? "rejected" as const
           : "approved" as const
   }));
+  const operationalDate = getPerthDate();
 
   return {
     currentUserId: sessionProfile.workerId ?? sessionProfile.userId,
@@ -168,8 +169,10 @@ export async function getSupabaseDashboardData(
     adminJobs: adminJobSystem.jobs,
     adminWorkers: adminJobSystem.workers.map((worker) => ({
       ...worker,
-      approvedRatePerTonne: workerRates.find(
-        (rate) => rate.workerId === worker.id && rate.status === "approved" && rate.ratePerTonne > 0
+      approvedRatePerTonne: getCurrentApprovedTonneRateForWorker(
+        workerRates,
+        worker.id,
+        operationalDate
       )?.ratePerTonne
     })),
     adminAssignments: adminJobSystem.assignments,
@@ -1227,6 +1230,35 @@ function parseExpenseFrequency(frequency: string): RecurringExpense["frequency"]
   return "fortnightly";
 }
 
+function getPerthDate(offsetDays = 0) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Perth",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return formatter.format(date);
+}
+
+function getCurrentApprovedTonneRateForWorker(
+  workerRates: WorkerRate[],
+  workerId: string,
+  operationalDate: string
+) {
+  return workerRates
+    .filter(
+      (rate) =>
+        rate.workerId === workerId &&
+        rate.kind === "tonne" &&
+        rate.status === "approved" &&
+        rate.ratePerTonne > 0 &&
+        rate.effectiveFrom <= operationalDate
+    )
+    .sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom))[0];
+}
+
 function mapAdminJobs(rows: unknown[] | null): AdminJob[] {
   return (rows ?? []).map((row) => {
     const job = row as Record<string, unknown>;
@@ -1266,14 +1298,13 @@ function mapAdminJobs(rows: unknown[] | null): AdminJob[] {
 }
 
 function mapAdminWorkers(rows: unknown[] | null, workerRates: WorkerRate[] = []): AdminWorker[] {
+  const operationalDate = getPerthDate();
   return (rows ?? []).map((row) => {
     const worker = row as Record<string, unknown>;
-    const approvedRate = workerRates.find(
-      (rate) =>
-        rate.workerId === String(worker.id) &&
-        (rate.kind === undefined || rate.kind === "tonne") &&
-        rate.status === "approved" &&
-        rate.ratePerTonne > 0
+    const approvedRate = getCurrentApprovedTonneRateForWorker(
+      workerRates,
+      String(worker.id),
+      operationalDate
     );
     return {
       id: String(worker.id),

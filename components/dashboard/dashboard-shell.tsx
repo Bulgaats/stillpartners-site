@@ -5235,13 +5235,20 @@ export function DashboardShell({
           </InfoCard>
           {canViewWorkerRate(role) ? (
             <InfoCard icon={BadgeDollarSign} title="Contractor rate">
-              {data.workerRates
-                .filter((rate) => rate.workerId === currentUserId || role === "admin")
-                .map((rate) => (
-                  <p className="text-sm text-gray-700" key={rate.id}>
-                    ${rate.ratePerTonne.toFixed(2)} per tonne · {rate.status}
-                  </p>
-                ))}
+              {role === "admin" ? (
+                <p className="text-sm font-bold text-gray-700">
+                  Contractor rates vary by contractor. Open a contractor profile to view or update
+                  the current approved rate.
+                </p>
+              ) : (
+                data.workerRates
+                  .filter((rate) => rate.workerId === currentUserId)
+                  .map((rate) => (
+                    <p className="text-sm text-gray-700" key={rate.id}>
+                      ${rate.ratePerTonne.toFixed(2)} per tonne · {rate.status}
+                    </p>
+                  ))
+              )}
             </InfoCard>
           ) : null}
         </DashboardGrid>

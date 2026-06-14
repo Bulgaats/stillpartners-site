@@ -684,7 +684,7 @@ export async function updateAdminWorkerProfileAction(payload: {
       return { ok: false, error: "Approved rate per tonne must be greater than zero." };
     }
 
-    const rateEffectiveFrom = new Date().toISOString().slice(0, 10);
+    const rateEffectiveFrom = getPerthDate();
     const rateRow = {
       worker_id: payload.workerId,
       trade: payload.trade || "Subcontract services",
@@ -3809,6 +3809,18 @@ function addDays(dateValue: string, days: number) {
   const date = new Date(`${dateValue}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function getPerthDate(offsetDays = 0) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Perth",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return formatter.format(date);
 }
 
 function roundMoney(value: number) {
