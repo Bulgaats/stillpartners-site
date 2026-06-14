@@ -306,6 +306,7 @@ export type WorkEntry = {
   workerId: string;
   jobId: string;
   assignmentId?: string;
+  projectParticipationRequestId?: string;
   workDate: string;
   hours: number;
   tonnes: number;

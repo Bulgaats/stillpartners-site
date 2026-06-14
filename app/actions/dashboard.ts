@@ -1706,9 +1706,13 @@ export async function upsertWorkEntryAction(payload: {
     }
   }
 
+  if (session.profile.role !== "admin" && payload.workDate > getPerthDate()) {
+    return { ok: false, error: "Production entry is not available before the project date." };
+  }
+
   const { data: existing, error: existingError } = await supabase
     .from("work_entries")
-    .select("id, approved, locked")
+    .select("id, approved, locked, project_participation_request_id")
     .eq("worker_id", payload.workerId)
     .eq("job_id", payload.jobId)
     .eq("work_date", payload.workDate)
@@ -1722,11 +1726,20 @@ export async function upsertWorkEntryAction(payload: {
     return { ok: false, error: "Approved production records are locked." };
   }
 
+  const confirmedParticipationRequestId = await getConfirmedProjectParticipationRequestId({
+    supabase,
+    workerId: payload.workerId,
+    jobId: payload.jobId,
+    workDate: payload.workDate
+  });
+
   const row = {
     worker_id: payload.workerId,
     job_id: payload.jobId,
     assignment_id: payload.assignmentId || null,
     work_date: payload.workDate,
+    project_participation_request_id:
+      confirmedParticipationRequestId ?? existing?.project_participation_request_id ?? null,
     hours: payload.hours,
     entered_by: session.userId,
     entry_role: entryRole,
@@ -1781,7 +1794,8 @@ export async function bulkUpsertWorkEntriesAction(payload: {
     return { ok: false, error: "No production records to save." };
   }
 
-  const supabase = await createServerSupabaseClient();
+  const userSupabase = await createServerSupabaseClient();
+  const supabase = createServiceRoleSupabaseClient() ?? userSupabase;
   const rows = [];
   const sessionWorkerId = session.workerId ?? session.userId;
 
@@ -1799,9 +1813,13 @@ export async function bulkUpsertWorkEntriesAction(payload: {
       return { ok: false, error: "You cannot enter site activity for this project team." };
     }
 
+    if (session.profile.role !== "admin" && entry.workDate > getPerthDate()) {
+      return { ok: false, error: "Production entry is not available before the project date." };
+    }
+
     const { data: existing, error: existingError } = await supabase
       .from("work_entries")
-      .select("id, approved, locked")
+      .select("id, approved, locked, project_participation_request_id")
       .eq("worker_id", entry.workerId)
       .eq("job_id", entry.jobId)
       .eq("work_date", entry.workDate)
@@ -1815,11 +1833,20 @@ export async function bulkUpsertWorkEntriesAction(payload: {
       return { ok: false, error: "Approved production records are locked." };
     }
 
+    const confirmedParticipationRequestId = await getConfirmedProjectParticipationRequestId({
+      supabase,
+      workerId: entry.workerId,
+      jobId: entry.jobId,
+      workDate: entry.workDate
+    });
+
     rows.push({
       worker_id: entry.workerId,
       job_id: entry.jobId,
       assignment_id: entry.assignmentId || null,
       work_date: entry.workDate,
+      project_participation_request_id:
+        confirmedParticipationRequestId ?? existing?.project_participation_request_id ?? null,
       hours: entry.hours,
       entered_by: session.userId,
       entry_role: session.profile.role === "admin" ? "admin" : "leading_hand",
@@ -2010,20 +2037,35 @@ export async function generateWorkerInvoiceDraftAction(payload: {
     .select("gst_registered")
     .eq("id", payload.workerId)
     .maybeSingle();
-  const { data: rates } = await supabase
-    .from("worker_rates")
-    .select("pay_rate")
-    .eq("worker_id", payload.workerId)
-    .eq("approval_status", "approved")
-    .order("effective_from", { ascending: false })
-    .limit(1);
-  const ratePerTonne =
-    rates?.[0]?.pay_rate === null || rates?.[0]?.pay_rate === undefined
-      ? null
-      : Number(rates[0].pay_rate);
+  const rateResolution = await resolveApprovedTonneRatesForWorkEntries(
+    supabase,
+    eligibleEntries.map((entry) => ({
+      id: String(entry.id),
+      workerId: String(entry.worker_id),
+      workDate: String(entry.work_date)
+    }))
+  );
+
+  if (!rateResolution.ok) {
+    return { ok: false, error: rateResolution.error };
+  }
+
+  const invoiceItems = eligibleEntries.map((entry) => {
+    const tonnes = Number(entry.tonnes ?? Number(entry.hours ?? 0) / 10);
+    const rate = rateResolution.ratesByWorkEntryId.get(String(entry.id));
+    const ratePerTonne = rate?.ratePerTonne ?? 0;
+    return {
+      entry,
+      tonnes,
+      ratePerTonne,
+      total: roundMoney(tonnes * ratePerTonne)
+    };
+  });
+  const uniqueItemRates = [...new Set(invoiceItems.map((item) => item.ratePerTonne))];
+  const ratePerTonne = uniqueItemRates.length === 1 ? uniqueItemRates[0] : null;
   const gstRegistered = worker?.gst_registered === true;
-  const subtotal = ratePerTonne === null ? 0 : roundMoney(totalTonnes * ratePerTonne);
-  if (ratePerTonne === null || ratePerTonne <= 0 || subtotal <= 0) {
+  const subtotal = roundMoney(invoiceItems.reduce((sum, item) => sum + item.total, 0));
+  if (subtotal <= 0) {
     return {
       ok: false,
       error: "Configure an approved contractor rate before generating an invoice."
@@ -2061,14 +2103,17 @@ export async function generateWorkerInvoiceDraftAction(payload: {
   }
 
   const { error: itemError } = await supabase.from("worker_invoice_items").insert(
-    eligibleEntries.map((entry) => ({
+    invoiceItems.map((item) => ({
+      worker_invoice_id: invoice.id,
       invoice_id: invoice.id,
-      work_entry_id: entry.id,
-      worker_id: entry.worker_id,
-      job_id: entry.job_id,
-      work_date: entry.work_date,
-      hours: entry.hours,
-      tonnes: entry.tonnes ?? Number(entry.hours ?? 0) / 10
+      work_entry_id: item.entry.id,
+      worker_id: item.entry.worker_id,
+      job_id: item.entry.job_id,
+      work_date: item.entry.work_date,
+      hours: item.entry.hours,
+      tonnes: item.tonnes,
+      rate: item.ratePerTonne,
+      total: item.total
     }))
   );
 
@@ -2900,6 +2945,10 @@ export async function generateWorkerInvoiceAction(workerId: string): Promise<Act
     return { ok: false, error: "No approved locked production records found for this contractor period." };
   }
 
+  if (payload.items.some((item) => item.rate <= 0)) {
+    return { ok: false, error: "Configure an approved contractor rate for each selected production date." };
+  }
+
   if (payload.total <= 0) {
     return { ok: false, error: "Configure an approved contractor rate before generating an invoice." };
   }
@@ -2961,13 +3010,16 @@ export async function generateWorkerInvoiceAction(workerId: string): Promise<Act
 
   const { error: itemError } = await supabase.from("worker_invoice_items").insert(
     payload.items.map((item) => ({
+      worker_invoice_id: invoice.id,
       invoice_id: invoice.id,
       work_entry_id: item.timesheetId,
       worker_id: workerId,
       job_id: item.jobId,
       hours: item.hours,
       tonnes: item.tonnes,
-      work_date: item.workDate
+      work_date: item.workDate,
+      rate: item.rate,
+      total: item.total
     }))
   );
 
@@ -4066,6 +4118,39 @@ async function hasActiveProductionProjectAccess({
     .limit(1);
 
   return Boolean(participation?.length);
+}
+
+async function getConfirmedProjectParticipationRequestId({
+  supabase,
+  jobId,
+  workerId,
+  workDate
+}: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  jobId: string;
+  workerId: string;
+  workDate: string;
+}) {
+  const { data, error } = await supabase
+    .from("project_participation_requests")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("worker_id", workerId)
+    .eq("participation_date", workDate)
+    .eq("status", "contractor_confirmed")
+    .maybeSingle();
+
+  if (error) {
+    if (!isProjectParticipationRequestMissingError(error)) {
+      console.warn("Confirmed project participation request link skipped", {
+        code: error.code,
+        message: error.message
+      });
+    }
+    return null;
+  }
+
+  return data?.id ? String(data.id) : null;
 }
 
 function projectParticipationRequestSchemaError(error: { code?: string; message: string }) {

@@ -379,7 +379,7 @@ async function getWorkEntriesForDashboard(
   sessionProfile: SessionProfile
 ) {
   const dataSupabase = createServiceRoleSupabaseClient() ?? supabase;
-  const columns = "id, worker_id, job_id, assignment_id, work_date, hours, tonnes, entered_by, entry_role, approved, approved_by, approved_at, locked, created_at, updated_at";
+  const columns = "id, worker_id, job_id, assignment_id, project_participation_request_id, work_date, hours, tonnes, entered_by, entry_role, approved, approved_by, approved_at, locked, created_at, updated_at";
 
   if (sessionProfile.profile.role === "admin") {
     const { data, error } = await dataSupabase
@@ -790,16 +790,23 @@ export async function buildWorkerInvoicePayload(workerId: string) {
       : { data: [] };
   const { data: rates } = await supabase
     .from("worker_rates")
-    .select("pay_rate")
+    .select("worker_id, pay_rate, effective_from")
     .eq("worker_id", workerId)
+    .eq("kind", "tonne")
     .eq("approval_status", "approved")
     .order("effective_from", { ascending: false })
-    .limit(1);
+    .lte("effective_from", period.end);
   const { count } = await supabase
     .from("worker_invoices")
     .select("id", { count: "exact", head: true });
   const invoiceNumber = generateInvoiceNumber("WINV", count ?? 0);
-  const rate = Number(rates?.[0]?.pay_rate ?? 0);
+  const approvedRates = (rates ?? [])
+    .map((rate) => ({
+      workerId: String(rate.worker_id),
+      ratePerTonne: Number(rate.pay_rate ?? 0),
+      effectiveFrom: String(rate.effective_from ?? "")
+    }))
+    .filter((rate) => rate.ratePerTonne > 0 && rate.effectiveFrom);
   const alreadyInvoicedIds = new Set(
     (alreadyInvoiced ?? []).map((item) => String(item.work_entry_id))
   );
@@ -808,6 +815,12 @@ export async function buildWorkerInvoicePayload(workerId: string) {
     .map((entry) => {
       const job = Array.isArray(entry.jobs) ? entry.jobs[0] : entry.jobs;
       const tonnes = Number(entry.tonnes ?? Number(entry.hours ?? 0) / 10);
+      const rate = approvedRates.find(
+        (candidate) =>
+          candidate.workerId === workerId &&
+          candidate.effectiveFrom <= String(entry.work_date ?? "")
+      );
+      const ratePerTonne = rate?.ratePerTonne ?? 0;
       return {
         id: `item-${entry.id}`,
         timesheetId: String(entry.id),
@@ -817,8 +830,8 @@ export async function buildWorkerInvoicePayload(workerId: string) {
         workDate: String(entry.work_date ?? ""),
         siteName: String(job?.site_name ?? job?.location ?? "Project site"),
         tonnes,
-        rate,
-        total: tonnes * rate
+        rate: ratePerTonne,
+        total: roundMoney(tonnes * ratePerTonne)
       };
     });
 
@@ -1150,6 +1163,7 @@ function mapClientInvoices(
       .map((item) => ({
         id: String(item.id),
         timesheetId: String(item.timesheet_id ?? ""),
+        workEntryIds: item.work_entry_id ? [String(item.work_entry_id)] : undefined,
         description: String(item.description),
         hours: Number(item.hours ?? 0),
         workDate: item.work_date ? String(item.work_date) : undefined,
@@ -1240,6 +1254,10 @@ function getPerthDate(offsetDays = 0) {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() + offsetDays);
   return formatter.format(date);
+}
+
+function roundMoney(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function getCurrentApprovedTonneRateForWorker(
@@ -1362,6 +1380,9 @@ function mapWorkEntries(rows: unknown[] | null): WorkEntry[] {
       workerId: String(entry.worker_id),
       jobId: String(entry.job_id),
       assignmentId: entry.assignment_id ? String(entry.assignment_id) : undefined,
+      projectParticipationRequestId: entry.project_participation_request_id
+        ? String(entry.project_participation_request_id)
+        : undefined,
       workDate: String(entry.work_date ?? ""),
       hours,
       tonnes: Number(entry.tonnes ?? hoursToTonnes(hours)),
