@@ -551,7 +551,7 @@ export function DashboardShell({
   const contractorInvoicedWorkEntryIds = new Set(
     data.workerInvoiceDrafts.flatMap((invoice) =>
       invoice.items.map((item) => item.workEntryId)
-    )
+    ).filter(Boolean)
   );
   const contractorEligibleInvoiceEntries = data.workEntries.filter((entry) => {
     const job = data.adminJobs.find((item) => item.id === entry.jobId);

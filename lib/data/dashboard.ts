@@ -457,7 +457,7 @@ async function getWorkerInvoiceDraftsForDashboard(
     invoiceQuery.limit(100),
     supabase
       .from("worker_invoice_items")
-      .select("id, invoice_id, work_entry_id, worker_id, job_id, work_date, hours, tonnes, rate, total, created_at")
+      .select("id, invoice_id, worker_invoice_id, work_entry_id, worker_id, job_id, work_date, hours, tonnes, rate, total, created_at")
       .order("work_date", { ascending: true })
   ]);
 
@@ -1448,12 +1448,18 @@ function mapWorkerInvoiceDrafts(
       createdAt: String(invoice.created_at ?? ""),
       updatedAt: String(invoice.updated_at ?? ""),
       items: items
-        .filter((item) => String((item as Record<string, unknown>).invoice_id) === id)
+        .filter((item) => {
+          const invoiceItem = item as Record<string, unknown>;
+          return (
+            String(invoiceItem.invoice_id ?? "") === id ||
+            String(invoiceItem.worker_invoice_id ?? "") === id
+          );
+        })
         .map((item) => {
           const invoiceItem = item as Record<string, unknown>;
           return {
             id: String(invoiceItem.id),
-            invoiceId: String(invoiceItem.invoice_id),
+            invoiceId: String(invoiceItem.invoice_id ?? invoiceItem.worker_invoice_id ?? ""),
             workEntryId: String(invoiceItem.work_entry_id ?? ""),
             workerId: String(invoiceItem.worker_id ?? ""),
             jobId: String(invoiceItem.job_id ?? ""),
