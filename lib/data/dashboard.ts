@@ -89,8 +89,11 @@ export async function getSupabaseDashboardData(
       .order("effective_from", { ascending: false }),
     supabase.from("client_rates").select("id, client_id, trade, charge_rate, effective_from"),
     supabase.from("rate_change_requests").select("id, worker_id, proposed_rate, status, agreement_addendum_id"),
-    supabase.from("worker_invoices").select("id, invoice_number, worker_id, period_start, period_end, payment_status, total_amount, storage_path, sent_at, approved_at, submitted_at, email_status, due_on, notes"),
-    supabase.from("worker_invoice_items").select("id, worker_invoice_id, timesheet_id, description, hours, tonnes, rate, total, work_date, site_name"),
+    // Keep contractor invoice dashboard reads aligned to production-visible columns.
+    // Do not reintroduce worker_invoice_items.worker_invoice_id/rate/total or
+    // worker_invoices.payment_status/total here without verifying production schema.
+    supabase.from("worker_invoices").select("id, invoice_number, worker_id, period_start, period_end, status, total_hours, total_tonnes, rate_per_tonne, subtotal, gst_registered, gst_amount, total_amount, approved_by_worker_at, submitted_at, paid_at, created_at, updated_at, pdf_url, invoice_title"),
+    supabase.from("worker_invoice_items").select("id, invoice_id, work_entry_id, worker_id, job_id, work_date, hours, tonnes, created_at"),
     supabase.from("client_invoices").select("id, invoice_number, client_id, period_start, period_end, payment_status, subtotal, gst_amount, total_amount, total, pdf_url, storage_path, sent_at, email_status, due_on, notes"),
     supabase.from("client_invoice_items").select("id, client_invoice_id, timesheet_id, work_entry_id, job_id, description, hours, tonnes, rate, total, work_date, site_name"),
     supabase.from("recurring_expenses").select("id, name, amount, frequency"),
@@ -457,7 +460,9 @@ async function getWorkerInvoiceDraftsForDashboard(
     invoiceQuery.limit(100),
     supabase
       .from("worker_invoice_items")
-      .select("id, invoice_id, worker_invoice_id, work_entry_id, worker_id, job_id, work_date, hours, tonnes, rate, total, created_at")
+      // Production currently exposes invoice_id/work_entry_id/hours/tonnes only for items.
+      // The simplified MVP contractor PDF path does not depend on item rate/total snapshots.
+      .select("id, invoice_id, work_entry_id, worker_id, job_id, work_date, hours, tonnes, created_at")
       .order("work_date", { ascending: true })
   ]);
 
@@ -1108,17 +1113,17 @@ function mapWorkerInvoices(
     const id = String(invoice.id);
     const items = (itemRows ?? [])
       .map((item) => item as Record<string, unknown>)
-      .filter((item) => String(item.worker_invoice_id) === id)
+      .filter((item) => String(item.invoice_id) === id)
       .map((item) => ({
         id: String(item.id),
-        timesheetId: String(item.work_entry_id ?? item.timesheet_id ?? ""),
-        description: String(item.description),
+        timesheetId: String(item.work_entry_id ?? ""),
+        description: "Reinforcement subcontract services",
         hours: Number(item.hours ?? 0),
         workDate: item.work_date ? String(item.work_date) : undefined,
-        siteName: item.site_name ? String(item.site_name) : undefined,
+        siteName: undefined,
         tonnes: Number(item.tonnes ?? 0),
-        rate: Number(item.rate ?? 0),
-        total: Number(item.total ?? 0)
+        rate: Number(invoice.rate_per_tonne ?? 0),
+        total: roundMoney(Number(item.tonnes ?? 0) * Number(invoice.rate_per_tonne ?? 0))
       }));
 
     return {
@@ -1127,7 +1132,7 @@ function mapWorkerInvoices(
       workerId: String(invoice.worker_id),
       periodStart: String(invoice.period_start),
       periodEnd: String(invoice.period_end),
-      status: parseWorkerInvoiceStatus(String(invoice.payment_status)),
+      status: parseWorkerInvoiceStatus(String(invoice.status ?? "draft")),
       items,
       total: Number(invoice.total_amount ?? invoice.total ?? 0),
       subtotal:
@@ -1139,13 +1144,13 @@ function mapWorkerInvoices(
           ? undefined
           : Number(invoice.gst_amount),
       pdfUrl: invoice.pdf_url ? String(invoice.pdf_url) : undefined,
-      storagePath: invoice.storage_path ? String(invoice.storage_path) : undefined,
-      sentAt: invoice.sent_at ? String(invoice.sent_at) : undefined,
-      approvedAt: invoice.approved_at ? String(invoice.approved_at) : undefined,
+      storagePath: invoice.pdf_url ? String(invoice.pdf_url) : undefined,
+      sentAt: invoice.submitted_at ? String(invoice.submitted_at) : undefined,
+      approvedAt: invoice.approved_by_worker_at ? String(invoice.approved_by_worker_at) : undefined,
       submittedAt: invoice.submitted_at ? String(invoice.submitted_at) : undefined,
-      emailStatus: parseEmailStatus(String(invoice.email_status ?? "not_sent")),
-      dueOn: invoice.due_on ? String(invoice.due_on) : undefined,
-      notes: invoice.notes ? String(invoice.notes) : undefined
+      emailStatus: "not_sent",
+      dueOn: undefined,
+      notes: undefined
     };
   });
 }

@@ -25,7 +25,6 @@ import {
   addProjectNoteAction,
   bulkUpsertWorkEntriesAction,
   confirmProjectParticipationRequestAction,
-  createWorkerInvoiceDraftFromWorkEntriesAction,
   createAdminJobAction,
   createAdminWorkerAction,
   createCorrectionRequestAction,
@@ -36,6 +35,7 @@ import {
   createSiteAction,
   decideCorrectionRequestAction,
   generateClientInvoiceAction,
+  generateContractorWeeklyInvoicePdfAction,
   getOrCreateWorkerInvoiceDraftPdfAction,
   getClientInvoicePdfAction,
   inviteUserAction,
@@ -117,6 +117,9 @@ type Tab =
   | "admin";
 const adminTabs: Tab[] = ["overview", "adminJobs", "workers", "clients", "workerInvoices", "admin"];
 const contractorTabs: Tab[] = ["jobs", "workEntries", "workerInvoices", "profile"];
+// Simplified contractor MVP hides old test records from visible production/invoice lists.
+// This is a UI filter only; it does not delete or mutate historical data.
+const MVP_GO_LIVE_DATE = "2026-06-18";
 
 type ContractorProfileDraft = {
   fullName: string;
@@ -269,7 +272,11 @@ export function DashboardShell({
     periodEnd: initialFormDate,
     ratePerTonne: String(data.clientRates[0]?.ratePerTonne ?? "")
   });
-  const [selectedContractorInvoiceEntryIds, setSelectedContractorInvoiceEntryIds] = useState<string[]>([]);
+  const initialContractorInvoicePeriod = determineCurrentWeekPeriod(initialFormDate);
+  const [contractorInvoicePeriod, setContractorInvoicePeriod] = useState({
+    periodStart: initialContractorInvoicePeriod.start,
+    periodEnd: initialContractorInvoicePeriod.end
+  });
   const [availabilityDrafts, setAvailabilityDrafts] = useState<
     Record<string, { status: "available" | "limited" | "unavailable"; availableFrom: string; notes: string }>
   >(() =>
@@ -489,6 +496,11 @@ export function DashboardShell({
       )
     );
   });
+  const contractorMvpWorkEntries = visibleWorkEntries.filter(
+    (entry) =>
+      entry.workerId === workSystemUserWorkerId &&
+      entry.workDate >= MVP_GO_LIVE_DATE
+  );
   const filteredWorkEntries = visibleWorkEntries.filter((entry) => {
     const week = determineCurrentWeekPeriod(workEntryFilters.date);
     const matchesJob = !workEntryFilters.jobId || entry.jobId === workEntryFilters.jobId;
@@ -563,54 +575,6 @@ export function DashboardShell({
       (!job || isProjectSelectableForAllocation(job))
     );
   });
-  const contractorEligibleInvoiceTonnes = contractorEligibleInvoiceEntries.reduce(
-    (sum, entry) => sum + entry.tonnes,
-    0
-  );
-  const selectedContractorInvoiceEntries = contractorEligibleInvoiceEntries.filter((entry) =>
-    selectedContractorInvoiceEntryIds.includes(entry.id)
-  );
-  const selectedContractorInvoiceTonnes = selectedContractorInvoiceEntries.reduce(
-    (sum, entry) => sum + entry.tonnes,
-    0
-  );
-  const selectedContractorInvoiceRateRows = selectedContractorInvoiceEntries.map((entry) => {
-    const rate = findEffectiveApprovedTonneRate(
-      data.workerRates,
-      entry.workerId,
-      entry.workDate
-    );
-    const subtotal = rate ? Math.round(entry.tonnes * rate.ratePerTonne * 100) / 100 : 0;
-    return { entry, rate, subtotal };
-  });
-  const selectedContractorInvoiceMissingRateCount = selectedContractorInvoiceRateRows.filter(
-    (row) => !row.rate
-  ).length;
-  const selectedContractorInvoiceRates = [
-    ...new Set(
-      selectedContractorInvoiceRateRows
-        .map((row) => row.rate?.ratePerTonne)
-        .filter((rate): rate is number => rate !== undefined)
-    )
-  ];
-  const contractorInvoiceRateLabel =
-    selectedContractorInvoiceEntries.length === 0
-      ? "Select approved production records to calculate invoice."
-      : selectedContractorInvoiceMissingRateCount > 0
-        ? "Approved tonne rate missing"
-        : selectedContractorInvoiceRates.length > 1
-          ? "Multiple approved rates"
-          : selectedContractorInvoiceRates[0] === undefined
-            ? "Approved tonne rate missing"
-            : formatCurrency(selectedContractorInvoiceRates[0]);
-  const selectedContractorInvoiceSubtotal = Math.round(
-    selectedContractorInvoiceRateRows.reduce((sum, row) => sum + row.subtotal, 0) * 100
-  ) / 100;
-  const selectedContractorInvoiceGst = currentContractor?.gstRegistered
-    ? Math.round(selectedContractorInvoiceSubtotal * 10) / 100
-    : 0;
-  const selectedContractorInvoiceTotal =
-    Math.round((selectedContractorInvoiceSubtotal + selectedContractorInvoiceGst) * 100) / 100;
   const visibleWorkerInvoiceDrafts =
     role === "admin"
       ? data.workerInvoiceDrafts
@@ -643,22 +607,10 @@ export function DashboardShell({
   const contractorTodayAssignments = contractorAssignments.filter(
     (assignment) => assignment.date === today
   );
-  const contractorTodayConfirmedRequests = data.projectParticipationRequests.filter(
-    (request) =>
-      request.workerId === workSystemUserWorkerId &&
-      request.participationDate === today &&
-      request.status === "contractor_confirmed"
+  const contractorTomorrowAssignments = contractorAssignments.filter(
+    (assignment) => assignment.date === tomorrow
   );
   const contractorProductionItems = [
-    ...contractorTodayConfirmedRequests.map((request) => ({
-      id: `participation-request-${request.id}`,
-      assignmentId: undefined,
-      requestId: request.id,
-      jobId: request.jobId,
-      workerId: request.workerId,
-      date: request.participationDate,
-      startTime: request.siteAccessTime
-    })),
     ...contractorTodayAssignments.map((assignment) => ({
       id: assignment.id,
       assignmentId: assignment.id,
@@ -667,14 +619,12 @@ export function DashboardShell({
       workerId: assignment.workerId,
       date: assignment.date,
       startTime: assignment.startTime
-    })).filter((assignment) =>
-      !contractorTodayConfirmedRequests.some((request) => request.jobId === assignment.jobId)
-    ),
+    })),
     ...data.adminJobs
       .filter((job) => {
         const participation = currentParticipationByJobId.get(job.id);
         return (
-          contractorTodayConfirmedRequests.length === 0 &&
+          contractorTodayAssignments.length === 0 &&
           isProjectSelectableForAllocation(job) &&
           participation?.status === "confirmed" &&
           !contractorTodayAssignments.some((assignment) => assignment.jobId === job.id)
@@ -690,6 +640,34 @@ export function DashboardShell({
         startTime: "06:30"
 	      }))
 	  ];
+  const contractorTomorrowProjectItems = [
+    ...contractorParticipationRequests
+      .filter((request) => request.participationDate === tomorrow)
+      .map((request) => ({
+        id: `request-${request.id}`,
+        jobId: request.jobId,
+        date: request.participationDate,
+        startTime: request.siteAccessTime,
+        note: request.scopeNote,
+        source: "request" as const
+      })),
+    ...contractorTomorrowAssignments
+      .filter((assignment) =>
+        !contractorParticipationRequests.some(
+          (request) =>
+            request.jobId === assignment.jobId &&
+            request.participationDate === assignment.date
+        )
+      )
+      .map((assignment) => ({
+        id: `assignment-${assignment.id}`,
+        jobId: assignment.jobId,
+        date: assignment.date,
+        startTime: assignment.startTime,
+        note: "",
+        source: "assignment" as const
+      }))
+  ];
   const contractorPendingParticipationRequests = contractorParticipationRequests.filter(
     (request) => request.status === "proposed"
   );
@@ -707,25 +685,71 @@ export function DashboardShell({
           entry.workDate === item.date
       )
   );
-	  const contractorTomorrowAssignments = contractorAssignments.filter(
-	    (assignment) => assignment.date === tomorrow
-	  );
   const contractorWeekEntries = visibleWorkEntries.filter(
     (entry) =>
       entry.workerId === workSystemUserWorkerId &&
       entry.workDate >= weekPeriod.start &&
-      entry.workDate <= weekPeriod.end
+      entry.workDate <= weekPeriod.end &&
+      entry.workDate >= MVP_GO_LIVE_DATE
   );
   const contractorWeekTonnes = contractorWeekEntries.reduce(
     (sum, entry) => sum + entry.tonnes,
     0
   );
   const contractorPendingEntries = visibleWorkEntries.filter(
-    (entry) => entry.workerId === workSystemUserWorkerId && !entry.approved
+    (entry) =>
+      entry.workerId === workSystemUserWorkerId &&
+      entry.workDate >= MVP_GO_LIVE_DATE &&
+      !entry.approved
   ).length;
   const contractorOpenInvoices = visibleWorkerInvoiceDrafts.filter(
     (invoice) => invoice.status !== "paid"
   ).length;
+  const contractorMvpInvoiceEntries = contractorMvpWorkEntries.filter(
+    (entry) =>
+      entry.workDate >= contractorInvoicePeriod.periodStart &&
+      entry.workDate <= contractorInvoicePeriod.periodEnd
+  );
+  const contractorMvpInvoiceTonnes = contractorMvpInvoiceEntries.reduce(
+    (sum, entry) => sum + entry.tonnes,
+    0
+  );
+  const contractorMvpInvoiceRateRows = contractorMvpInvoiceEntries.map((entry) => {
+    const rate = findEffectiveApprovedTonneRate(data.workerRates, entry.workerId, entry.workDate);
+    return {
+      entry,
+      rate,
+      subtotal: rate ? Math.round(entry.tonnes * rate.ratePerTonne * 100) / 100 : 0
+    };
+  });
+  const contractorMvpInvoiceMissingRateCount = contractorMvpInvoiceRateRows.filter(
+    (row) => !row.rate
+  ).length;
+  const contractorMvpInvoiceRates = [
+    ...new Set(
+      contractorMvpInvoiceRateRows
+        .map((row) => row.rate?.ratePerTonne)
+        .filter((rate): rate is number => rate !== undefined)
+    )
+  ];
+  const contractorMvpInvoiceRateLabel =
+    contractorMvpInvoiceEntries.length === 0
+      ? "Select a week with saved production records."
+      : contractorMvpInvoiceMissingRateCount > 0
+        ? "Approved tonne rate missing"
+        : contractorMvpInvoiceRates.length > 1
+          ? "Multiple approved rates"
+          : contractorMvpInvoiceRates[0] === undefined
+            ? "Approved tonne rate missing"
+            : formatCurrency(contractorMvpInvoiceRates[0]);
+  const contractorMvpInvoiceSubtotal = Math.round(
+    contractorMvpInvoiceRateRows.reduce((sum, row) => sum + row.subtotal, 0) * 100
+  ) / 100;
+  const contractorMvpInvoiceGst = currentContractor?.gstRegistered
+    ? Math.round(contractorMvpInvoiceSubtotal * 10) / 100
+    : 0;
+  const contractorMvpInvoiceTotal =
+    Math.round((contractorMvpInvoiceSubtotal + contractorMvpInvoiceGst) * 100) / 100;
   const profit = calculateProfit({
     clientInvoices: data.clientInvoices,
     workerInvoices: data.workerInvoices,
@@ -2566,30 +2590,9 @@ export function DashboardShell({
       return;
     }
 
-    const sameDateRequests = data.projectParticipationRequests.filter(
-      (request) =>
-        request.workerId === assignment.workerId &&
-        request.participationDate === assignment.date &&
-        request.status !== "withdrawn"
-    );
-    const confirmedRequest = sameDateRequests.find(
-      (request) =>
-        request.jobId === assignment.jobId &&
-        request.status === "contractor_confirmed"
-    );
-
-    if (sameDateRequests.length > 0 && !confirmedRequest) {
-      setLocalFeedback(
-        feedbackKey,
-        "error",
-        "Confirm your project participation to continue with production entry."
-      );
-      return;
-    }
-
     const hours = Number(crewHoursDrafts[assignmentId] ?? existingEntry?.hours ?? 8);
     if (Number.isNaN(hours) || hours < 0 || hours > 24) {
-      setLocalFeedback(feedbackKey, "error", "Enter site activity between 0 and 24.");
+      setLocalFeedback(feedbackKey, "error", "Enter hours basis between 0 and 24.");
       return;
     }
 
@@ -2747,29 +2750,51 @@ export function DashboardShell({
 
   function createContractorInvoiceDraft() {
     const feedbackKey = "generate-worker-invoice";
-    if (selectedContractorInvoiceEntries.length === 0) {
-      setLocalFeedback(feedbackKey, "error", "Select approved production records before creating an invoice.");
+    if (contractorMvpInvoiceEntries.length === 0) {
+      setLocalFeedback(feedbackKey, "error", "Choose a week with saved production records before generating a PDF.");
+      return;
+    }
+
+    if (contractorMvpInvoiceMissingRateCount > 0) {
+      setLocalFeedback(feedbackKey, "error", "An approved tonne rate is needed before generating this PDF.");
       return;
     }
 
     if (!demoMode) {
-      runSupabaseAction(
-        () =>
-          createWorkerInvoiceDraftFromWorkEntriesAction({
-            workEntryIds: selectedContractorInvoiceEntries.map((entry) => entry.id)
-          }),
-        "Creating contractor invoice",
-        feedbackKey
-      );
-      setSelectedContractorInvoiceEntryIds([]);
+      setPendingAction("Generating contractor invoice PDF...");
+      setPendingActionKey(feedbackKey);
+      setLocalFeedback(feedbackKey, "loading", "Generating contractor invoice PDF...");
+      startTransition(async () => {
+        try {
+          const result = await generateContractorWeeklyInvoicePdfAction({
+            periodStart: contractorInvoicePeriod.periodStart,
+            periodEnd: contractorInvoicePeriod.periodEnd
+          });
+          if (!result.ok || !result.downloadUrl) {
+            setLocalFeedback(feedbackKey, "error", result.error ?? "Could not generate the PDF.");
+            return;
+          }
+          window.open(result.downloadUrl, "_blank", "noopener,noreferrer");
+          setLocalFeedback(feedbackKey, "success", "Contractor invoice PDF generated.");
+        } catch (error) {
+          setLocalFeedback(
+            feedbackKey,
+            "error",
+            error instanceof Error ? error.message : "Could not generate the PDF."
+          );
+        } finally {
+          setPendingAction(null);
+          setPendingActionKey(null);
+        }
+      });
       return;
     }
 
-    const invoiceId = `worker-invoice-draft-${Date.now()}`;
+    const invoiceId = `worker-invoice-pdf-${Date.now()}`;
     const contractor = data.adminWorkers.find(
       (worker) => worker.id === workSystemUserWorkerId
     );
-    const demoInvoiceRateRows = selectedContractorInvoiceEntries.map((entry) => {
+    const demoInvoiceRateRows = contractorMvpInvoiceEntries.map((entry) => {
       const rate = findEffectiveApprovedTonneRate(data.workerRates, entry.workerId, entry.workDate);
       return {
         ratePerTonne: rate?.ratePerTonne ?? 0,
@@ -2780,13 +2805,13 @@ export function DashboardShell({
       (rate) => rate > 0
     );
     const ratePerTonne = demoInvoiceRates.length === 1 ? demoInvoiceRates[0] : undefined;
-    const selectedTonnes = selectedContractorInvoiceEntries.reduce((sum, entry) => sum + entry.tonnes, 0);
-    const selectedHours = selectedContractorInvoiceEntries.reduce((sum, entry) => sum + entry.hours, 0);
+    const selectedTonnes = contractorMvpInvoiceEntries.reduce((sum, entry) => sum + entry.tonnes, 0);
+    const selectedHours = contractorMvpInvoiceEntries.reduce((sum, entry) => sum + entry.hours, 0);
     const subtotal = Math.round(demoInvoiceRateRows.reduce((sum, row) => sum + row.subtotal, 0) * 100) / 100;
     const gstAmount = contractor?.gstRegistered ? Math.round(subtotal * 10) / 100 : 0;
     const totalAmount = Math.round((subtotal + gstAmount) * 100) / 100;
-    const periodStart = selectedContractorInvoiceEntries[0]?.workDate ?? today;
-    const periodEnd = selectedContractorInvoiceEntries[selectedContractorInvoiceEntries.length - 1]?.workDate ?? periodStart;
+    const periodStart = contractorInvoicePeriod.periodStart;
+    const periodEnd = contractorInvoicePeriod.periodEnd;
     setData((current) => ({
       ...current,
       workerInvoiceDrafts: [
@@ -2808,11 +2833,11 @@ export function DashboardShell({
           gstAmount,
           totalAmount,
           invoiceTitle: contractor?.gstRegistered ? "Tax Invoice" : "Invoice",
-          status: "submitted",
-          submittedAt: new Date().toISOString(),
+          status: "draft",
+          pdfUrl: `invoices/${invoiceId}.pdf`,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          items: selectedContractorInvoiceEntries.map((entry) => ({
+          items: contractorMvpInvoiceEntries.map((entry) => ({
             id: `worker-invoice-item-${entry.id}`,
             invoiceId,
             workEntryId: entry.id,
@@ -2826,8 +2851,7 @@ export function DashboardShell({
         }
       ]
     }));
-    setSelectedContractorInvoiceEntryIds([]);
-    setLocalFeedback(feedbackKey, "success", "Contractor invoice created in demo mode.");
+    setLocalFeedback(feedbackKey, "success", "Contractor invoice PDF prepared in demo mode.");
   }
 
   function markWorkerInvoiceDraftPaid(invoiceId: string) {
@@ -3795,7 +3819,52 @@ export function DashboardShell({
         )
       ) : null}
 
-	      {activeTab === "jobs" ? (
+      {activeTab === "jobs" && role !== "admin" ? (
+        <section className="grid gap-4">
+          <InfoCard icon={CalendarDays} title="Tomorrow’s project">
+            {contractorTomorrowProjectItems.length > 0 ? (
+              <div className="grid gap-3">
+                {contractorTomorrowProjectItems.map((item) => {
+                  const job = data.adminJobs.find((project) => project.id === item.jobId);
+                  return (
+                    <article className="rounded-lg border border-gray-200 bg-gray-50 p-4" key={item.id}>
+                      <p className="text-xs font-black uppercase tracking-wide text-gray-500">
+                        Project / site information
+                      </p>
+                      <p className="mt-1 text-lg font-black text-blue-950">
+                        {job?.siteName ?? adminJobName(data, item.jobId)}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-700">
+                        {job?.location || "Site location to be confirmed"}
+                      </p>
+                      <div className="mt-3 grid gap-1 text-sm font-bold text-gray-700">
+                        <p>Project date: {item.date}</p>
+                        <p>Site access time: {item.startTime || "To be confirmed"}</p>
+                        {item.note ? <p>{item.note}</p> : null}
+                        {job?.scopeSummary ? <p>{job.scopeSummary}</p> : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
+                Tomorrow’s project information is not listed yet.
+              </p>
+            )}
+          </InfoCard>
+          <div className="grid grid-cols-2 gap-3">
+            <button className="dashboard-button dashboard-button-primary" onClick={() => setActiveTab("workEntries")} type="button">
+              Production
+            </button>
+            <button className="dashboard-button dashboard-button-outline" onClick={() => setActiveTab("workerInvoices")} type="button">
+              Invoice
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+	      {activeTab === "jobs" && role === "admin" ? (
 	        <DashboardGrid>
 		          {role !== "admin" ? (
 		            <InfoCard icon={CalendarDays} title="Project Participation Requests">
@@ -3938,6 +4007,7 @@ export function DashboardShell({
 	          {contractorParticipationRequests
 	            .filter(
 	              (request) =>
+	                false &&
 	                request.participationDate === today &&
 	                request.status === "proposed" &&
 	                !contractorConfirmedRequestByDate.get(today)
@@ -3971,7 +4041,7 @@ export function DashboardShell({
 	                <ActionFeedbackMessage feedback={actionFeedbacks[`participation-request:${request.id}`]} />
 	              </InfoCard>
 	            ))}
-	          <InfoCard icon={Hammer} title="Production Records">
+	          <InfoCard icon={Hammer} title="Production record">
             {contractorProductionItems.length > 0 ? (
               <div className="grid gap-3">
                 {contractorProductionItems.map((assignment) => {
@@ -4002,8 +4072,8 @@ export function DashboardShell({
                           {locked ? "approved" : "editable"}
                         </StatusBadge>
                       </div>
-                      <label className="dashboard-label mt-3">
-                        Site Activity
+	                      <label className="dashboard-label mt-3">
+                        Hours basis for tonne conversion
                         <input
                           className="dashboard-field"
                           disabled={locked}
@@ -4030,8 +4100,8 @@ export function DashboardShell({
                         type="button"
                       >
                         {isActionPending(`production-entry:${assignment.id}`)
-                          ? "Saving production log..."
-                          : "Save production log"}
+                          ? "Saving production record..."
+                          : "Save production record"}
                       </button>
                       <ActionFeedbackMessage feedback={actionFeedbacks[`production-entry:${assignment.id}`]} />
                     </div>
@@ -4040,7 +4110,7 @@ export function DashboardShell({
               </div>
             ) : (
               <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
-                No production record is available because you do not have active project participation today.
+                No project / site information is available for production entry today.
               </p>
             )}
           </InfoCard>
@@ -4625,79 +4695,97 @@ export function DashboardShell({
       {activeTab === "workerInvoices" ? (
         <section className="grid gap-4">
           {role !== "admin" ? (
-            <InfoCard icon={Lock} title="Approved production ready to invoice">
+            <InfoCard icon={ReceiptText} title="Weekly contractor invoice PDF">
               <div className="grid gap-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <Stat label="Eligible records" value={String(contractorEligibleInvoiceEntries.length)} />
-                  <Stat label="Eligible tonnes" value={`${contractorEligibleInvoiceTonnes.toFixed(3)}t`} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="dashboard-label">
+                    Period start
+                    <input
+                      className="dashboard-field"
+                      onChange={(event) =>
+                        setContractorInvoicePeriod((period) => ({
+                          ...period,
+                          periodStart: event.target.value
+                        }))
+                      }
+                      type="date"
+                      value={contractorInvoicePeriod.periodStart}
+                    />
+                  </label>
+                  <label className="dashboard-label">
+                    Period end
+                    <input
+                      className="dashboard-field"
+                      onChange={(event) =>
+                        setContractorInvoicePeriod((period) => ({
+                          ...period,
+                          periodEnd: event.target.value
+                        }))
+                      }
+                      type="date"
+                      value={contractorInvoicePeriod.periodEnd}
+                    />
+                  </label>
                 </div>
                 <div className="grid gap-3 rounded-md border border-gray-200 bg-white p-3 sm:grid-cols-4">
-                  <Stat label="Selected tonnes delivered" value={`${selectedContractorInvoiceTonnes.toFixed(3)}t`} />
-                  <Stat
-                    label="Rate per tonne"
-                    value={contractorInvoiceRateLabel}
-                  />
-                  <Stat label="GST" value={formatCurrency(selectedContractorInvoiceGst)} />
-                  <Stat label="Total" value={formatCurrency(selectedContractorInvoiceTotal)} />
+                  <Stat label="Production records" value={String(contractorMvpInvoiceEntries.length)} />
+                  <Stat label="Tonnes delivered" value={`${contractorMvpInvoiceTonnes.toFixed(3)}t`} />
+                  <Stat label="Rate per tonne" value={contractorMvpInvoiceRateLabel} />
+                  <Stat label="Total" value={formatCurrency(contractorMvpInvoiceTotal)} />
                 </div>
-                {selectedContractorInvoiceMissingRateCount > 0 ? (
-                  <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-800">
-                    One or more selected production records has no approved tonne rate effective on its project date.
+                {currentContractor?.gstRegistered ? (
+                  <p className="rounded-md bg-gray-50 p-3 text-sm font-bold text-gray-700">
+                    GST: {formatCurrency(contractorMvpInvoiceGst)}
                   </p>
                 ) : null}
-                {contractorEligibleInvoiceEntries.map((entry) => {
-                  const checked = selectedContractorInvoiceEntryIds.includes(entry.id);
+                {contractorMvpInvoiceMissingRateCount > 0 ? (
+                  <p className="rounded-md bg-orange-50 p-3 text-sm font-bold text-orange-800">
+                    One or more production records has no approved tonne rate effective on its project date.
+                  </p>
+                ) : null}
+                {contractorMvpInvoiceEntries.map((entry) => {
                   const job = data.adminJobs.find((item) => item.id === entry.jobId);
                   return (
-                    <label
-                      className="grid cursor-pointer gap-2 rounded-md border border-gray-200 bg-white p-3 sm:grid-cols-[auto_1fr]"
+                    <article
+                      className="rounded-md border border-gray-200 bg-white p-3"
                       key={entry.id}
                     >
-                      <input
-                        checked={checked}
-                        className="mt-1 h-4 w-4"
-                        onChange={(event) =>
-                          setSelectedContractorInvoiceEntryIds((current) =>
-                            event.target.checked
-                              ? [...current, entry.id]
-                              : current.filter((id) => id !== entry.id)
-                          )
-                        }
-                        type="checkbox"
-                      />
-                      <span>
-                        <span className="block text-sm font-black text-blue-950">
+                        <span className="text-sm font-black text-blue-950">
                           {job?.siteName ?? adminJobName(data, entry.jobId)} · {entry.workDate}
                         </span>
-                        <span className="mt-1 block text-sm text-gray-700">
-                          {entry.tonnes.toFixed(3)}t · {job?.scopeSummary ?? "Scope completed"}
-                        </span>
-                      </span>
-                    </label>
+                      <p className="mt-1 text-sm text-gray-700">
+                        {entry.tonnes.toFixed(3)}t tonnes delivered · {job?.scopeSummary ?? "Scope completed"}
+                      </p>
+                    </article>
                   );
                 })}
-                {contractorEligibleInvoiceEntries.length === 0 ? (
+                {contractorMvpInvoiceEntries.length === 0 ? (
                   <p className="rounded-md bg-gray-50 p-4 text-sm font-bold text-gray-600">
-                    No approved locked production records are ready to invoice.
+                    No saved production records are available for this period.
                   </p>
                 ) : null}
                 <button
                   className="dashboard-button dashboard-button-primary"
                   disabled={
                     isActionPending("generate-worker-invoice") ||
-                    selectedContractorInvoiceEntryIds.length === 0
+                    contractorMvpInvoiceEntries.length === 0 ||
+                    contractorMvpInvoiceMissingRateCount > 0
                   }
                   onClick={createContractorInvoiceDraft}
                   type="button"
                 >
-                  {isActionPending("generate-worker-invoice") ? "Creating..." : "Create invoice"}
+                  {isActionPending("generate-worker-invoice") ? "Generating PDF..." : "Generate PDF"}
                 </button>
                 <ActionFeedbackMessage feedback={actionFeedbacks["generate-worker-invoice"]} />
+                <p className="text-xs font-bold text-gray-500">
+                  Download the PDF and email it manually outside Still Partners.
+                </p>
               </div>
             </InfoCard>
           ) : null}
 
-          <InfoCard icon={ReceiptText} title={role === "admin" ? "Payables" : "Submitted and paid invoices"}>
+          {role === "admin" ? (
+          <InfoCard icon={ReceiptText} title="Payables">
             <div className="grid gap-4">
               {visibleWorkerInvoiceGroups.map((group) => (
                 <section className="grid gap-2" key={group.title}>
@@ -4802,6 +4890,7 @@ export function DashboardShell({
               ) : null}
             </div>
           </InfoCard>
+          ) : null}
         </section>
       ) : null}
 
@@ -7779,7 +7868,7 @@ function formatTabLabel(tab: Tab, role: Role) {
   }
 
   if (tab === "jobs") {
-    return "Projects";
+    return "Tomorrow’s project";
   }
 
   if (tab === "workEntries") {
@@ -7787,7 +7876,7 @@ function formatTabLabel(tab: Tab, role: Role) {
   }
 
   if (tab === "workerInvoices") {
-    return "Invoices";
+    return "Invoice";
   }
 
   if (tab === "timesheets") {

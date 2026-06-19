@@ -131,6 +131,13 @@ layer reads from Supabase tables through RLS and server actions handle writes:
 Server actions repeat permission checks before writing. RLS remains the hard
 database boundary.
 
+### Contractor weekly PDF storage
+
+The simplified contractor MVP invoice flow generates a weekly contractor PDF
+from saved production records, uploads it to the private Supabase Storage bucket
+named `invoices`, and returns a signed download URL. Production must have the
+`invoices` bucket configured before contractors use Generate PDF.
+
 See [docs/authentication-architecture.md](docs/authentication-architecture.md).
 
 Agreement wording notes live in

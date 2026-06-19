@@ -2420,6 +2420,206 @@ export async function markWorkerInvoiceDraftPaidAction(
   return { ok: true };
 }
 
+export async function generateContractorWeeklyInvoicePdfAction(payload: {
+  periodStart: string;
+  periodEnd: string;
+}): Promise<ActionResult> {
+  // MVP contractor invoices are download-only PDFs generated from saved production records.
+  // This visible contractor path must not auto-submit, auto-email, or insert worker_invoice_items.
+  const session = await requireSession();
+
+  if (session.profile.role === "admin") {
+    return { ok: false, error: "Use the client invoice PDF workflow for admin invoicing." };
+  }
+
+  if (!payload.periodStart || !payload.periodEnd || payload.periodStart > payload.periodEnd) {
+    return { ok: false, error: "Choose a valid invoice period." };
+  }
+
+  const workerId = session.workerId ?? session.userId;
+  const supabase = await createServerSupabaseClient();
+  const { data: entries, error: entriesError } = await supabase
+    .from("work_entries")
+    .select("id, worker_id, job_id, work_date, hours, tonnes")
+    .eq("worker_id", workerId)
+    .gte("work_date", payload.periodStart)
+    .lte("work_date", payload.periodEnd)
+    .gte("work_date", "2026-06-18")
+    .order("work_date", { ascending: true });
+
+  if (entriesError) {
+    return { ok: false, error: entriesError.message };
+  }
+
+  const workEntries = (entries ?? []).map((entry) => ({
+    id: String(entry.id),
+    workerId: String(entry.worker_id),
+    jobId: String(entry.job_id),
+    workDate: String(entry.work_date),
+    hours: Number(entry.hours ?? 0),
+    tonnes: Number(entry.tonnes ?? 0)
+  }));
+
+  if (workEntries.length === 0) {
+    return { ok: false, error: "No saved production records are available for this period." };
+  }
+
+  const rateResolution = await resolveApprovedTonneRatesForWorkEntries(
+    supabase,
+    workEntries.map((entry) => ({
+      id: entry.id,
+      workerId: entry.workerId,
+      workDate: entry.workDate
+    }))
+  );
+
+  if (!rateResolution.ok) {
+    return { ok: false, error: rateResolution.error };
+  }
+
+  const { data: worker } = await supabase
+    .from("workers")
+    .select("full_name, email, phone, abn, gst_registered, bank_name, bsb, account_number")
+    .eq("id", workerId)
+    .maybeSingle();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, abn, email, phone")
+    .eq("id", workerId)
+    .maybeSingle();
+  const { data: paymentDetails } = await supabase
+    .from("worker_payment_details")
+    .select("account_name, bsb, account_number, remittance_email")
+    .eq("worker_id", workerId)
+    .maybeSingle();
+
+  const projectIds = [...new Set(workEntries.map((entry) => entry.jobId).filter(Boolean))];
+  const { data: projects } = projectIds.length
+    ? await supabase.from("jobs").select("id, title").in("id", projectIds)
+    : { data: [] };
+  const projectNameById = new Map(
+    (projects ?? []).map((project) => [
+      String(project.id),
+      String(project.title ?? "Project scope")
+    ])
+  );
+
+  const projectTonnes = new Map<string, number>();
+  const rateSummaryByRate = new Map<
+    string,
+    { ratePerTonne: number; tonnes: number; subtotal: number }
+  >();
+
+  workEntries.forEach((entry) => {
+    projectTonnes.set(entry.jobId, roundMoney((projectTonnes.get(entry.jobId) ?? 0) + entry.tonnes));
+    const rate = rateResolution.ratesByWorkEntryId.get(entry.id);
+    if (!rate) {
+      return;
+    }
+    const key = rate.ratePerTonne.toFixed(2);
+    const existing = rateSummaryByRate.get(key);
+    rateSummaryByRate.set(key, {
+      ratePerTonne: rate.ratePerTonne,
+      tonnes: (existing?.tonnes ?? 0) + entry.tonnes,
+      subtotal: roundMoney((existing?.subtotal ?? 0) + entry.tonnes * rate.ratePerTonne)
+    });
+  });
+
+  const projectSummaries = [...projectTonnes.entries()].map(([projectId, tonnes]) => ({
+    projectName: projectNameById.get(projectId) ?? "Project scope",
+    tonnes
+  }));
+  const rateSummaries = [...rateSummaryByRate.values()].sort(
+    (a, b) => b.ratePerTonne - a.ratePerTonne
+  );
+  const subtotal = roundMoney(rateSummaries.reduce((sum, row) => sum + row.subtotal, 0));
+  const gstRegistered = worker?.gst_registered === true;
+  const gst = gstRegistered ? roundMoney(subtotal * 0.1) : 0;
+  const totalAmount = roundMoney(subtotal + gst);
+  const issueDate = getPerthDate();
+  const invoiceNumber = `WINV-${issueDate.replaceAll("-", "")}`;
+  const totalTonnes = workEntries.reduce((sum, entry) => sum + entry.tonnes, 0);
+  const singleRate =
+    rateSummaries.length === 1 ? rateSummaries[0]?.ratePerTonne : undefined;
+
+  const pdfBytes = generateContractorInvoicePdf({
+    invoiceNumber,
+    periodStart: payload.periodStart,
+    periodEnd: payload.periodEnd,
+    contractorName: String(worker?.full_name ?? profile?.full_name ?? "Contractor"),
+    contractorAbn: worker?.abn
+      ? String(worker.abn)
+      : profile?.abn
+        ? String(profile.abn)
+        : undefined,
+    contractorEmail: paymentDetails?.remittance_email
+      ? String(paymentDetails.remittance_email)
+      : worker?.email
+        ? String(worker.email)
+        : profile?.email
+          ? String(profile.email)
+          : undefined,
+    businessName: "Still Partners Pty Ltd",
+    businessAbn: "62 687 072 420",
+    businessEmail: "work@stillpartners.net",
+    issueDate,
+    dueDate: addDays(issueDate, 21),
+    status: "PDF generated",
+    accountName: paymentDetails?.account_name
+      ? String(paymentDetails.account_name)
+      : worker?.full_name
+        ? String(worker.full_name)
+        : "Contractor",
+    bankName: worker?.bank_name ? String(worker.bank_name) : undefined,
+    bsb: worker?.bsb
+      ? String(worker.bsb)
+      : paymentDetails?.bsb
+        ? String(paymentDetails.bsb)
+        : undefined,
+    accountNumber: worker?.account_number
+      ? String(worker.account_number)
+      : paymentDetails?.account_number
+        ? String(paymentDetails.account_number)
+        : undefined,
+    gstRegistered,
+    totalTonnes,
+    projectSummaries,
+    ratePerTonne: singleRate,
+    rateSummaries,
+    subtotal,
+    gst,
+    totalAmount
+  });
+
+  const storagePath = `invoices/contractor-weekly/${workerId}-${payload.periodStart}-${payload.periodEnd}-${Date.now()}.pdf`;
+  const storageSupabase = createServiceRoleSupabaseClient() ?? supabase;
+  const { error: uploadError } = await storageSupabase.storage
+    .from("invoices")
+    .upload(storagePath, pdfBytes, {
+      contentType: "application/pdf",
+      upsert: true
+    });
+
+  if (uploadError) {
+    return {
+      ok: false,
+      error: `Could not upload the contractor invoice PDF to the invoices storage bucket: ${uploadError.message}`
+    };
+  }
+
+  const signed = await createInvoiceSignedUrl(storagePath);
+  if (!signed.ok) {
+    return { ok: false, error: signed.error };
+  }
+
+  return {
+    ok: true,
+    message: "Contractor invoice PDF generated.",
+    downloadUrl: signed.downloadUrl,
+    pdfUrl: storagePath
+  };
+}
+
 export async function getOrCreateWorkerInvoiceDraftPdfAction(
   invoiceId: string,
   options: { regenerate?: boolean } = {}
