@@ -34,7 +34,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en-AU">
+    <html lang="en-AU" suppressHydrationWarning>
       <body>
         <PwaInstall />
         {children}

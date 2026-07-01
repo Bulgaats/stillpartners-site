@@ -1,0 +1,25 @@
+{
+  "name": "Still Partners Invoice",
+  "short_name": "SP Invoice",
+  "description": "Still Partners contractor invoice generator",
+  "start_url": "/contractor-invoice",
+  "scope": "/contractor-invoice/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/contractor-invoice/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/contractor-invoice/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
