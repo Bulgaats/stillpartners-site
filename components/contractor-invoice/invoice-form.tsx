@@ -1,7 +1,7 @@
 "use client";
 
 import { Download, Share2 } from "lucide-react";
-import { type MouseEvent, useState } from "react";
+import { type MouseEvent, useEffect, useRef, useState } from "react";
 import {
   formatDate,
   formatMoney,
@@ -57,6 +57,20 @@ export function InvoiceForm({
     tone: "success" | "error" | "info" | "warning";
   } | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copying" | "copied">("idle");
+  const copyStatusTimerRef = useRef<number | null>(null);
+  const copyStatusTokenRef = useRef(0);
+  const copyStateTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyStatusTimerRef.current !== null) {
+        window.clearTimeout(copyStatusTimerRef.current);
+      }
+      if (copyStateTimerRef.current !== null) {
+        window.clearTimeout(copyStateTimerRef.current);
+      }
+    };
+  }, []);
 
   function update<K extends keyof InvoiceDraft>(field: K, value: InvoiceDraft[K]) {
     onDraftChange({ ...draft, [field]: value });
@@ -70,22 +84,49 @@ export function InvoiceForm({
     update("billTo", nextBillTo);
   }
 
+  function updateCopyStatus(status: typeof copyStatus) {
+    copyStatusTokenRef.current += 1;
+    const token = copyStatusTokenRef.current;
+
+    if (copyStatusTimerRef.current !== null) {
+      window.clearTimeout(copyStatusTimerRef.current);
+      copyStatusTimerRef.current = null;
+    }
+
+    setCopyStatus(status);
+
+    if (status?.tone === "success" || status?.tone === "info") {
+      copyStatusTimerRef.current = window.setTimeout(() => {
+        if (copyStatusTokenRef.current === token) {
+          setCopyStatus(null);
+          copyStatusTimerRef.current = null;
+        }
+      }, 3000);
+    }
+  }
+
   async function copyEmail() {
     const recipientEmail = getInvoiceRecipientEmail(draft);
     if (!recipientEmail) {
       return;
     }
     setCopyState("copying");
-    setCopyStatus(null);
+    updateCopyStatus(null);
 
     const copied = await copyTextToClipboard(recipientEmail);
 
     if (copied) {
-      setCopyStatus({ message: "Email copied.", tone: "success" });
+      updateCopyStatus({ message: "Email copied.", tone: "success" });
       setCopyState("copied");
-      window.setTimeout(() => setCopyState("idle"), 1200);
+      if (copyStateTimerRef.current !== null) {
+        window.clearTimeout(copyStateTimerRef.current);
+      }
+      copyStateTimerRef.current = window.setTimeout(() => {
+        setCopyState("idle");
+        copyStateTimerRef.current = null;
+      }, 1200);
     } else {
-      setCopyStatus({
+      updateCopyStatus({
         message: "Copy failed. Please press and hold the email address to copy it.",
         tone: "error"
       });
@@ -95,19 +136,19 @@ export function InvoiceForm({
 
   function startDownload(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    setCopyStatus(null);
+    updateCopyStatus(null);
     onDownloadPdf();
   }
 
   function startShare(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    setCopyStatus(null);
+    updateCopyStatus(null);
     onSharePdf();
   }
 
   function startNewInvoice(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
-    setCopyStatus(null);
+    updateCopyStatus(null);
     onStartNewInvoice();
   }
 

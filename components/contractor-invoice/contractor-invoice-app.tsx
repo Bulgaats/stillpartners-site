@@ -55,6 +55,8 @@ export function ContractorInvoiceApp() {
   const [showSecureContextWarning, setShowSecureContextWarning] = useState(false);
   const [isSecureBrowserContext, setIsSecureBrowserContext] = useState(true);
   const processingRef = useRef(false);
+  const actionStatusTimerRef = useRef<number | null>(null);
+  const actionStatusTokenRef = useRef(0);
 
   useEffect(() => {
     const secureContext = window.isSecureContext;
@@ -75,6 +77,14 @@ export function ContractorInvoiceApp() {
     setDraft(restoredDraft);
     setHistory(loadHistory());
     setReady(true);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (actionStatusTimerRef.current !== null) {
+        window.clearTimeout(actionStatusTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -106,6 +116,27 @@ export function ContractorInvoiceApp() {
       nextDraft = { ...nextDraft, dueDate: addDaysIso(nextDraft.issueDate, 14) };
     }
     setDraft(nextDraft);
+  }
+
+  function updateActionStatus(status: ActionStatus | null) {
+    actionStatusTokenRef.current += 1;
+    const token = actionStatusTokenRef.current;
+
+    if (actionStatusTimerRef.current !== null) {
+      window.clearTimeout(actionStatusTimerRef.current);
+      actionStatusTimerRef.current = null;
+    }
+
+    setActionStatus(status);
+
+    if (status?.tone === "success" || status?.tone === "info") {
+      actionStatusTimerRef.current = window.setTimeout(() => {
+        if (actionStatusTokenRef.current === token) {
+          setActionStatus(null);
+          actionStatusTimerRef.current = null;
+        }
+      }, 3000);
+    }
   }
 
   async function generatePdfBlob(recordOverride?: GeneratedInvoiceRecord) {
@@ -140,11 +171,11 @@ export function ContractorInvoiceApp() {
     if (!sourceDraft) return;
     processingRef.current = true;
     setPdfAction("download");
-    setActionStatus(null);
+    updateActionStatus(null);
     try {
       const blob = await generatePdfBlob(recordOverride);
       if (!blob) {
-        setActionStatus({
+        updateActionStatus({
           message: isSecureBrowserContext
             ? "PDF download failed. Please try again."
             : "PDF download failed. Try the live secure site or download from desktop.",
@@ -154,7 +185,7 @@ export function ContractorInvoiceApp() {
       }
       const downloaded = downloadBlob(blob, `invoice-${sourceDraft.invoiceNumber}.pdf`);
       if (!downloaded) {
-        setActionStatus({
+        updateActionStatus({
           message: isSecureBrowserContext
             ? "PDF download failed. Please try again."
             : "PDF download failed. Try the live secure site or download from desktop.",
@@ -163,9 +194,9 @@ export function ContractorInvoiceApp() {
         return;
       }
       if (!recordOverride) recordCurrentInvoice();
-      setActionStatus({ message: "PDF downloaded.", tone: "success" });
+      updateActionStatus({ message: "PDF downloaded.", tone: "success" });
     } catch {
-      setActionStatus({
+      updateActionStatus({
         message: isSecureBrowserContext
           ? "PDF download failed. Please try again."
           : "PDF download failed. Try the live secure site or download from desktop.",
@@ -182,10 +213,10 @@ export function ContractorInvoiceApp() {
     if (!profile || !draft || !calculation) return;
     processingRef.current = true;
     setPdfAction("share");
-    setActionStatus(null);
+    updateActionStatus(null);
     try {
       if (!isSecureBrowserContext) {
-        setActionStatus({
+        updateActionStatus({
           message: "Sharing needs HTTPS on this phone. Please download the PDF and attach it manually, or use the live secure site.",
           tone: "warning"
         });
@@ -194,7 +225,7 @@ export function ContractorInvoiceApp() {
 
       const blob = await generatePdfBlob();
       if (!blob) {
-        setActionStatus({
+        updateActionStatus({
           message: "Could not share PDF. Please download the PDF and attach it manually.",
           tone: "error"
         });
@@ -213,7 +244,7 @@ export function ContractorInvoiceApp() {
       };
 
       if (!navigator.share || (navigator.canShare && !navigator.canShare(shareData))) {
-        setActionStatus({
+        updateActionStatus({
           message: "Sharing is not supported on this browser. Please download the PDF and attach it manually.",
           tone: "warning"
         });
@@ -222,9 +253,9 @@ export function ContractorInvoiceApp() {
 
       await navigator.share(shareData);
       recordCurrentInvoice();
-      setActionStatus({ message: "Share opened.", tone: "success" });
+      updateActionStatus({ message: "Share opened.", tone: "success" });
     } catch {
-      setActionStatus({
+      updateActionStatus({
         message: "Could not share PDF. Please download the PDF and attach it manually.",
         tone: "error"
       });
@@ -265,7 +296,7 @@ export function ContractorInvoiceApp() {
     freshDraft.invoiceNumber = peekNextInvoiceNumber();
     setDraft(freshDraft);
     setErrors([]);
-    setActionStatus({
+    updateActionStatus({
       message: "New invoice draft ready.",
       tone: "success"
     });
