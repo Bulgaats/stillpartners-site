@@ -35,6 +35,7 @@ type InvoiceFormProps = {
   onDraftChange: (draft: InvoiceDraft) => void;
   onDownloadPdf: () => void;
   onSharePdf: () => void;
+  onStartNewInvoice: () => void;
 };
 
 export function InvoiceForm({
@@ -48,7 +49,8 @@ export function InvoiceForm({
   showSecureContextWarning,
   onDraftChange,
   onDownloadPdf,
-  onSharePdf
+  onSharePdf,
+  onStartNewInvoice
 }: InvoiceFormProps) {
   const [copyStatus, setCopyStatus] = useState<{
     message: string;
@@ -103,12 +105,19 @@ export function InvoiceForm({
     onSharePdf();
   }
 
+  function startNewInvoice(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    setCopyStatus(null);
+    onStartNewInvoice();
+  }
+
   const recipientEmail = getInvoiceRecipientEmail(draft);
   const sendToText = recipientEmail || "Enter bill-to email for this company.";
   const helperText = recipientEmail
     ? `Download or share the PDF, then send it from your own email to ${recipientEmail}.`
     : "Download the PDF, then send it from your own email to the bill-to recipient.";
   const pdfBusy = pdfAction !== null;
+  const showStartNewCta = actionStatus?.message === "PDF downloaded." || actionStatus?.message === "Share opened.";
 
   return (
     <section className="grid gap-4">
@@ -290,6 +299,18 @@ export function InvoiceForm({
           {pdfAction === "share" ? "Preparing share..." : "Share PDF"}
         </button>
         {actionStatus ? <ActionStatusLine status={actionStatus} /> : null}
+        {showStartNewCta ? (
+          <p className="text-center text-xs font-bold text-slate-600">
+            This clears the current invoice draft only. Your profile and invoice history stay saved.
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="flex min-h-12 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950"
+          onClick={startNewInvoice}
+        >
+          Start new invoice
+        </button>
         <p className="text-center text-xs font-bold text-slate-600">{helperText}</p>
       </div>
     </section>

@@ -253,6 +253,24 @@ export function ContractorInvoiceApp() {
     setErrors([]);
   }
 
+  function startNewInvoice() {
+    if (!profile || !draft) return;
+
+    if (hasMeaningfulDraftValues(draft, profile.defaultRatePerTonne)) {
+      const confirmed = window.confirm("Clear this invoice draft and start a new invoice?");
+      if (!confirmed) return;
+    }
+
+    const freshDraft = createInitialDraft(profile.defaultRatePerTonne);
+    freshDraft.invoiceNumber = peekNextInvoiceNumber();
+    setDraft(freshDraft);
+    setErrors([]);
+    setActionStatus({
+      message: "New invoice draft ready.",
+      tone: "success"
+    });
+  }
+
   function clearLocalHistory() {
     if (!window.confirm("Clear local invoice history on this device?")) return;
     clearHistory();
@@ -296,6 +314,7 @@ export function ContractorInvoiceApp() {
             onSharePdf={() => {
               void sharePdf();
             }}
+            onStartNewInvoice={startNewInvoice}
           />
         ) : null}
 
@@ -394,4 +413,23 @@ function downloadBlob(blob: Blob, filename: string) {
   } catch {
     return false;
   }
+}
+
+function hasMeaningfulDraftValues(draft: InvoiceDraft, defaultRatePerTonne: string) {
+  const freshDraft = createInitialDraft(defaultRatePerTonne);
+  const hasHours = Object.values(draft.dailyHours).some((hours) => Number(hours) > 0);
+  const hasProject = draft.projectSite.trim().length > 0;
+  const hasCustomBillTo =
+    draft.billTo.option === "other" ||
+    draft.billTo.companyName !== "Still Partners Pty Ltd" ||
+    draft.billTo.abn !== "62 687 072 420" ||
+    draft.billTo.email !== "work@stillpartners.net" ||
+    draft.billTo.address.trim().length > 0;
+  const hasEditedRate = draft.ratePerTonne.trim() !== defaultRatePerTonne.trim();
+  const hasEditedDates =
+    draft.weekMonday !== freshDraft.weekMonday ||
+    draft.issueDate !== freshDraft.issueDate ||
+    draft.dueDate !== freshDraft.dueDate;
+
+  return hasHours || hasProject || hasCustomBillTo || hasEditedRate || hasEditedDates;
 }
