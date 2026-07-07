@@ -26,6 +26,7 @@ create table if not exists public.contractor_notification_events (
   sent_count integer not null default 0,
   failed_count integer not null default 0,
   disabled_count integer not null default 0,
+  sent_by_admin text,
   created_at timestamptz default now()
 );
 

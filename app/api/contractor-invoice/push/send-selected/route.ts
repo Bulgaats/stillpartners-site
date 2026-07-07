@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import {
   configureWebPush,
-  getAdminPasswordError,
   getServiceRoleClientOrError,
   sendPushToSubscriptions,
-  type StoredPushSubscription
+  type StoredPushSubscription,
+  verifyNotificationAdmin
 } from "@/lib/contractor-invoice/push-server";
 
 type SendSelectedRequest = {
+  adminName?: string;
   adminPassword?: string;
   message?: string;
   subscriberIds?: string[];
@@ -15,14 +16,17 @@ type SendSelectedRequest = {
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as SendSelectedRequest | null;
-  const passwordError = getAdminPasswordError(payload?.adminPassword);
+  const { admin, error: adminError } = verifyNotificationAdmin({
+    adminName: payload?.adminName,
+    adminPassword: payload?.adminPassword
+  });
   const message = payload?.message?.trim() ?? "";
   const subscriberIds = Array.isArray(payload?.subscriberIds)
     ? [...new Set(payload.subscriberIds.filter((id) => typeof id === "string" && id.trim()))]
     : [];
 
-  if (passwordError) {
-    return NextResponse.json({ error: passwordError }, { status: 401 });
+  if (adminError || !admin) {
+    return NextResponse.json({ error: adminError ?? "Invalid admin credentials." }, { status: 401 });
   }
   if (!message) {
     return NextResponse.json({ error: "Notification message is required." }, { status: 400 });
@@ -55,7 +59,11 @@ export async function POST(request: Request) {
   }
 
   const subscriptions = (data ?? []) as StoredPushSubscription[];
-  const summary = await sendPushToSubscriptions({ subscriptions, message });
+  const summary = await sendPushToSubscriptions({
+    subscriptions,
+    message,
+    sentByAdmin: admin.name
+  });
 
   return NextResponse.json({
     ok: true,

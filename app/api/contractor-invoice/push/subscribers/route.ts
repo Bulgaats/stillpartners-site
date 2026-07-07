@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import {
-  getAdminPasswordError,
-  getServiceRoleClientOrError
+  getServiceRoleClientOrError,
+  verifyNotificationAdmin
 } from "@/lib/contractor-invoice/push-server";
 
 type SubscribersRequest = {
+  adminName?: string;
   adminPassword?: string;
 };
 
@@ -18,10 +19,13 @@ type SubscriberRow = {
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as SubscribersRequest | null;
-  const passwordError = getAdminPasswordError(payload?.adminPassword);
+  const { error: adminError } = verifyNotificationAdmin({
+    adminName: payload?.adminName,
+    adminPassword: payload?.adminPassword
+  });
 
-  if (passwordError) {
-    return NextResponse.json({ error: passwordError }, { status: 401 });
+  if (adminError) {
+    return NextResponse.json({ error: adminError }, { status: 401 });
   }
 
   const { supabase, error } = getServiceRoleClientOrError();

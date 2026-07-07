@@ -20,6 +20,7 @@ type SendResult = {
 };
 
 export function AdminNotificationPage() {
+  const [adminName, setAdminName] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -45,7 +46,7 @@ export function AdminNotificationPage() {
       const response = await fetch("/api/contractor-invoice/push/subscribers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminPassword: password })
+        body: JSON.stringify({ adminName, adminPassword: password })
       });
       const result = (await response.json().catch(() => null)) as
         | { subscribers?: Subscriber[]; error?: string }
@@ -97,6 +98,7 @@ export function AdminNotificationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           adminPassword: password,
+          adminName,
           message: trimmed,
           subscriberIds: selectedIds
         })
@@ -144,6 +146,14 @@ export function AdminNotificationPage() {
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3">
+            <label className="grid gap-1 text-sm font-bold text-slate-800">
+              Admin name
+              <input
+                className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/15"
+                value={adminName}
+                onChange={(event) => setAdminName(event.target.value)}
+              />
+            </label>
             <label className="grid gap-1 text-sm font-bold text-slate-800">
               Password
               <input

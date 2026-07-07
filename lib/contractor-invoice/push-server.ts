@@ -17,14 +17,38 @@ export type PushSendSummary = {
   disabled: number;
 };
 
-export function getAdminPasswordError(value: unknown) {
-  const password = process.env.CONTRACTOR_INVOICE_ADMIN_PASSWORD;
+export type AdminCredentials = {
+  adminName?: string;
+  adminPassword?: string;
+};
 
-  if (!password || value !== password) {
-    return "Incorrect admin password.";
+export type VerifiedAdmin = {
+  name: string;
+};
+
+type ConfiguredAdmin = {
+  name: string;
+  password: string;
+};
+
+export function verifyNotificationAdmin(credentials: AdminCredentials) {
+  const adminName = credentials.adminName?.trim() ?? "";
+  const adminPassword = credentials.adminPassword ?? "";
+  const admins = getConfiguredAdmins();
+
+  if (!adminName || !adminPassword) {
+    return { admin: null, error: "Admin name and password are required." };
   }
 
-  return null;
+  const matchedAdmin = admins.find(
+    (admin) => admin.name === adminName && admin.password === adminPassword
+  );
+
+  if (!matchedAdmin) {
+    return { admin: null, error: "Invalid admin credentials." };
+  }
+
+  return { admin: { name: matchedAdmin.name }, error: null };
 }
 
 export function configureWebPush() {
@@ -52,10 +76,12 @@ export function getServiceRoleClientOrError() {
 
 export async function sendPushToSubscriptions({
   subscriptions,
-  message
+  message,
+  sentByAdmin
 }: {
   subscriptions: StoredPushSubscription[];
   message: string;
+  sentByAdmin: string;
 }) {
   const { supabase, error } = getServiceRoleClientOrError();
   if (!supabase) {
@@ -67,7 +93,8 @@ export async function sendPushToSubscriptions({
     .from("contractor_notification_events")
     .insert({
       message,
-      recipient_count: subscriptions.length
+      recipient_count: subscriptions.length,
+      sent_by_admin: sentByAdmin
     })
     .select("id")
     .single();
@@ -190,4 +217,24 @@ function isGoneError(error: unknown) {
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function getConfiguredAdmins() {
+  const rawAdmins = process.env.CONTRACTOR_INVOICE_ADMINS;
+  if (!rawAdmins) return [];
+
+  try {
+    const parsed = JSON.parse(rawAdmins) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.filter(isConfiguredAdmin);
+  } catch {
+    return [];
+  }
+}
+
+function isConfiguredAdmin(value: unknown): value is ConfiguredAdmin {
+  if (!value || typeof value !== "object") return false;
+  const admin = value as Record<string, unknown>;
+  return typeof admin.name === "string" && admin.name.trim().length > 0 && typeof admin.password === "string";
 }
