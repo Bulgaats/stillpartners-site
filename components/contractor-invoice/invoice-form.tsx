@@ -271,6 +271,7 @@ export function InvoiceForm({
             type="number"
             value={draft.ratePerTonne}
             onChange={(value) => update("ratePerTonne", value)}
+            helperText="Uses your saved profile rate unless changed for this invoice."
           />
           <Field
             label="Invoice number"
@@ -430,12 +431,14 @@ function Field({
   label,
   value,
   onChange,
-  type = "text"
+  type = "text",
+  helperText
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  helperText?: string;
 }) {
   return (
     <label className="grid gap-1 text-sm font-bold text-slate-800">
@@ -449,6 +452,7 @@ function Field({
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {helperText ? <span className="text-xs font-bold text-slate-500">{helperText}</span> : null}
     </label>
   );
 }

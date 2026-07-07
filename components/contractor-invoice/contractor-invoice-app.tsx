@@ -106,6 +106,12 @@ export function ContractorInvoiceApp() {
     saveDraft(draft);
   }, [draft, ready]);
 
+  useEffect(() => {
+    if (!profile || !draft || !ready) return;
+    if (draft.ratePerTonne.trim() || !profile.defaultRatePerTonne.trim()) return;
+    setDraft({ ...draft, ratePerTonne: profile.defaultRatePerTonne });
+  }, [draft, profile, ready]);
+
   const calculation = useMemo(() => {
     if (!profile || !draft) return null;
     return calculateInvoice(draft, profile.gstRegistered);

@@ -120,6 +120,7 @@ function normalizeDraft(draft: InvoiceDraft, fallback: InvoiceDraft): InvoiceDra
   return {
     ...fallback,
     ...draft,
+    ratePerTonne: draft.ratePerTonne.trim() ? draft.ratePerTonne : fallback.ratePerTonne,
     dailyHours: {
       ...fallback.dailyHours,
       ...draft.dailyHours
