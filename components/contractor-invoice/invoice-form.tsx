@@ -163,7 +163,10 @@ export function InvoiceForm({
   return (
     <section className="grid gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <Summary label="Total hours" value={calculation.totalHours.toFixed(2)} />
+        <Summary
+          label="Invoice period"
+          value={`${formatDate(calculation.periodStart)} to ${formatDate(calculation.periodEnd)}`}
+        />
         <Summary label="Tonnes delivered" value={calculation.tonnesDelivered.toFixed(3)} />
         <Summary label="Rate per tonne" value={formatMoney(Number(draft.ratePerTonne || 0))} />
         <Summary label="Total" value={formatMoney(calculation.total)} strong />
@@ -234,7 +237,12 @@ export function InvoiceForm({
             )}
           </div>
           <div className="grid gap-2">
-            <p className="text-sm font-black text-slate-800">Daily hours basis for tonne conversion</p>
+            <div>
+              <p className="text-sm font-black text-slate-800">Production details</p>
+              <p className="mt-1 text-xs font-bold text-slate-500">
+                Enter the daily production record for this invoice period.
+              </p>
+            </div>
             {dayKeys.map((day) => (
               <label
                 key={day}

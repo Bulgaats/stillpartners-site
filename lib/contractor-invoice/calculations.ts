@@ -106,7 +106,7 @@ export function validateForPdf(
   if (!draft.issueDate) errors.push("Issue date is required.");
   if (!draft.dueDate) errors.push("Due date is required.");
   if (readNumber(draft.ratePerTonne) <= 0) errors.push("Rate per tonne must be greater than zero.");
-  if (!calculation.hasHours) errors.push("Enter hours basis for tonne conversion for at least one day.");
+  if (!calculation.hasHours) errors.push("Enter a daily production record for at least one day.");
   if (draft.billTo.option === "other") {
     if (!draft.billTo.companyName.trim()) errors.push("Bill To company name is required.");
     if (!draft.billTo.abn.trim()) errors.push("Bill To ABN is required.");
