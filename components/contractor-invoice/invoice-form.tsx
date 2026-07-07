@@ -272,6 +272,7 @@ export function InvoiceForm({
             value={draft.ratePerTonne}
             onChange={(value) => update("ratePerTonne", value)}
             helperText="Uses your saved profile rate unless changed for this invoice."
+            selectOnFocus
           />
           <Field
             label="Invoice number"
@@ -432,13 +433,15 @@ function Field({
   value,
   onChange,
   type = "text",
-  helperText
+  helperText,
+  selectOnFocus = false
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
   helperText?: string;
+  selectOnFocus?: boolean;
 }) {
   return (
     <label className="grid gap-1 text-sm font-bold text-slate-800">
@@ -450,6 +453,16 @@ function Field({
         step={type === "number" ? "0.01" : undefined}
         inputMode={type === "number" ? "decimal" : undefined}
         value={value}
+        onFocus={(event) => {
+          if (selectOnFocus) {
+            event.currentTarget.select();
+          }
+        }}
+        onClick={(event) => {
+          if (selectOnFocus) {
+            event.currentTarget.select();
+          }
+        }}
         onChange={(event) => onChange(event.target.value)}
       />
       {helperText ? <span className="text-xs font-bold text-slate-500">{helperText}</span> : null}
