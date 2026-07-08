@@ -10,6 +10,8 @@ import {
 } from "@/lib/contractor-invoice/push";
 import {
   getRecentNotifications,
+  getUnreadNotificationCount,
+  markNotificationsRead,
   pruneRecentNotifications,
   type LocalNotificationRecord
 } from "@/lib/contractor-invoice/notification-history";
@@ -18,6 +20,8 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
   const [status, setStatus] = useState<NotificationStatus>("idle");
   const [message, setMessage] = useState("");
   const [recentNotifications, setRecentNotifications] = useState<LocalNotificationRecord[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showRecentNotifications, setShowRecentNotifications] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -48,9 +52,16 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
       try {
         await pruneRecentNotifications();
         const records = await getRecentNotifications();
-        if (active) setRecentNotifications(records);
+        const count = await getUnreadNotificationCount();
+        if (active) {
+          setRecentNotifications(records);
+          setUnreadCount(count);
+        }
       } catch {
-        if (active) setRecentNotifications([]);
+        if (active) {
+          setRecentNotifications([]);
+          setUnreadCount(0);
+        }
       }
     }
 
@@ -78,6 +89,19 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
     setMessage(result.message ?? "");
   }
 
+  async function openRecentNotifications() {
+    setShowRecentNotifications((current) => !current);
+
+    if (!showRecentNotifications) {
+      setUnreadCount(0);
+      try {
+        await markNotificationsRead();
+      } catch {
+        // Local notification history is a convenience and must not block the invoice app.
+      }
+    }
+  }
+
   const label =
     status === "enabled"
       ? "Notifications enabled"
@@ -97,6 +121,9 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-black">{label}</p>
+          <p className="mt-1 text-sm font-bold text-slate-300">
+            {unreadCount === 1 ? "1 unread notification" : `${unreadCount} unread notifications`}
+          </p>
           {message ? <p className="mt-1 text-sm text-slate-300">{message}</p> : null}
         </div>
       </div>
@@ -109,21 +136,32 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
         {status === "enabled" ? "Update notifications" : "Enable notifications"}
       </button>
       <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
-        <p className="text-sm font-black text-white">Recent notifications</p>
-        {recentNotifications.length > 0 ? (
-          <ul className="mt-3 grid gap-2">
-            {recentNotifications.map((notification) => (
-              <li key={notification.id} className="rounded-lg bg-white/10 p-3">
-                <p className="text-sm font-bold text-white">{notification.message}</p>
-                <p className="mt-1 text-xs font-bold text-slate-300">
-                  {formatNotificationTime(notification.receivedAt)}
-                </p>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-2 text-sm font-bold text-slate-300">No recent notifications.</p>
-        )}
+        <button
+          type="button"
+          className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg bg-white/10 px-3 py-2 text-left text-sm font-black text-white"
+          onClick={() => {
+            void openRecentNotifications();
+          }}
+        >
+          <span>View recent notifications</span>
+          <span className="text-xs text-slate-300">{showRecentNotifications ? "Hide" : "Open"}</span>
+        </button>
+        {showRecentNotifications ? (
+          recentNotifications.length > 0 ? (
+            <ul className="mt-3 grid max-h-56 gap-2 overflow-y-auto pr-1">
+              {recentNotifications.map((notification) => (
+                <li key={notification.id} className="rounded-lg bg-white/10 p-3">
+                  <p className="text-sm font-bold text-white">{notification.message}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-300">
+                    {formatNotificationTime(notification.receivedAt)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm font-bold text-slate-300">No recent notifications.</p>
+          )
+        ) : null}
       </div>
     </section>
   );

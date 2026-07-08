@@ -58,8 +58,10 @@ self.addEventListener("notificationclick", (event) => {
 });
 
 const DB_NAME = "still-partners-invoice-notifications";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = "notifications";
+const META_STORE_NAME = "metadata";
+const UNREAD_COUNT_KEY = "unread-count";
 const MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
 
 async function saveLocalNotification(message) {
@@ -71,6 +73,8 @@ async function saveLocalNotification(message) {
       message: String(message || "Still Partners notification"),
       receivedAt: new Date().toISOString()
     });
+    const unreadCount = await incrementUnreadCount(db);
+    await updateAppBadge(unreadCount);
     await notifyClients();
   } catch {
     // Notification display must still work if local inbox storage is unavailable.
@@ -85,6 +89,9 @@ function openNotificationDb() {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(META_STORE_NAME)) {
+        db.createObjectStore(META_STORE_NAME, { keyPath: "key" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -118,6 +125,36 @@ function pruneOldNotifications(db) {
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => resolve();
   });
+}
+
+function incrementUnreadCount(db) {
+  return new Promise((resolve) => {
+    const transaction = db.transaction(META_STORE_NAME, "readwrite");
+    const store = transaction.objectStore(META_STORE_NAME);
+    const request = store.get(UNREAD_COUNT_KEY);
+
+    request.onsuccess = () => {
+      const currentValue = request.result && typeof request.result.value === "number" ? request.result.value : 0;
+      const nextValue = currentValue + 1;
+      store.put({
+        key: UNREAD_COUNT_KEY,
+        value: nextValue
+      });
+      resolve(nextValue);
+    };
+    request.onerror = () => resolve(0);
+    transaction.onerror = () => resolve(0);
+  });
+}
+
+async function updateAppBadge(count) {
+  try {
+    if (count > 0 && typeof self.registration.setAppBadge === "function") {
+      await self.registration.setAppBadge(count);
+    }
+  } catch {
+    // Badge support is optional.
+  }
 }
 
 async function notifyClients() {

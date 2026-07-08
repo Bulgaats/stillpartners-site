@@ -3,6 +3,8 @@
 import { RefreshCw, Search, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 
+type AdminTab = "subscribers" | "send" | "inactive";
+
 type Subscriber = {
   id: string;
   display_name: string;
@@ -33,15 +35,26 @@ export function AdminNotificationPage() {
   const [sendResult, setSendResult] = useState<Required<Pick<SendResult, "selected" | "sent" | "failed" | "disabled">> | null>(
     null
   );
+  const [activeTab, setActiveTab] = useState<AdminTab>("subscribers");
+
+  const activeSubscribers = useMemo(
+    () => subscribers.filter((subscriber) => isActiveSubscriber(subscriber)),
+    [subscribers]
+  );
+  const inactiveSubscribers = useMemo(
+    () => subscribers.filter((subscriber) => !isActiveSubscriber(subscriber)),
+    [subscribers]
+  );
 
   const visibleSubscribers = useMemo(() => {
+    const tabSubscribers = activeTab === "inactive" ? inactiveSubscribers : activeSubscribers;
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return subscribers;
+    if (!normalizedQuery) return tabSubscribers;
 
-    return subscribers.filter((subscriber) =>
+    return tabSubscribers.filter((subscriber) =>
       subscriber.display_name.toLowerCase().includes(normalizedQuery)
     );
-  }, [query, subscribers]);
+  }, [activeSubscribers, activeTab, inactiveSubscribers, query]);
 
   async function loadSubscribers({ preserveStatus = false }: { preserveStatus?: boolean } = {}) {
     setBusy(true);
@@ -143,7 +156,14 @@ export function AdminNotificationPage() {
   }
 
   function selectAllVisible() {
-    setSelectedIds((current) => [...new Set([...current, ...visibleSubscribers.map((subscriber) => subscriber.id)])]);
+    setSelectedIds((current) => [
+      ...new Set([
+        ...current,
+        ...visibleSubscribers
+          .filter((subscriber) => subscriber.notification_enabled)
+          .map((subscriber) => subscriber.id)
+      ])
+    ]);
   }
 
   function clearSelection() {
@@ -193,12 +213,50 @@ export function AdminNotificationPage() {
 
         {isAuthenticated ? (
           <>
-            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <nav className="grid grid-cols-3 gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+              <button
+                type="button"
+                className={`min-h-10 rounded-lg px-3 text-xs font-black ${
+                  activeTab === "subscribers" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
+                }`}
+                onClick={() => setActiveTab("subscribers")}
+              >
+                Subscribers
+              </button>
+              <button
+                type="button"
+                className={`min-h-10 rounded-lg px-3 text-xs font-black ${
+                  activeTab === "send" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
+                }`}
+                onClick={() => setActiveTab("send")}
+              >
+                Send
+              </button>
+              <button
+                type="button"
+                className={`min-h-10 rounded-lg px-3 text-xs font-black ${
+                  activeTab === "inactive" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
+                }`}
+                onClick={() => setActiveTab("inactive")}
+              >
+                Inactive devices
+              </button>
+            </nav>
+
+            {activeTab === "subscribers" || activeTab === "inactive" ? (
+              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-black text-slate-950">Notification subscribers</h2>
+                  <h2 className="text-lg font-black text-slate-950">
+                    {activeTab === "inactive" ? "Inactive devices" : "Notification subscribers"}
+                  </h2>
                   <span className="text-xs font-black text-slate-500">{selectedIds.length} selected</span>
                 </div>
+                <p className="text-sm font-bold text-slate-500">
+                  {activeTab === "inactive"
+                    ? "Inactive devices are disabled or have not been seen in the last 10 days."
+                    : "Active subscribers are enabled and have been seen in the last 10 days."}
+                </p>
                 <label className="flex min-h-12 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-800">
                   <Search className="size-4 text-slate-500" aria-hidden="true" />
                   <input
@@ -253,8 +311,10 @@ export function AdminNotificationPage() {
                             {subscriber.device_label ?? "Device"} | Last seen:{" "}
                             {subscriber.last_seen_at ? formatDateTime(subscriber.last_seen_at) : "Not recorded"}
                           </span>
-                          {!subscriber.notification_enabled ? (
-                            <span className="mt-1 block text-xs font-black text-red-700">Notifications disabled</span>
+                          {!subscriber.notification_enabled || !isActiveSubscriber(subscriber) ? (
+                            <span className="mt-1 block text-xs font-black text-red-700">
+                              {!subscriber.notification_enabled ? "Notifications disabled" : "Inactive device"}
+                            </span>
                           ) : null}
                         </span>
                       </label>
@@ -263,8 +323,10 @@ export function AdminNotificationPage() {
                 </div>
               </div>
             </section>
+            ) : null}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            {activeTab === "send" ? (
+              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-black text-slate-950">Send notification</h2>
@@ -295,6 +357,7 @@ export function AdminNotificationPage() {
                 </button>
               </div>
             </section>
+            ) : null}
           </>
         ) : null}
 
@@ -372,4 +435,12 @@ function formatDateTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));
+}
+
+function isActiveSubscriber(subscriber: Subscriber) {
+  if (!subscriber.notification_enabled || !subscriber.last_seen_at) return false;
+  const lastSeenAt = Date.parse(subscriber.last_seen_at);
+  if (!Number.isFinite(lastSeenAt)) return false;
+
+  return Date.now() - lastSeenAt <= 10 * 24 * 60 * 60 * 1000;
 }
