@@ -22,14 +22,17 @@ self.addEventListener("push", (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: "/contractor-invoice/icon-192.png",
-      badge: "/contractor-invoice/icon-192.png",
-      data: {
-        url: payload.url || "/contractor-invoice"
-      }
-    })
+    Promise.all([
+      saveLocalNotification(payload.body),
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: "/contractor-invoice/icon-192.png",
+        badge: "/contractor-invoice/icon-192.png",
+        data: {
+          url: payload.url || "/contractor-invoice"
+        }
+      })
+    ])
   );
 });
 
@@ -53,3 +56,73 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+
+const DB_NAME = "still-partners-invoice-notifications";
+const DB_VERSION = 1;
+const STORE_NAME = "notifications";
+const MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
+
+async function saveLocalNotification(message) {
+  try {
+    const db = await openNotificationDb();
+    await pruneOldNotifications(db);
+    await putNotification(db, {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      message: String(message || "Still Partners notification"),
+      receivedAt: new Date().toISOString()
+    });
+    await notifyClients();
+  } catch {
+    // Notification display must still work if local inbox storage is unavailable.
+  }
+}
+
+function openNotificationDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function putNotification(db, notification) {
+  return new Promise((resolve) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    transaction.objectStore(STORE_NAME).put(notification);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => resolve();
+  });
+}
+
+function pruneOldNotifications(db) {
+  return new Promise((resolve) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      for (const record of request.result || []) {
+        const timestamp = Date.parse(record.receivedAt);
+        if (!Number.isFinite(timestamp) || Date.now() - timestamp > MAX_AGE_MS) {
+          store.delete(record.id);
+        }
+      }
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => resolve();
+  });
+}
+
+async function notifyClients() {
+  const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  for (const client of clients) {
+    client.postMessage({ type: "contractor-invoice-notification-saved" });
+  }
+}

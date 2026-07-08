@@ -49,6 +49,57 @@ export async function enableContractorNotifications({
       applicationServerKey: urlBase64ToUint8Array(publicKey)
     }));
 
+  const saved = await saveSubscription({ subscription, displayName });
+  if (!saved) {
+    return { ok: false, status: "error" as const, message: "Subscription could not be saved." };
+  }
+
+  return { ok: true, status: "enabled" as const };
+}
+
+export async function getContractorNotificationState({
+  displayName
+}: {
+  displayName?: string;
+} = {}) {
+  if (!isPushSupported()) {
+    return { ok: false, status: "unsupported" as const };
+  }
+
+  if (Notification.permission === "denied") {
+    return { ok: false, status: "blocked" as const };
+  }
+
+  if (Notification.permission !== "granted") {
+    return { ok: false, status: "idle" as const };
+  }
+
+  const registration =
+    (await navigator.serviceWorker.getRegistration("/contractor-invoice/")) ??
+    (await navigator.serviceWorker.register("/contractor-invoice/sw.js", {
+      scope: "/contractor-invoice/"
+    }));
+  const subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    return { ok: false, status: "idle" as const };
+  }
+
+  const saved = await saveSubscription({ subscription, displayName });
+  if (!saved) {
+    return { ok: true, status: "enabled" as const, message: "Notifications are enabled on this device." };
+  }
+
+  return { ok: true, status: "enabled" as const };
+}
+
+async function saveSubscription({
+  subscription,
+  displayName
+}: {
+  subscription: PushSubscription;
+  displayName?: string;
+}) {
   const response = await fetch("/api/contractor-invoice/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -59,11 +110,7 @@ export async function enableContractorNotifications({
     })
   });
 
-  if (!response.ok) {
-    return { ok: false, status: "error" as const, message: "Subscription could not be saved." };
-  }
-
-  return { ok: true, status: "enabled" as const };
+  return response.ok;
 }
 
 function getDeviceLabel() {

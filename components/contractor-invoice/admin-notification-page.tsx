@@ -29,6 +29,10 @@ export function AdminNotificationPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [showSendConfirmation, setShowSendConfirmation] = useState(false);
+  const [sendResult, setSendResult] = useState<Required<Pick<SendResult, "selected" | "sent" | "failed" | "disabled">> | null>(
+    null
+  );
 
   const visibleSubscribers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -73,8 +77,9 @@ export function AdminNotificationPage() {
     }
   }
 
-  async function sendSelectedNotification() {
+  function requestSendConfirmation() {
     setStatus("");
+    setSendResult(null);
     const trimmed = message.trim();
 
     if (!trimmed) {
@@ -89,7 +94,14 @@ export function AdminNotificationPage() {
       setStatus("Select at least one notification subscriber.");
       return;
     }
-    if (!window.confirm("Send this app notification to selected recipients?")) return;
+
+    setShowSendConfirmation(true);
+  }
+
+  async function sendSelectedNotification() {
+    setStatus("");
+    setSendResult(null);
+    const trimmed = message.trim();
 
     setBusy(true);
     try {
@@ -110,14 +122,16 @@ export function AdminNotificationPage() {
         return;
       }
 
-      setStatus(
-        `Selected: ${result?.selected ?? selectedIds.length}. Sent: ${result?.sent ?? 0}. Failed: ${
-          result?.failed ?? 0
-        }. Disabled: ${result?.disabled ?? 0}.`
-      );
+      setSendResult({
+        selected: result?.selected ?? selectedIds.length,
+        sent: result?.sent ?? 0,
+        failed: result?.failed ?? 0,
+        disabled: result?.disabled ?? 0
+      });
       setMessage("");
       await loadSubscribers({ preserveStatus: true });
     } finally {
+      setShowSendConfirmation(false);
       setBusy(false);
     }
   }
@@ -272,7 +286,7 @@ export function AdminNotificationPage() {
                   type="button"
                   className="flex min-h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-500"
                   onClick={() => {
-                    void sendSelectedNotification();
+                    requestSendConfirmation();
                   }}
                   disabled={busy || selectedIds.length === 0}
                 >
@@ -289,7 +303,66 @@ export function AdminNotificationPage() {
             {status}
           </p>
         ) : null}
+
+        {sendResult ? (
+          <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950 shadow-sm">
+            <p className="font-black">Notification sent.</p>
+            <dl className="mt-3 grid grid-cols-2 gap-2">
+              <div>
+                <dt className="text-xs uppercase text-emerald-700">Selected</dt>
+                <dd className="text-lg font-black">{sendResult.selected}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-emerald-700">Sent</dt>
+                <dd className="text-lg font-black">{sendResult.sent}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-emerald-700">Failed</dt>
+                <dd className="text-lg font-black">{sendResult.failed}</dd>
+              </div>
+              <div>
+                <dt className="text-xs uppercase text-emerald-700">Disabled</dt>
+                <dd className="text-lg font-black">{sendResult.disabled}</dd>
+              </div>
+            </dl>
+          </section>
+        ) : null}
       </div>
+      {showSendConfirmation ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 px-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="send-confirmation-title"
+            className="grid w-full max-w-sm gap-4 rounded-lg bg-white p-5 text-slate-950 shadow-xl"
+          >
+            <h2 id="send-confirmation-title" className="text-lg font-black">
+              Send this app notification to selected recipients?
+            </h2>
+            <p className="text-sm font-bold text-slate-600">Selected recipients: {selectedIds.length}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className="min-h-11 rounded-lg border border-slate-300 px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-wait disabled:text-slate-500"
+                onClick={() => setShowSendConfirmation(false)}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="min-h-11 rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white disabled:cursor-wait disabled:bg-slate-500"
+                onClick={() => {
+                  void sendSelectedNotification();
+                }}
+                disabled={busy}
+              >
+                {busy ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

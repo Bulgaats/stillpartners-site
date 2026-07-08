@@ -1,18 +1,74 @@
 "use client";
 
 import { Bell } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   enableContractorNotifications,
+  getContractorNotificationState,
   isPushSupported,
   type NotificationStatus
 } from "@/lib/contractor-invoice/push";
+import {
+  getRecentNotifications,
+  pruneRecentNotifications,
+  type LocalNotificationRecord
+} from "@/lib/contractor-invoice/notification-history";
 
 export function NotificationPanel({ displayName }: { displayName?: string }) {
-  const [status, setStatus] = useState<NotificationStatus>(() =>
-    isPushSupported() ? "idle" : "unsupported"
-  );
+  const [status, setStatus] = useState<NotificationStatus>("idle");
   const [message, setMessage] = useState("");
+  const [recentNotifications, setRecentNotifications] = useState<LocalNotificationRecord[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function restoreNotificationState() {
+      if (!isPushSupported()) {
+        if (active) setStatus("unsupported");
+        return;
+      }
+
+      const result = await getContractorNotificationState({ displayName });
+      if (!active) return;
+      setStatus(result.status);
+      setMessage(result.message ?? "");
+    }
+
+    void restoreNotificationState();
+
+    return () => {
+      active = false;
+    };
+  }, [displayName]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRecentNotifications() {
+      try {
+        await pruneRecentNotifications();
+        const records = await getRecentNotifications();
+        if (active) setRecentNotifications(records);
+      } catch {
+        if (active) setRecentNotifications([]);
+      }
+    }
+
+    void loadRecentNotifications();
+
+    function handleServiceWorkerMessage(event: MessageEvent) {
+      if ((event.data as { type?: string } | null)?.type === "contractor-invoice-notification-saved") {
+        void loadRecentNotifications();
+      }
+    }
+
+    navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
+
+    return () => {
+      active = false;
+      navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
+    };
+  }, []);
 
   async function enableNotifications() {
     setStatus("enabling");
@@ -52,6 +108,30 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
       >
         {status === "enabled" ? "Update notifications" : "Enable notifications"}
       </button>
+      <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
+        <p className="text-sm font-black text-white">Recent notifications</p>
+        {recentNotifications.length > 0 ? (
+          <ul className="mt-3 grid gap-2">
+            {recentNotifications.map((notification) => (
+              <li key={notification.id} className="rounded-lg bg-white/10 p-3">
+                <p className="text-sm font-bold text-white">{notification.message}</p>
+                <p className="mt-1 text-xs font-bold text-slate-300">
+                  {formatNotificationTime(notification.receivedAt)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm font-bold text-slate-300">No recent notifications.</p>
+        )}
+      </div>
     </section>
   );
+}
+
+function formatNotificationTime(value: string) {
+  return new Intl.DateTimeFormat("en-AU", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
 }
