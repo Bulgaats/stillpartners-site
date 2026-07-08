@@ -32,16 +32,20 @@ type ConfiguredAdmin = {
 };
 
 export function verifyNotificationAdmin(credentials: AdminCredentials) {
-  const adminName = credentials.adminName?.trim() ?? "";
+  const adminName = normalizeAdminName(credentials.adminName);
   const adminPassword = credentials.adminPassword ?? "";
-  const admins = getConfiguredAdmins();
+  const { admins, error } = getConfiguredAdmins();
+
+  if (error) {
+    return { admin: null, error };
+  }
 
   if (!adminName || !adminPassword) {
     return { admin: null, error: "Admin name and password are required." };
   }
 
   const matchedAdmin = admins.find(
-    (admin) => admin.name === adminName && admin.password === adminPassword
+    (admin) => normalizeAdminName(admin.name) === adminName && admin.password === adminPassword
   );
 
   if (!matchedAdmin) {
@@ -221,15 +225,28 @@ function getErrorMessage(error: unknown) {
 
 function getConfiguredAdmins() {
   const rawAdmins = process.env.CONTRACTOR_INVOICE_ADMINS;
-  if (!rawAdmins) return [];
+  if (!rawAdmins) {
+    return { admins: [], error: "Notification admin credentials are not configured." };
+  }
 
   try {
-    const parsed = JSON.parse(rawAdmins) as unknown;
-    if (!Array.isArray(parsed)) return [];
+    const parsed = parseAdminsJson(rawAdmins);
+    if (!Array.isArray(parsed)) {
+      return { admins: [], error: "Notification admin credentials are not configured correctly." };
+    }
 
-    return parsed.filter(isConfiguredAdmin);
+    const admins = parsed.filter(isConfiguredAdmin).map((admin) => ({
+      name: admin.name.trim(),
+      password: admin.password
+    }));
+
+    if (admins.length === 0) {
+      return { admins: [], error: "Notification admin credentials are not configured correctly." };
+    }
+
+    return { admins, error: null };
   } catch {
-    return [];
+    return { admins: [], error: "Notification admin credentials are not configured correctly." };
   }
 }
 
@@ -237,4 +254,17 @@ function isConfiguredAdmin(value: unknown): value is ConfiguredAdmin {
   if (!value || typeof value !== "object") return false;
   const admin = value as Record<string, unknown>;
   return typeof admin.name === "string" && admin.name.trim().length > 0 && typeof admin.password === "string";
+}
+
+function parseAdminsJson(rawAdmins: string) {
+  const parsed = JSON.parse(rawAdmins.trim()) as unknown;
+  if (typeof parsed === "string") {
+    return JSON.parse(parsed.trim()) as unknown;
+  }
+
+  return parsed;
+}
+
+function normalizeAdminName(value: string | undefined) {
+  return value?.trim().toLowerCase() ?? "";
 }
