@@ -71,7 +71,11 @@ export function AdminNotificationPage() {
 
       if (!response.ok) {
         setIsAuthenticated(false);
-        setStatus(result?.error ?? "Notification subscribers could not be loaded.");
+        if (response.status === 401) {
+          setStatus("Invalid admin credentials.");
+        } else {
+          setStatus(result?.error ?? "Notification subscribers could not be loaded. Check the Supabase migration and service role configuration.");
+        }
         return;
       }
 
