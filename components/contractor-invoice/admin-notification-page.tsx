@@ -9,8 +9,18 @@ type Subscriber = {
   id: string;
   display_name: string;
   device_label: string | null;
+  phone_hash: string | null;
+  phone_last4: string | null;
   last_seen_at: string | null;
   notification_enabled: boolean;
+};
+
+type SubscriberGroup = {
+  id: string;
+  displayName: string;
+  otherNames: string[];
+  phoneLast4: string | null;
+  devices: Subscriber[];
 };
 
 type SendResult = {
@@ -71,22 +81,20 @@ export function AdminNotificationPage() {
     void checkExistingSession();
   }, []);
 
-  const activeSubscribers = useMemo(
-    () => subscribers.filter((subscriber) => isActiveSubscriber(subscriber)),
-    [subscribers]
-  );
-  const inactiveSubscribers = useMemo(
-    () => subscribers.filter((subscriber) => !isActiveSubscriber(subscriber)),
-    [subscribers]
-  );
+  const activeSubscribers = useMemo(() => subscribers.filter(isActiveSubscriber), [subscribers]);
+  const inactiveSubscribers = useMemo(() => subscribers.filter((subscriber) => !isActiveSubscriber(subscriber)), [subscribers]);
 
-  const visibleSubscribers = useMemo(() => {
+  const visibleGroups = useMemo(() => {
     const tabSubscribers = activeTab === "inactive" ? inactiveSubscribers : activeSubscribers;
+    const groups = createSubscriberGroups(tabSubscribers);
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return tabSubscribers;
+    if (!normalizedQuery) return groups;
 
-    return tabSubscribers.filter((subscriber) =>
-      subscriber.display_name.toLowerCase().includes(normalizedQuery)
+    return groups.filter((group) =>
+      [group.displayName, ...group.otherNames, group.phoneLast4 ? `***${group.phoneLast4}` : ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedQuery)
     );
   }, [activeSubscribers, activeTab, inactiveSubscribers, query]);
 
@@ -220,13 +228,27 @@ export function AdminNotificationPage() {
     );
   }
 
+  function toggleGroup(group: SubscriberGroup) {
+    const activeDeviceIds = group.devices.filter((subscriber) => subscriber.notification_enabled).map((subscriber) => subscriber.id);
+    if (activeDeviceIds.length === 0) return;
+
+    setSelectedIds((current) => {
+      const allSelected = activeDeviceIds.every((id) => current.includes(id));
+      if (allSelected) {
+        return current.filter((id) => !activeDeviceIds.includes(id));
+      }
+
+      return [...new Set([...current, ...activeDeviceIds])];
+    });
+  }
+
   function selectAllVisible() {
     setSelectedIds((current) => [
       ...new Set([
         ...current,
-        ...visibleSubscribers
-          .filter((subscriber) => subscriber.notification_enabled)
-          .map((subscriber) => subscriber.id)
+        ...visibleGroups.flatMap((group) =>
+          group.devices.filter((subscriber) => subscriber.notification_enabled).map((subscriber) => subscriber.id)
+        )
       ])
     ]);
   }
@@ -380,40 +402,61 @@ export function AdminNotificationPage() {
                 </div>
 
                 <div className="grid gap-2">
-                  {visibleSubscribers.length === 0 ? (
+                  {visibleGroups.length === 0 ? (
                     <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-bold text-slate-500">
                       No notification subscribers found.
                     </p>
                   ) : (
-                    visibleSubscribers.map((subscriber) => (
-                      <label
-                        key={subscriber.id}
-                        className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${
-                          subscriber.notification_enabled
-                            ? "border-slate-200 bg-slate-50"
-                            : "border-slate-200 bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-1 size-4 accent-slate-950"
-                          checked={selectedIds.includes(subscriber.id)}
-                          onChange={() => toggleSubscriber(subscriber.id)}
-                          disabled={!subscriber.notification_enabled}
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block font-black text-slate-950">{subscriber.display_name}</span>
-                          <span className="block text-xs font-bold text-slate-500">
-                            {subscriber.device_label ?? "Device"} | Last seen:{" "}
-                            {subscriber.last_seen_at ? formatDateTime(subscriber.last_seen_at) : "Not recorded"}
-                          </span>
-                          {!subscriber.notification_enabled || !isActiveSubscriber(subscriber) ? (
-                            <span className="mt-1 block text-xs font-black text-red-700">
-                              {!subscriber.notification_enabled ? "Notifications disabled" : "Inactive device"}
+                    visibleGroups.map((group) => (
+                      <div key={group.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                        <label className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            className="mt-1 size-4 accent-slate-950"
+                            checked={isGroupSelected(group, selectedIds)}
+                            onChange={() => toggleGroup(group)}
+                            disabled={!group.devices.some((subscriber) => subscriber.notification_enabled)}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-black text-slate-950">
+                              {group.displayName}
+                              {group.phoneLast4 ? ` - ***${group.phoneLast4}` : ""}
+                              {group.devices.length > 1 ? ` - ${group.devices.length} devices` : ""}
                             </span>
-                          ) : null}
-                        </span>
-                      </label>
+                            {group.otherNames.length > 0 ? (
+                              <span className="mt-1 block text-xs font-bold text-slate-500">
+                                Also seen as: {group.otherNames.join(", ")}
+                              </span>
+                            ) : null}
+                          </span>
+                        </label>
+                        <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3">
+                          {group.devices.map((subscriber) => (
+                            <label key={subscriber.id} className="flex items-start gap-3 rounded-lg bg-white p-2">
+                              <input
+                                type="checkbox"
+                                className="mt-1 size-4 accent-slate-950"
+                                checked={selectedIds.includes(subscriber.id)}
+                                onChange={() => toggleSubscriber(subscriber.id)}
+                                disabled={!subscriber.notification_enabled}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-xs font-black text-slate-700">
+                                  {subscriber.device_label ?? "Device"}
+                                </span>
+                                <span className="block text-xs font-bold text-slate-500">
+                                  Last seen: {subscriber.last_seen_at ? formatDateTime(subscriber.last_seen_at) : "Not recorded"}
+                                </span>
+                                {!subscriber.notification_enabled || !isActiveSubscriber(subscriber) ? (
+                                  <span className="mt-1 block text-xs font-black text-red-700">
+                                    {!subscriber.notification_enabled ? "Notifications disabled" : "Inactive device"}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     ))
                   )}
                 </div>
@@ -539,4 +582,50 @@ function isActiveSubscriber(subscriber: Subscriber) {
   if (!Number.isFinite(lastSeenAt)) return false;
 
   return Date.now() - lastSeenAt <= 10 * 24 * 60 * 60 * 1000;
+}
+
+function createSubscriberGroups(subscribers: Subscriber[]) {
+  const grouped = new Map<string, Subscriber[]>();
+
+  for (const subscriber of subscribers) {
+    const groupKey = subscriber.phone_hash ? `phone:${subscriber.phone_hash}` : `subscription:${subscriber.id}`;
+    grouped.set(groupKey, [...(grouped.get(groupKey) ?? []), subscriber]);
+  }
+
+  return [...grouped.entries()]
+    .map(([id, devices]) => {
+      const sortedDevices = [...devices].sort(compareLastSeenDesc);
+      const displayName = sortedDevices[0]?.display_name || "Unnamed contractor";
+      const otherNames = [
+        ...new Set(
+          sortedDevices
+            .map((subscriber) => subscriber.display_name)
+            .filter((name) => name && name !== displayName)
+        )
+      ];
+
+      return {
+        id,
+        displayName,
+        otherNames,
+        phoneLast4: sortedDevices.find((subscriber) => subscriber.phone_last4)?.phone_last4 ?? null,
+        devices: sortedDevices
+      } satisfies SubscriberGroup;
+    })
+    .sort((left, right) => compareLastSeenDesc(left.devices[0], right.devices[0]));
+}
+
+function isGroupSelected(group: SubscriberGroup, selectedIds: string[]) {
+  const enabledDeviceIds = group.devices.filter((subscriber) => subscriber.notification_enabled).map((subscriber) => subscriber.id);
+  return enabledDeviceIds.length > 0 && enabledDeviceIds.every((id) => selectedIds.includes(id));
+}
+
+function compareLastSeenDesc(left?: Subscriber, right?: Subscriber) {
+  return getLastSeenTime(right) - getLastSeenTime(left);
+}
+
+function getLastSeenTime(subscriber?: Subscriber) {
+  if (!subscriber?.last_seen_at) return 0;
+  const timestamp = Date.parse(subscriber.last_seen_at);
+  return Number.isFinite(timestamp) ? timestamp : 0;
 }

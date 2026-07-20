@@ -332,7 +332,7 @@ export function ContractorInvoiceApp() {
       </header>
 
       <div className="mx-auto grid w-full max-w-3xl gap-4 px-4 py-4">
-        <NotificationPanel displayName={profile.fullName} />
+        <NotificationPanel displayName={profile.fullName} profilePhone={profile.phone} />
 
         {tab === "invoice" ? (
           <InvoiceForm

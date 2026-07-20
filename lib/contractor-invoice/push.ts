@@ -18,9 +18,11 @@ export function isPushSupported() {
 }
 
 export async function enableContractorNotifications({
-  displayName
+  displayName,
+  phone
 }: {
   displayName?: string;
+  phone?: string;
 } = {}) {
   if (!isPushSupported()) {
     return { ok: false, status: "unsupported" as const };
@@ -49,7 +51,7 @@ export async function enableContractorNotifications({
       applicationServerKey: urlBase64ToUint8Array(publicKey)
     }));
 
-  const saved = await saveSubscription({ subscription, displayName });
+  const saved = await saveSubscription({ subscription, displayName, phone });
   if (!saved) {
     return { ok: false, status: "error" as const, message: "Subscription could not be saved." };
   }
@@ -58,9 +60,11 @@ export async function enableContractorNotifications({
 }
 
 export async function getContractorNotificationState({
-  displayName
+  displayName,
+  phone
 }: {
   displayName?: string;
+  phone?: string;
 } = {}) {
   if (!isPushSupported()) {
     return { ok: false, status: "unsupported" as const };
@@ -85,7 +89,7 @@ export async function getContractorNotificationState({
     return { ok: false, status: "idle" as const };
   }
 
-  const saved = await saveSubscription({ subscription, displayName });
+  const saved = await saveSubscription({ subscription, displayName, phone });
   if (!saved) {
     return { ok: true, status: "enabled" as const, message: "Notifications are enabled on this device." };
   }
@@ -95,10 +99,12 @@ export async function getContractorNotificationState({
 
 async function saveSubscription({
   subscription,
-  displayName
+  displayName,
+  phone
 }: {
   subscription: PushSubscription;
   displayName?: string;
+  phone?: string;
 }) {
   const response = await fetch("/api/contractor-invoice/push/subscribe", {
     method: "POST",
@@ -106,6 +112,7 @@ async function saveSubscription({
     body: JSON.stringify({
       ...subscription.toJSON(),
       displayName: displayName?.trim() || "Unnamed contractor",
+      phone: phone?.trim() || undefined,
       deviceLabel: getDeviceLabel()
     })
   });

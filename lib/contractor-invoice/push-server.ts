@@ -28,6 +28,11 @@ export type VerifiedAdmin = {
   name: string;
 };
 
+export type NotificationPhoneIdentity = {
+  phone_hash: string | null;
+  phone_last4: string | null;
+};
+
 type ConfiguredAdmin = {
   name: string;
   password: string;
@@ -87,6 +92,27 @@ export function clearNotificationAdminSession(response: NextResponse) {
     path: "/",
     maxAge: 0
   });
+}
+
+export function createNotificationPhoneIdentity(phone: unknown): NotificationPhoneIdentity {
+  if (typeof phone !== "string") {
+    return { phone_hash: null, phone_last4: null };
+  }
+
+  const normalizedPhone = normalizeNotificationPhone(phone);
+  if (!normalizedPhone) {
+    return { phone_hash: null, phone_last4: null };
+  }
+
+  const secret = process.env.CONTRACTOR_NOTIFICATION_ID_SECRET;
+  if (!secret) {
+    return { phone_hash: null, phone_last4: normalizedPhone.slice(-4) };
+  }
+
+  return {
+    phone_hash: createHmac("sha256", secret).update(normalizedPhone).digest("hex"),
+    phone_last4: normalizedPhone.slice(-4)
+  };
 }
 
 export function configureWebPush() {
@@ -367,4 +393,21 @@ function parseAdminsJson(rawAdmins: string) {
 
 function normalizeAdminName(value: string | undefined) {
   return value?.trim().toLowerCase() ?? "";
+}
+
+function normalizeNotificationPhone(value: string) {
+  const cleaned = value.trim().replace(/[\s()[\]\-]/g, "");
+  if (!cleaned) return "";
+
+  if (/^04\d{8}$/.test(cleaned)) {
+    return `+61${cleaned.slice(1)}`;
+  }
+  if (/^4\d{8}$/.test(cleaned)) {
+    return `+61${cleaned}`;
+  }
+  if (/^\+61\d+$/.test(cleaned)) {
+    return cleaned;
+  }
+
+  return cleaned;
 }

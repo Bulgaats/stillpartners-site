@@ -14,6 +14,8 @@ type SubscriberRow = {
   id: string;
   display_name: string | null;
   device_label: string | null;
+  phone_hash: string | null;
+  phone_last4: string | null;
   last_seen_at: string | null;
   notification_enabled: boolean | null;
 };
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
 
   const { data, error: subscribersError } = await supabase
     .from("contractor_push_subscriptions")
-    .select("id, display_name, device_label, last_seen_at, notification_enabled")
+    .select("id, display_name, device_label, phone_hash, phone_last4, last_seen_at, notification_enabled")
     .order("display_name", { ascending: true });
 
   if (!subscribersError) {
@@ -68,6 +70,8 @@ export async function POST(request: Request) {
     id: subscriber.id,
     display_name: "Unnamed contractor",
     device_label: null,
+    phone_hash: null,
+    phone_last4: null,
     last_seen_at: subscriber.last_seen_at,
     notification_enabled: true
   }));
@@ -80,6 +84,8 @@ function normalizeSubscriber(subscriber: SubscriberRow) {
     id: subscriber.id,
     display_name: subscriber.display_name?.trim() || "Unnamed contractor",
     device_label: subscriber.device_label,
+    phone_hash: subscriber.phone_hash,
+    phone_last4: subscriber.phone_last4,
     last_seen_at: subscriber.last_seen_at,
     notification_enabled: subscriber.notification_enabled ?? true
   };

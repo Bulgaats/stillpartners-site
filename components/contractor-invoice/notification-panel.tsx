@@ -16,12 +16,20 @@ import {
   type LocalNotificationRecord
 } from "@/lib/contractor-invoice/notification-history";
 
-export function NotificationPanel({ displayName }: { displayName?: string }) {
+export function NotificationPanel({
+  displayName,
+  profilePhone
+}: {
+  displayName?: string;
+  profilePhone?: string;
+}) {
   const [status, setStatus] = useState<NotificationStatus>("idle");
   const [message, setMessage] = useState("");
+  const [notificationPhone, setNotificationPhone] = useState("");
   const [recentNotifications, setRecentNotifications] = useState<LocalNotificationRecord[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showRecentNotifications, setShowRecentNotifications] = useState(false);
+  const phoneForNotifications = profilePhone?.trim() || notificationPhone.trim();
 
   useEffect(() => {
     let active = true;
@@ -32,7 +40,7 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
         return;
       }
 
-      const result = await getContractorNotificationState({ displayName });
+      const result = await getContractorNotificationState({ displayName, phone: profilePhone });
       if (!active) return;
       setStatus(result.status);
       setMessage(result.message ?? "");
@@ -43,7 +51,7 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
     return () => {
       active = false;
     };
-  }, [displayName]);
+  }, [displayName, profilePhone]);
 
   useEffect(() => {
     let active = true;
@@ -84,7 +92,7 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
   async function enableNotifications() {
     setStatus("enabling");
     setMessage("");
-    const result = await enableContractorNotifications({ displayName });
+    const result = await enableContractorNotifications({ displayName, phone: phoneForNotifications });
     setStatus(result.status);
     setMessage(result.message ?? "");
   }
@@ -135,6 +143,20 @@ export function NotificationPanel({ displayName }: { displayName?: string }) {
       >
         {status === "enabled" ? "Update notifications" : "Enable notifications"}
       </button>
+      {!profilePhone?.trim() && status !== "enabled" ? (
+        <label className="mt-4 grid gap-1 text-sm font-bold text-slate-200">
+          Phone number
+          <input
+            className="min-h-11 rounded-lg border border-white/20 bg-white px-3 text-base font-normal text-slate-950 outline-none focus:border-white focus:ring-2 focus:ring-white/20"
+            value={notificationPhone}
+            onChange={(event) => setNotificationPhone(event.target.value)}
+            inputMode="tel"
+          />
+          <span className="text-xs font-bold text-slate-300">
+            Used only to match your notification device. Your full phone number is not stored.
+          </span>
+        </label>
+      ) : null}
       <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
         <button
           type="button"
