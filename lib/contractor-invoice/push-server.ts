@@ -1,4 +1,6 @@
+import { createHmac, timingSafeEqual } from "crypto";
 import webPush, { type PushSubscription } from "web-push";
+import { type NextResponse } from "next/server";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 export type StoredPushSubscription = {
@@ -31,6 +33,9 @@ type ConfiguredAdmin = {
   password: string;
 };
 
+const ADMIN_SESSION_COOKIE = "sp_invoice_admin_session";
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+
 export function verifyNotificationAdmin(credentials: AdminCredentials) {
   const adminName = normalizeAdminName(credentials.adminName);
   const adminPassword = credentials.adminPassword ?? "";
@@ -53,6 +58,35 @@ export function verifyNotificationAdmin(credentials: AdminCredentials) {
   }
 
   return { admin: { name: matchedAdmin.name }, error: null };
+}
+
+export function verifyNotificationAdminRequest(request: Request, credentials: AdminCredentials) {
+  const sessionAdmin = verifyAdminSessionCookie(request);
+  if (sessionAdmin) {
+    return { admin: sessionAdmin, error: null };
+  }
+
+  return verifyNotificationAdmin(credentials);
+}
+
+export function setNotificationAdminSession(response: NextResponse, admin: VerifiedAdmin) {
+  response.cookies.set(ADMIN_SESSION_COOKIE, createAdminSessionValue(admin), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: ADMIN_SESSION_MAX_AGE_SECONDS
+  });
+}
+
+export function clearNotificationAdminSession(response: NextResponse) {
+  response.cookies.set(ADMIN_SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 0
+  });
 }
 
 export function configureWebPush() {
@@ -248,6 +282,72 @@ function getConfiguredAdmins() {
   } catch {
     return { admins: [], error: "Notification admin credentials are not configured correctly." };
   }
+}
+
+function verifyAdminSessionCookie(request: Request) {
+  const cookieValue = getCookieValue(request, ADMIN_SESSION_COOKIE);
+  if (!cookieValue) return null;
+
+  const [encodedPayload, signature] = cookieValue.split(".");
+  if (!encodedPayload || !signature || !isValidSignature(encodedPayload, signature)) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8")) as {
+      name?: unknown;
+      expiresAt?: unknown;
+    };
+    if (typeof payload.name !== "string" || typeof payload.expiresAt !== "number") return null;
+    if (payload.expiresAt <= Date.now()) return null;
+
+    const sessionAdminName = payload.name;
+    const { admins } = getConfiguredAdmins();
+    const matchedAdmin = admins.find((admin) => normalizeAdminName(admin.name) === normalizeAdminName(sessionAdminName));
+    return matchedAdmin ? { name: matchedAdmin.name } : null;
+  } catch {
+    return null;
+  }
+}
+
+function createAdminSessionValue(admin: VerifiedAdmin) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      name: admin.name,
+      expiresAt: Date.now() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000
+    }),
+    "utf8"
+  ).toString("base64url");
+
+  return `${payload}.${signAdminSessionPayload(payload)}`;
+}
+
+function getCookieValue(request: Request, name: string) {
+  const cookies = request.headers.get("cookie");
+  if (!cookies) return null;
+
+  for (const cookie of cookies.split(";")) {
+    const [cookieName, ...valueParts] = cookie.trim().split("=");
+    if (cookieName === name) {
+      return valueParts.join("=");
+    }
+  }
+
+  return null;
+}
+
+function isValidSignature(payload: string, signature: string) {
+  const expected = signAdminSessionPayload(payload);
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(signature);
+
+  return expectedBuffer.length === signatureBuffer.length && timingSafeEqual(expectedBuffer, signatureBuffer);
+}
+
+function signAdminSessionPayload(payload: string) {
+  return createHmac("sha256", getAdminSessionSecret()).update(payload).digest("base64url");
+}
+
+function getAdminSessionSecret() {
+  return process.env.CONTRACTOR_INVOICE_ADMINS ?? "missing-contractor-invoice-admins";
 }
 
 function isConfiguredAdmin(value: unknown): value is ConfiguredAdmin {

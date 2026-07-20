@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   getServiceRoleClientOrError,
-  verifyNotificationAdmin
+  setNotificationAdminSession,
+  verifyNotificationAdminRequest
 } from "@/lib/contractor-invoice/push-server";
 
 type SubscribersRequest = {
@@ -24,12 +25,12 @@ type BaseSubscriberRow = {
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as SubscribersRequest | null;
-  const { error: adminError } = verifyNotificationAdmin({
+  const { admin, error: adminError } = verifyNotificationAdminRequest(request, {
     adminName: payload?.adminName,
     adminPassword: payload?.adminPassword
   });
 
-  if (adminError) {
+  if (adminError || !admin) {
     return NextResponse.json({ error: adminError }, { status: 401 });
   }
 
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
       .map(normalizeSubscriber)
       .sort((left, right) => left.display_name.localeCompare(right.display_name));
 
-    return NextResponse.json({ subscribers });
+    return createSubscribersResponse(subscribers, admin);
   }
 
   const { data: baseData, error: baseError } = await supabase
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     notification_enabled: true
   }));
 
-  return NextResponse.json({ subscribers });
+  return createSubscribersResponse(subscribers, admin);
 }
 
 function normalizeSubscriber(subscriber: SubscriberRow) {
@@ -82,4 +83,15 @@ function normalizeSubscriber(subscriber: SubscriberRow) {
     last_seen_at: subscriber.last_seen_at,
     notification_enabled: subscriber.notification_enabled ?? true
   };
+}
+
+function createSubscribersResponse(subscribers: ReturnType<typeof normalizeSubscriber>[], admin: { name: string }) {
+  const response = NextResponse.json({
+    subscribers,
+    admin: {
+      name: admin.name
+    }
+  });
+  setNotificationAdminSession(response, admin);
+  return response;
 }

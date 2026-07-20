@@ -3,8 +3,9 @@ import {
   configureWebPush,
   getServiceRoleClientOrError,
   sendPushToSubscriptions,
+  setNotificationAdminSession,
   type StoredPushSubscription,
-  verifyNotificationAdmin
+  verifyNotificationAdminRequest
 } from "@/lib/contractor-invoice/push-server";
 
 type SendRequest = {
@@ -15,7 +16,7 @@ type SendRequest = {
 
 export async function POST(request: Request) {
   const payload = (await request.json().catch(() => null)) as SendRequest | null;
-  const { admin, error: adminError } = verifyNotificationAdmin({
+  const { admin, error: adminError } = verifyNotificationAdminRequest(request, {
     adminName: payload?.adminName,
     adminPassword: payload?.adminPassword
   });
@@ -56,10 +57,12 @@ export async function POST(request: Request) {
     sentByAdmin: admin.name
   });
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     ok: true,
     sent: summary.sent,
     failed: summary.failed,
     removed: summary.disabled
   });
+  setNotificationAdminSession(response, admin);
+  return response;
 }

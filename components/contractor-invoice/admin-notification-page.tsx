@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw, Search, Send } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type AdminTab = "subscribers" | "send" | "inactive";
 
@@ -21,8 +21,17 @@ type SendResult = {
   error?: string;
 };
 
+type SubscribersResponse = {
+  subscribers?: Subscriber[];
+  admin?: {
+    name?: string;
+  };
+  error?: string;
+};
+
 export function AdminNotificationPage() {
   const [adminName, setAdminName] = useState("");
+  const [signedInAdminName, setSignedInAdminName] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
@@ -36,6 +45,31 @@ export function AdminNotificationPage() {
     null
   );
   const [activeTab, setActiveTab] = useState<AdminTab>("subscribers");
+
+  useEffect(() => {
+    async function checkExistingSession() {
+      setBusy(true);
+      try {
+        const response = await fetch("/api/contractor-invoice/push/subscribers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const result = (await response.json().catch(() => null)) as SubscribersResponse | null;
+
+        if (!response.ok) return;
+
+        setIsAuthenticated(true);
+        setSignedInAdminName(result?.admin?.name?.trim() || "Admin");
+        setPassword("");
+        setSubscribers(result?.subscribers ?? []);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    void checkExistingSession();
+  }, []);
 
   const activeSubscribers = useMemo(
     () => subscribers.filter((subscriber) => isActiveSubscriber(subscriber)),
@@ -56,7 +90,13 @@ export function AdminNotificationPage() {
     );
   }, [activeSubscribers, activeTab, inactiveSubscribers, query]);
 
-  async function loadSubscribers({ preserveStatus = false }: { preserveStatus?: boolean } = {}) {
+  async function loadSubscribers({
+    preserveStatus = false,
+    silentSessionCheck = false
+  }: {
+    preserveStatus?: boolean;
+    silentSessionCheck?: boolean;
+  } = {}) {
     setBusy(true);
     if (!preserveStatus) setStatus("");
     try {
@@ -65,14 +105,14 @@ export function AdminNotificationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ adminName, adminPassword: password })
       });
-      const result = (await response.json().catch(() => null)) as
-        | { subscribers?: Subscriber[]; error?: string }
-        | null;
+      const result = (await response.json().catch(() => null)) as SubscribersResponse | null;
 
       if (!response.ok) {
         setIsAuthenticated(false);
         if (response.status === 401) {
-          setStatus("Invalid admin credentials.");
+          if (!silentSessionCheck) {
+            setStatus("Invalid admin credentials.");
+          }
         } else {
           setStatus(result?.error ?? "Notification subscribers could not be loaded. Check the Supabase migration and service role configuration.");
         }
@@ -80,6 +120,8 @@ export function AdminNotificationPage() {
       }
 
       setIsAuthenticated(true);
+      setSignedInAdminName(result?.admin?.name?.trim() || adminName.trim());
+      setPassword("");
       setSubscribers(result?.subscribers ?? []);
       setSelectedIds((current) =>
         current.filter((id) =>
@@ -90,6 +132,25 @@ export function AdminNotificationPage() {
       );
       setStatus("");
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function signOut() {
+    setBusy(true);
+    setStatus("");
+    try {
+      await fetch("/api/contractor-invoice/push/sign-out", {
+        method: "POST"
+      });
+    } finally {
+      setIsAuthenticated(false);
+      setSignedInAdminName("");
+      setPassword("");
+      setSubscribers([]);
+      setSelectedIds([]);
+      setSendResult(null);
+      setShowSendConfirmation(false);
       setBusy(false);
     }
   }
@@ -182,38 +243,69 @@ export function AdminNotificationPage() {
           <h1 className="mt-2 text-2xl font-black">Admin notifications</h1>
         </header>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3">
-            <label className="grid gap-1 text-sm font-bold text-slate-800">
-              Admin name
-              <input
-                className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/15"
-                value={adminName}
-                onChange={(event) => setAdminName(event.target.value)}
-              />
-            </label>
-            <label className="grid gap-1 text-sm font-bold text-slate-800">
-              Password
-              <input
-                className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/15"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              className="flex min-h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-wait disabled:bg-slate-500"
-              onClick={() => {
-                void loadSubscribers();
-              }}
-              disabled={busy}
-            >
-              <RefreshCw className="size-4" aria-hidden="true" />
-              Load notification subscribers
-            </button>
-          </div>
-        </section>
+        {!isAuthenticated ? (
+          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-3">
+              <label className="grid gap-1 text-sm font-bold text-slate-800">
+                Admin name
+                <input
+                  className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/15"
+                  value={adminName}
+                  onChange={(event) => setAdminName(event.target.value)}
+                />
+              </label>
+              <label className="grid gap-1 text-sm font-bold text-slate-800">
+                Password
+                <input
+                  className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/15"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="flex min-h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-wait disabled:bg-slate-500"
+                onClick={() => {
+                  void loadSubscribers();
+                }}
+                disabled={busy}
+              >
+                <RefreshCw className="size-4" aria-hidden="true" />
+                Load notification subscribers
+              </button>
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+              <p className="text-sm font-bold text-slate-700">
+                Signed in as: <span className="font-black text-slate-950">{signedInAdminName || "Admin"}</span>
+              </p>
+              <button
+                type="button"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-wait disabled:text-slate-500"
+                onClick={() => {
+                  void loadSubscribers();
+                }}
+                disabled={busy}
+              >
+                <RefreshCw className="size-4" aria-hidden="true" />
+                Reload subscribers
+              </button>
+              <button
+                type="button"
+                className="min-h-11 rounded-lg bg-slate-950 px-4 py-2 text-sm font-black text-white disabled:cursor-wait disabled:bg-slate-500"
+                onClick={() => {
+                  void signOut();
+                }}
+                disabled={busy}
+              >
+                Sign out
+              </button>
+            </div>
+          </section>
+        )}
 
         {isAuthenticated ? (
           <>
