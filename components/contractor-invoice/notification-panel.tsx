@@ -18,10 +18,12 @@ import {
 
 export function NotificationPanel({
   displayName,
-  profilePhone
+  profilePhone,
+  onUnreadCountChange
 }: {
   displayName?: string;
   profilePhone?: string;
+  onUnreadCountChange?: (count: number) => void;
 }) {
   const [status, setStatus] = useState<NotificationStatus>("idle");
   const [message, setMessage] = useState("");
@@ -80,11 +82,13 @@ export function NotificationPanel({
         if (active) {
           setRecentNotifications(records);
           setUnreadCount(count);
+          onUnreadCountChange?.(count);
         }
       } catch {
         if (active) {
           setRecentNotifications([]);
           setUnreadCount(0);
+          onUnreadCountChange?.(0);
         }
       }
     }
@@ -103,7 +107,7 @@ export function NotificationPanel({
       active = false;
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
     };
-  }, []);
+  }, [onUnreadCountChange]);
 
   async function enableNotifications() {
     setStatus("enabling");
@@ -125,6 +129,7 @@ export function NotificationPanel({
 
     if (!showRecentNotifications) {
       setUnreadCount(0);
+      onUnreadCountChange?.(0);
       try {
         await markNotificationsRead();
       } catch {

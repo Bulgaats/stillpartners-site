@@ -55,6 +55,7 @@ export async function markNotificationsRead() {
   const db = await openNotificationDb();
   await setUnreadCount(db, 0);
   await updateAppBadge(0);
+  window.dispatchEvent(new CustomEvent("contractor-invoice-notifications-read"));
 }
 
 function openNotificationDb() {

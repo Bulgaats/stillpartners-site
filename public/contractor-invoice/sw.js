@@ -10,7 +10,7 @@ self.addEventListener("push", (event) => {
   let payload = {
     title: "Still Partners",
     body: "Still Partners notification",
-    url: "/contractor-invoice"
+    url: "/contractor-invoice?tab=notifications"
   };
 
   if (event.data) {
@@ -29,7 +29,7 @@ self.addEventListener("push", (event) => {
         icon: "/contractor-invoice/icon-192.png",
         badge: "/contractor-invoice/icon-192.png",
         data: {
-          url: payload.url || "/contractor-invoice"
+          url: getNotificationTargetUrl(payload.url)
         }
       })
     ])
@@ -38,7 +38,10 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = new URL(event.notification.data?.url || "/contractor-invoice", self.location.origin).href;
+  const targetUrl = new URL(
+    getNotificationTargetUrl(event.notification.data?.url),
+    self.location.origin
+  ).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
@@ -162,4 +165,12 @@ async function notifyClients() {
   for (const client of clients) {
     client.postMessage({ type: "contractor-invoice-notification-saved" });
   }
+}
+
+function getNotificationTargetUrl(url) {
+  if (!url || url === "/contractor-invoice") {
+    return "/contractor-invoice?tab=notifications";
+  }
+
+  return url;
 }
