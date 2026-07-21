@@ -405,6 +405,63 @@ export function AdminNotificationPage() {
               </button>
             </nav>
 
+            {activeTab === "send" ? (
+              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-lg font-black text-slate-950">Send notification</h2>
+                    <span className="text-xs font-black text-slate-500">
+                      Selected recipients: {selectedIds.length}
+                    </span>
+                  </div>
+                  <label className="grid gap-1 text-sm font-bold text-slate-800">
+                    App notification message
+                    <input
+                      className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/15"
+                      maxLength={50}
+                      value={message}
+                      onChange={(event) => setMessage(event.target.value)}
+                    />
+                  </label>
+                  <p className="text-right text-xs font-bold text-slate-500">{message.length} / 50</p>
+                  <button
+                    type="button"
+                    className="flex min-h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-500"
+                    onClick={() => {
+                      requestSendConfirmation();
+                    }}
+                    disabled={busy || selectedIds.length === 0}
+                  >
+                    <Send className="size-4" aria-hidden="true" />
+                    Send to selected
+                  </button>
+                  {sendResult ? (
+                    <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950">
+                      <p className="font-black">Notification sent.</p>
+                      <dl className="mt-3 grid grid-cols-2 gap-2">
+                        <div>
+                          <dt className="text-xs uppercase text-emerald-700">Selected</dt>
+                          <dd className="text-lg font-black">{sendResult.selected}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase text-emerald-700">Sent</dt>
+                          <dd className="text-lg font-black">{sendResult.sent}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase text-emerald-700">Failed</dt>
+                          <dd className="text-lg font-black">{sendResult.failed}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase text-emerald-700">Disabled</dt>
+                          <dd className="text-lg font-black">{sendResult.disabled}</dd>
+                        </div>
+                      </dl>
+                    </section>
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
             {activeTab === "send" || activeTab === "inactive" ? (
               <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="grid gap-3">
@@ -512,40 +569,6 @@ export function AdminNotificationPage() {
             </section>
             ) : null}
 
-            {activeTab === "send" ? (
-              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="grid gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-black text-slate-950">Send notification</h2>
-                  <span className="text-xs font-black text-slate-500">
-                    Selected recipients: {selectedIds.length}
-                  </span>
-                </div>
-                <label className="grid gap-1 text-sm font-bold text-slate-800">
-                  App notification message
-                  <input
-                    className="min-h-12 rounded-lg border border-slate-300 px-3 text-base font-normal outline-none focus:border-slate-950 focus:ring-2 focus:ring-slate-950/15"
-                    maxLength={50}
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                  />
-                </label>
-                <p className="text-right text-xs font-bold text-slate-500">{message.length} / 50</p>
-                <button
-                  type="button"
-                  className="flex min-h-12 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-500"
-                  onClick={() => {
-                    requestSendConfirmation();
-                  }}
-                  disabled={busy || selectedIds.length === 0}
-                >
-                  <Send className="size-4" aria-hidden="true" />
-                  Send to selected
-                </button>
-              </div>
-            </section>
-            ) : null}
-
             {activeTab === "history" ? (
               <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="grid gap-3">
@@ -607,29 +630,6 @@ export function AdminNotificationPage() {
           </p>
         ) : null}
 
-        {sendResult ? (
-          <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-950 shadow-sm">
-            <p className="font-black">Notification sent.</p>
-            <dl className="mt-3 grid grid-cols-2 gap-2">
-              <div>
-                <dt className="text-xs uppercase text-emerald-700">Selected</dt>
-                <dd className="text-lg font-black">{sendResult.selected}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-emerald-700">Sent</dt>
-                <dd className="text-lg font-black">{sendResult.sent}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-emerald-700">Failed</dt>
-                <dd className="text-lg font-black">{sendResult.failed}</dd>
-              </div>
-              <div>
-                <dt className="text-xs uppercase text-emerald-700">Disabled</dt>
-                <dd className="text-lg font-black">{sendResult.disabled}</dd>
-              </div>
-            </dl>
-          </section>
-        ) : null}
       </div>
       {showSendConfirmation ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 px-4">

@@ -29,6 +29,7 @@ export function NotificationPanel({
   const [recentNotifications, setRecentNotifications] = useState<LocalNotificationRecord[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showRecentNotifications, setShowRecentNotifications] = useState(false);
+  const [platform, setPlatform] = useState<"ios" | "desktop" | "other">("other");
   const phoneForNotifications = notificationPhone.trim() || profilePhone?.trim() || "";
 
   useEffect(() => {
@@ -36,6 +37,15 @@ export function NotificationPanel({
       setNotificationPhone(profilePhone.trim());
     }
   }, [notificationPhone, profilePhone]);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent;
+    if (/iPhone|iPad|iPod/i.test(userAgent)) {
+      setPlatform("ios");
+    } else if (/Macintosh|Windows|Linux/i.test(userAgent)) {
+      setPlatform("desktop");
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -129,10 +139,22 @@ export function NotificationPanel({
     : status === "blocked"
         ? "Notifications are blocked on this device or browser."
         : status === "unsupported"
-          ? "Notifications not supported"
+          ? "Notifications are not available in this browser view."
           : status === "enabling"
             ? "Enabling notifications..."
             : "Notifications not enabled";
+  const statusText =
+    status === "blocked"
+      ? "blocked"
+      : status === "unsupported"
+        ? "not available in this browser view"
+        : status === "enabled"
+          ? "enabled"
+          : status === "enabling"
+            ? "checking"
+            : "ready to enable";
+  const canEnable =
+    status !== "unsupported" && status !== "enabling" && (status === "enabled" || Boolean(phoneForNotifications));
 
   return (
     <section className="rounded-lg border border-slate-800 bg-slate-950 p-4 text-white shadow-sm">
@@ -142,6 +164,7 @@ export function NotificationPanel({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-black">{label}</p>
+          <p className="mt-1 text-xs font-black uppercase text-slate-400">Status: {statusText}</p>
           <p className="mt-1 text-sm font-bold text-slate-300">
             {unreadCount === 1 ? "1 unread notification" : `${unreadCount} unread notifications`}
           </p>
@@ -151,7 +174,41 @@ export function NotificationPanel({
       {status === "blocked" ? (
         <>
           <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-bold text-amber-100">
-            Allow notifications in this device or browser settings, then return and check again.
+            Open this site in your browser notification settings and allow notifications, then return and check again.
+            {platform === "ios" ? (
+              <span className="mt-2 block">
+                Open iPhone Settings &gt; Notifications, find this web app, and allow notifications. If the app is not
+                listed, add this page to the Home Screen and open it from there.
+              </span>
+            ) : null}
+            {platform === "desktop" ? (
+              <span className="mt-2 block">
+                Use the site settings next to the address bar and set Notifications to Allow.
+              </span>
+            ) : null}
+          </p>
+          <button
+            type="button"
+            className="mt-4 min-h-11 w-full rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950"
+            onClick={() => {
+              void checkNotificationStatus();
+            }}
+          >
+            Check notification status
+          </button>
+        </>
+      ) : status === "unsupported" ? (
+        <>
+          <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-bold text-amber-100">
+            {platform === "ios" ? (
+              <span className="block">
+                On iPhone or iPad, install this page to the Home Screen first, then open the Home Screen app and enable
+                notifications.
+              </span>
+            ) : null}
+            <span className={platform === "ios" ? "mt-2 block" : "block"}>
+              Try opening this app from the installed Home Screen app or use a supported browser.
+            </span>
           </p>
           <button
             type="button"
@@ -164,16 +221,21 @@ export function NotificationPanel({
           </button>
         </>
       ) : (
-        <button
-          type="button"
-          className="mt-4 min-h-11 w-full rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-          onClick={enableNotifications}
-          disabled={status === "unsupported" || status === "enabling"}
-        >
-          {status === "enabled" ? "Update notifications" : "Enable notifications"}
-        </button>
+        <>
+          <button
+            type="button"
+            className="mt-4 min-h-11 w-full rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+            onClick={enableNotifications}
+            disabled={!canEnable}
+          >
+            {status === "enabled" ? "Update notifications" : "Enable notifications"}
+          </button>
+          {!phoneForNotifications ? (
+            <p className="mt-2 text-sm font-bold text-slate-300">Enter your phone number to enable notifications.</p>
+          ) : null}
+        </>
       )}
-      {(status === "blocked" || (!profilePhone?.trim() && status !== "enabled")) ? (
+      {(status === "blocked" || status === "unsupported" || !profilePhone?.trim()) ? (
         <label className="mt-4 grid gap-1 text-sm font-bold text-slate-200">
           Phone number
           <input
