@@ -3,7 +3,7 @@
 import { RefreshCw, Search, Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-type AdminTab = "subscribers" | "send" | "inactive";
+type AdminTab = "send" | "inactive" | "history";
 
 type Subscriber = {
   id: string;
@@ -39,12 +39,29 @@ type SubscribersResponse = {
   error?: string;
 };
 
+type NotificationHistoryEvent = {
+  id: string;
+  message: string;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  disabled_count: number;
+  sent_by_admin: string;
+  created_at: string | null;
+};
+
+type HistoryResponse = {
+  events?: NotificationHistoryEvent[];
+  error?: string;
+};
+
 export function AdminNotificationPage() {
   const [adminName, setAdminName] = useState("");
   const [signedInAdminName, setSignedInAdminName] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
+  const [historyEvents, setHistoryEvents] = useState<NotificationHistoryEvent[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState("");
@@ -54,7 +71,7 @@ export function AdminNotificationPage() {
   const [sendResult, setSendResult] = useState<Required<Pick<SendResult, "selected" | "sent" | "failed" | "disabled">> | null>(
     null
   );
-  const [activeTab, setActiveTab] = useState<AdminTab>("subscribers");
+  const [activeTab, setActiveTab] = useState<AdminTab>("send");
 
   useEffect(() => {
     async function checkExistingSession() {
@@ -73,6 +90,7 @@ export function AdminNotificationPage() {
         setSignedInAdminName(result?.admin?.name?.trim() || "Admin");
         setPassword("");
         setSubscribers(result?.subscribers ?? []);
+        void loadHistory();
       } finally {
         setBusy(false);
       }
@@ -81,11 +99,11 @@ export function AdminNotificationPage() {
     void checkExistingSession();
   }, []);
 
-  const activeSubscribers = useMemo(() => subscribers.filter(isActiveSubscriber), [subscribers]);
+  const sendableSubscribers = useMemo(() => subscribers.filter((subscriber) => subscriber.notification_enabled), [subscribers]);
   const inactiveSubscribers = useMemo(() => subscribers.filter((subscriber) => !isActiveSubscriber(subscriber)), [subscribers]);
 
   const visibleGroups = useMemo(() => {
-    const tabSubscribers = activeTab === "inactive" ? inactiveSubscribers : activeSubscribers;
+    const tabSubscribers = activeTab === "inactive" ? inactiveSubscribers : sendableSubscribers;
     const groups = createSubscriberGroups(tabSubscribers);
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return groups;
@@ -96,7 +114,7 @@ export function AdminNotificationPage() {
         .toLowerCase()
         .includes(normalizedQuery)
     );
-  }, [activeSubscribers, activeTab, inactiveSubscribers, query]);
+  }, [activeTab, inactiveSubscribers, query, sendableSubscribers]);
 
   async function loadSubscribers({
     preserveStatus = false,
@@ -131,6 +149,7 @@ export function AdminNotificationPage() {
       setSignedInAdminName(result?.admin?.name?.trim() || adminName.trim());
       setPassword("");
       setSubscribers(result?.subscribers ?? []);
+      void loadHistory();
       setSelectedIds((current) =>
         current.filter((id) =>
           (result?.subscribers ?? []).some(
@@ -156,11 +175,29 @@ export function AdminNotificationPage() {
       setSignedInAdminName("");
       setPassword("");
       setSubscribers([]);
+      setHistoryEvents([]);
       setSelectedIds([]);
       setSendResult(null);
       setShowSendConfirmation(false);
       setBusy(false);
     }
+  }
+
+  async function loadHistory() {
+    const response = await fetch("/api/contractor-invoice/push/history", {
+      method: "GET"
+    });
+    const result = (await response.json().catch(() => null)) as HistoryResponse | null;
+
+    if (!response.ok) {
+      setHistoryEvents([]);
+      if (response.status !== 401) {
+        setStatus(result?.error ?? "Notification history could not be loaded.");
+      }
+      return;
+    }
+
+    setHistoryEvents(result?.events ?? []);
   }
 
   function requestSendConfirmation() {
@@ -216,6 +253,7 @@ export function AdminNotificationPage() {
       });
       setMessage("");
       await loadSubscribers({ preserveStatus: true });
+      await loadHistory();
     } finally {
       setShowSendConfirmation(false);
       setBusy(false);
@@ -223,12 +261,14 @@ export function AdminNotificationPage() {
   }
 
   function toggleSubscriber(id: string) {
+    if (activeTab !== "send") return;
     setSelectedIds((current) =>
       current.includes(id) ? current.filter((selectedId) => selectedId !== id) : [...current, id]
     );
   }
 
   function toggleGroup(group: SubscriberGroup) {
+    if (activeTab !== "send") return;
     const activeDeviceIds = group.devices.filter((subscriber) => subscriber.notification_enabled).map((subscriber) => subscriber.id);
     if (activeDeviceIds.length === 0) return;
 
@@ -243,6 +283,7 @@ export function AdminNotificationPage() {
   }
 
   function selectAllVisible() {
+    if (activeTab !== "send") return;
     setSelectedIds((current) => [
       ...new Set([
         ...current,
@@ -335,20 +376,11 @@ export function AdminNotificationPage() {
               <button
                 type="button"
                 className={`min-h-10 rounded-lg px-3 text-xs font-black ${
-                  activeTab === "subscribers" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
-                }`}
-                onClick={() => setActiveTab("subscribers")}
-              >
-                Subscribers
-              </button>
-              <button
-                type="button"
-                className={`min-h-10 rounded-lg px-3 text-xs font-black ${
                   activeTab === "send" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
                 }`}
                 onClick={() => setActiveTab("send")}
               >
-                Send
+                Send notification
               </button>
               <button
                 type="button"
@@ -359,21 +391,35 @@ export function AdminNotificationPage() {
               >
                 Inactive devices
               </button>
+              <button
+                type="button"
+                className={`min-h-10 rounded-lg px-3 text-xs font-black ${
+                  activeTab === "history" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
+                }`}
+                onClick={() => {
+                  setActiveTab("history");
+                  void loadHistory();
+                }}
+              >
+                History
+              </button>
             </nav>
 
-            {activeTab === "subscribers" || activeTab === "inactive" ? (
+            {activeTab === "send" || activeTab === "inactive" ? (
               <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <div className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
                   <h2 className="text-lg font-black text-slate-950">
-                    {activeTab === "inactive" ? "Inactive devices" : "Notification subscribers"}
+                    {activeTab === "inactive" ? "Inactive devices" : "Send notification"}
                   </h2>
-                  <span className="text-xs font-black text-slate-500">{selectedIds.length} selected</span>
+                  {activeTab === "send" ? (
+                    <span className="text-xs font-black text-slate-500">{selectedIds.length} selected</span>
+                  ) : null}
                 </div>
                 <p className="text-sm font-bold text-slate-500">
                   {activeTab === "inactive"
-                    ? "Inactive devices are disabled or have not been seen in the last 10 days."
-                    : "Active subscribers are enabled and have been seen in the last 10 days."}
+                    ? "Disabled or stale devices are shown here for review."
+                    : "Search recipients, select devices, write a message, then send an app notification."}
                 </p>
                 <label className="flex min-h-12 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-bold text-slate-800">
                   <Search className="size-4 text-slate-500" aria-hidden="true" />
@@ -384,7 +430,8 @@ export function AdminNotificationPage() {
                     onChange={(event) => setQuery(event.target.value)}
                   />
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                {activeTab === "send" ? (
+                  <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     className="min-h-10 rounded-lg border border-slate-300 px-3 text-xs font-black text-slate-950"
@@ -400,6 +447,7 @@ export function AdminNotificationPage() {
                     Clear selection
                   </button>
                 </div>
+                ) : null}
 
                 <div className="grid gap-2">
                   {visibleGroups.length === 0 ? (
@@ -410,13 +458,15 @@ export function AdminNotificationPage() {
                     visibleGroups.map((group) => (
                       <div key={group.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
                         <label className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            className="mt-1 size-4 accent-slate-950"
-                            checked={isGroupSelected(group, selectedIds)}
-                            onChange={() => toggleGroup(group)}
-                            disabled={!group.devices.some((subscriber) => subscriber.notification_enabled)}
-                          />
+                          {activeTab === "send" ? (
+                            <input
+                              type="checkbox"
+                              className="mt-1 size-4 accent-slate-950"
+                              checked={isGroupSelected(group, selectedIds)}
+                              onChange={() => toggleGroup(group)}
+                              disabled={!group.devices.some((subscriber) => subscriber.notification_enabled)}
+                            />
+                          ) : null}
                           <span className="min-w-0 flex-1">
                             <span className="block font-black text-slate-950">
                               {group.displayName}
@@ -433,13 +483,15 @@ export function AdminNotificationPage() {
                         <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3">
                           {group.devices.map((subscriber) => (
                             <label key={subscriber.id} className="flex items-start gap-3 rounded-lg bg-white p-2">
-                              <input
-                                type="checkbox"
-                                className="mt-1 size-4 accent-slate-950"
-                                checked={selectedIds.includes(subscriber.id)}
-                                onChange={() => toggleSubscriber(subscriber.id)}
-                                disabled={!subscriber.notification_enabled}
-                              />
+                              {activeTab === "send" ? (
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 size-4 accent-slate-950"
+                                  checked={selectedIds.includes(subscriber.id)}
+                                  onChange={() => toggleSubscriber(subscriber.id)}
+                                  disabled={!subscriber.notification_enabled}
+                                />
+                              ) : null}
                               <span className="min-w-0 flex-1">
                                 <span className="block text-xs font-black text-slate-700">
                                   {subscriber.device_label ?? "Device"}
@@ -447,11 +499,7 @@ export function AdminNotificationPage() {
                                 <span className="block text-xs font-bold text-slate-500">
                                   Last seen: {subscriber.last_seen_at ? formatDateTime(subscriber.last_seen_at) : "Not recorded"}
                                 </span>
-                                {!subscriber.notification_enabled || !isActiveSubscriber(subscriber) ? (
-                                  <span className="mt-1 block text-xs font-black text-red-700">
-                                    {!subscriber.notification_enabled ? "Notifications disabled" : "Inactive device"}
-                                  </span>
-                                ) : null}
+                                <DeviceStatus subscriber={subscriber} />
                               </span>
                             </label>
                           ))}
@@ -496,6 +544,59 @@ export function AdminNotificationPage() {
                 </button>
               </div>
             </section>
+            ) : null}
+
+            {activeTab === "history" ? (
+              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="text-lg font-black text-slate-950">History</h2>
+                    <button
+                      type="button"
+                      className="min-h-10 rounded-lg border border-slate-300 px-3 text-xs font-black text-slate-950"
+                      onClick={() => {
+                        void loadHistory();
+                      }}
+                    >
+                      Reload history
+                    </button>
+                  </div>
+                  {historyEvents.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm font-bold text-slate-500">
+                      No notification history.
+                    </p>
+                  ) : (
+                    <div className="grid gap-2">
+                      {historyEvents.map((event) => (
+                        <article key={event.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+                          <p className="font-black text-slate-950">{event.message}</p>
+                          <p className="mt-1 text-xs font-bold text-slate-500">
+                            Sent by {event.sent_by_admin} - {event.created_at ? formatDateTime(event.created_at) : "Time not recorded"}
+                          </p>
+                          <dl className="mt-3 grid grid-cols-4 gap-2">
+                            <div>
+                              <dt className="text-xs font-black uppercase text-slate-500">Selected</dt>
+                              <dd className="text-base font-black text-slate-950">{event.recipient_count}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-black uppercase text-slate-500">Sent</dt>
+                              <dd className="text-base font-black text-slate-950">{event.sent_count}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-black uppercase text-slate-500">Failed</dt>
+                              <dd className="text-base font-black text-slate-950">{event.failed_count}</dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-black uppercase text-slate-500">Disabled</dt>
+                              <dd className="text-base font-black text-slate-950">{event.disabled_count}</dd>
+                            </div>
+                          </dl>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
             ) : null}
           </>
         ) : null}
@@ -576,6 +677,26 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
+function DeviceStatus({ subscriber }: { subscriber: Subscriber }) {
+  if (!subscriber.notification_enabled) {
+    return <span className="mt-1 block text-xs font-black text-red-700">Notifications disabled</span>;
+  }
+
+  const daysSinceSeen = getDaysSinceSeen(subscriber);
+  if (daysSinceSeen === null) {
+    return <span className="mt-1 block text-xs font-black text-amber-700">Possibly inactive - last seen unknown</span>;
+  }
+  if (daysSinceSeen > 10) {
+    return (
+      <span className="mt-1 block text-xs font-black text-amber-700">
+        Possibly inactive - last seen {daysSinceSeen} days ago
+      </span>
+    );
+  }
+
+  return null;
+}
+
 function isActiveSubscriber(subscriber: Subscriber) {
   if (!subscriber.notification_enabled || !subscriber.last_seen_at) return false;
   const lastSeenAt = Date.parse(subscriber.last_seen_at);
@@ -628,4 +749,10 @@ function getLastSeenTime(subscriber?: Subscriber) {
   if (!subscriber?.last_seen_at) return 0;
   const timestamp = Date.parse(subscriber.last_seen_at);
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getDaysSinceSeen(subscriber: Subscriber) {
+  const lastSeenAt = getLastSeenTime(subscriber);
+  if (!lastSeenAt) return null;
+  return Math.max(0, Math.floor((Date.now() - lastSeenAt) / (24 * 60 * 60 * 1000)));
 }

@@ -29,7 +29,13 @@ export function NotificationPanel({
   const [recentNotifications, setRecentNotifications] = useState<LocalNotificationRecord[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showRecentNotifications, setShowRecentNotifications] = useState(false);
-  const phoneForNotifications = profilePhone?.trim() || notificationPhone.trim();
+  const phoneForNotifications = notificationPhone.trim() || profilePhone?.trim() || "";
+
+  useEffect(() => {
+    if (!notificationPhone.trim() && profilePhone?.trim()) {
+      setNotificationPhone(profilePhone.trim());
+    }
+  }, [notificationPhone, profilePhone]);
 
   useEffect(() => {
     let active = true;
@@ -97,6 +103,13 @@ export function NotificationPanel({
     setMessage(result.message ?? "");
   }
 
+  async function checkNotificationStatus() {
+    setMessage("");
+    const result = await getContractorNotificationState({ displayName, phone: phoneForNotifications });
+    setStatus(result.status);
+    setMessage(result.message ?? "");
+  }
+
   async function openRecentNotifications() {
     setShowRecentNotifications((current) => !current);
 
@@ -114,7 +127,7 @@ export function NotificationPanel({
     status === "enabled"
       ? "Notifications enabled"
     : status === "blocked"
-        ? "Notification permission denied"
+        ? "Notifications are blocked on this device or browser."
         : status === "unsupported"
           ? "Notifications not supported"
           : status === "enabling"
@@ -135,15 +148,32 @@ export function NotificationPanel({
           {message ? <p className="mt-1 text-sm text-slate-300">{message}</p> : null}
         </div>
       </div>
-      <button
-        type="button"
-        className="mt-4 min-h-11 w-full rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
-        onClick={enableNotifications}
-        disabled={status === "blocked" || status === "unsupported" || status === "enabling"}
-      >
-        {status === "enabled" ? "Update notifications" : "Enable notifications"}
-      </button>
-      {!profilePhone?.trim() && status !== "enabled" ? (
+      {status === "blocked" ? (
+        <>
+          <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm font-bold text-amber-100">
+            Allow notifications in this device or browser settings, then return and check again.
+          </p>
+          <button
+            type="button"
+            className="mt-4 min-h-11 w-full rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950"
+            onClick={() => {
+              void checkNotificationStatus();
+            }}
+          >
+            Check notification status
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          className="mt-4 min-h-11 w-full rounded-lg bg-white px-4 py-2 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+          onClick={enableNotifications}
+          disabled={status === "unsupported" || status === "enabling"}
+        >
+          {status === "enabled" ? "Update notifications" : "Enable notifications"}
+        </button>
+      )}
+      {(status === "blocked" || (!profilePhone?.trim() && status !== "enabled")) ? (
         <label className="mt-4 grid gap-1 text-sm font-bold text-slate-200">
           Phone number
           <input

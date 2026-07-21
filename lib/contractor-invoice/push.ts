@@ -28,6 +28,10 @@ export async function enableContractorNotifications({
     return { ok: false, status: "unsupported" as const };
   }
 
+  if (Notification.permission === "denied") {
+    return { ok: false, status: "blocked" as const };
+  }
+
   const permission = await Notification.requestPermission();
   if (permission === "denied") {
     return { ok: false, status: "blocked" as const };
