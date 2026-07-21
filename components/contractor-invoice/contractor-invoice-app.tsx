@@ -427,9 +427,6 @@ export function ContractorInvoiceApp() {
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
         <div className="mx-auto grid max-w-3xl grid-cols-5 gap-1">
           <TabButton active={tab === "invoice"} label="Invoice" icon={<FileText />} onClick={() => setTab("invoice")} />
-          <TabButton active={tab === "profile"} label="Profile" icon={<UserRound />} onClick={() => setTab("profile")} />
-          <TabButton active={tab === "history"} label="History" icon={<History />} onClick={() => setTab("history")} />
-          <TabButton active={tab === "contact"} label="Contact" icon={<BookOpen />} onClick={() => setTab("contact")} />
           <TabButton
             active={tab === "notifications"}
             label="Notifications"
@@ -437,6 +434,9 @@ export function ContractorInvoiceApp() {
             badgeCount={unreadNotifications}
             onClick={() => setTab("notifications")}
           />
+          <TabButton active={tab === "profile"} label="Profile" icon={<UserRound />} onClick={() => setTab("profile")} />
+          <TabButton active={tab === "history"} label="History" icon={<History />} onClick={() => setTab("history")} />
+          <TabButton active={tab === "contact"} label="Contact" icon={<BookOpen />} onClick={() => setTab("contact")} />
         </div>
       </nav>
     </main>
