@@ -27,7 +27,11 @@ import {
   saveDraft,
   saveProfile
 } from "@/lib/contractor-invoice/local-storage";
-import { markNotificationsRead, syncAppBadgeToUnreadCount } from "@/lib/contractor-invoice/notification-history";
+import {
+  finalizeViewedNotifications,
+  markNotificationsRead,
+  syncAppBadgeToUnreadCount
+} from "@/lib/contractor-invoice/notification-history";
 import type {
   BillToDetails,
   ContractorProfile,
@@ -123,6 +127,23 @@ export function ContractorInvoiceApp() {
     if (tab !== "notifications") return;
     setUnreadNotifications(0);
     void markNotificationsRead();
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab !== "notifications") return;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        void finalizeViewedNotifications();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      void finalizeViewedNotifications();
+    };
   }, [tab]);
 
   useEffect(() => {

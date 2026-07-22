@@ -39,7 +39,7 @@ type ConfiguredAdmin = {
 };
 
 const ADMIN_SESSION_COOKIE = "sp_invoice_admin_session";
-const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
 export function verifyNotificationAdmin(credentials: AdminCredentials) {
   const adminName = normalizeAdminName(credentials.adminName);

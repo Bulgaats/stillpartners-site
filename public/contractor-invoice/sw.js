@@ -79,6 +79,7 @@ async function saveLocalNotification({ title, body }) {
       title: String(title || "Still Partners"),
       message: String(body || "Still Partners notification"),
       receivedAt: new Date().toISOString(),
+      viewedAt: null,
       readAt: null
     });
     const unreadCount = await incrementUnreadCount(db);

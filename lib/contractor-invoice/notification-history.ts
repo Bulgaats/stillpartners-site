@@ -5,6 +5,7 @@ export type LocalNotificationRecord = {
   title?: string;
   message: string;
   receivedAt: string;
+  viewedAt?: string | null;
   readAt?: string | null;
 };
 
@@ -69,7 +70,15 @@ export async function syncAppBadgeToUnreadCount() {
 
 export async function markNotificationsRead() {
   const db = await openNotificationDb();
-  await markStoredNotificationsRead(db);
+  await markStoredNotificationsViewed(db);
+  await setUnreadCount(db, 0);
+  await updateAppBadge(0);
+  window.dispatchEvent(new CustomEvent("contractor-invoice-notifications-read"));
+}
+
+export async function finalizeViewedNotifications() {
+  const db = await openNotificationDb();
+  await markViewedNotificationsRead(db);
   await setUnreadCount(db, 0);
   await updateAppBadge(0);
   window.dispatchEvent(new CustomEvent("contractor-invoice-notifications-read"));
@@ -111,7 +120,29 @@ function pruneOldNotifications(db: IDBDatabase) {
   });
 }
 
-function markStoredNotificationsRead(db: IDBDatabase) {
+function markStoredNotificationsViewed(db: IDBDatabase) {
+  return new Promise<void>((resolve) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    const viewedAt = new Date().toISOString();
+
+    request.onsuccess = () => {
+      for (const record of request.result as LocalNotificationRecord[]) {
+        if (record.readAt === null && !record.viewedAt) {
+          store.put({
+            ...record,
+            viewedAt
+          });
+        }
+      }
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => resolve();
+  });
+}
+
+function markViewedNotificationsRead(db: IDBDatabase) {
   return new Promise<void>((resolve) => {
     const transaction = db.transaction(STORE_NAME, "readwrite");
     const store = transaction.objectStore(STORE_NAME);
@@ -120,7 +151,7 @@ function markStoredNotificationsRead(db: IDBDatabase) {
 
     request.onsuccess = () => {
       for (const record of request.result as LocalNotificationRecord[]) {
-        if (record.readAt === null) {
+        if (record.readAt === null && record.viewedAt) {
           store.put({
             ...record,
             readAt
