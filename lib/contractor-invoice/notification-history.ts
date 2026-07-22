@@ -2,8 +2,10 @@
 
 export type LocalNotificationRecord = {
   id: string;
+  title?: string;
   message: string;
   receivedAt: string;
+  readAt?: string | null;
 };
 
 const DB_NAME = "still-partners-invoice-notifications";
@@ -31,6 +33,14 @@ export async function getRecentNotifications() {
   });
 }
 
+export async function getNotificationInbox() {
+  const records = await getRecentNotifications();
+  return {
+    unread: records.filter((record) => record.readAt === null),
+    previous: records.filter((record) => record.readAt !== null)
+  };
+}
+
 export async function pruneRecentNotifications() {
   const db = await openNotificationDb();
   await pruneOldNotifications(db);
@@ -51,8 +61,15 @@ export async function getUnreadNotificationCount() {
   });
 }
 
+export async function syncAppBadgeToUnreadCount() {
+  const count = await getUnreadNotificationCount();
+  await updateAppBadge(count);
+  return count;
+}
+
 export async function markNotificationsRead() {
   const db = await openNotificationDb();
+  await markStoredNotificationsRead(db);
   await setUnreadCount(db, 0);
   await updateAppBadge(0);
   window.dispatchEvent(new CustomEvent("contractor-invoice-notifications-read"));
@@ -86,6 +103,28 @@ function pruneOldNotifications(db: IDBDatabase) {
       for (const record of request.result as LocalNotificationRecord[]) {
         if (!isRecent(record.receivedAt)) {
           store.delete(record.id);
+        }
+      }
+    };
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => resolve();
+  });
+}
+
+function markStoredNotificationsRead(db: IDBDatabase) {
+  return new Promise<void>((resolve) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+    const readAt = new Date().toISOString();
+
+    request.onsuccess = () => {
+      for (const record of request.result as LocalNotificationRecord[]) {
+        if (record.readAt === null) {
+          store.put({
+            ...record,
+            readAt
+          });
         }
       }
     };

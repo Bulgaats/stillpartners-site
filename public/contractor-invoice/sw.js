@@ -23,7 +23,10 @@ self.addEventListener("push", (event) => {
 
   event.waitUntil(
     Promise.all([
-      saveLocalNotification(payload.body),
+      saveLocalNotification({
+        title: payload.title,
+        body: payload.body
+      }),
       self.registration.showNotification(payload.title, {
         body: payload.body,
         icon: "/contractor-invoice/icon-192.png",
@@ -67,14 +70,16 @@ const META_STORE_NAME = "metadata";
 const UNREAD_COUNT_KEY = "unread-count";
 const MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
 
-async function saveLocalNotification(message) {
+async function saveLocalNotification({ title, body }) {
   try {
     const db = await openNotificationDb();
     await pruneOldNotifications(db);
     await putNotification(db, {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      message: String(message || "Still Partners notification"),
-      receivedAt: new Date().toISOString()
+      title: String(title || "Still Partners"),
+      message: String(body || "Still Partners notification"),
+      receivedAt: new Date().toISOString(),
+      readAt: null
     });
     const unreadCount = await incrementUnreadCount(db);
     await updateAppBadge(unreadCount);
@@ -154,6 +159,8 @@ async function updateAppBadge(count) {
   try {
     if (count > 0 && typeof self.registration.setAppBadge === "function") {
       await self.registration.setAppBadge(count);
+    } else if (count === 0 && typeof self.registration.clearAppBadge === "function") {
+      await self.registration.clearAppBadge();
     }
   } catch {
     // Badge support is optional.

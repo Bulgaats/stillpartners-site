@@ -9,9 +9,8 @@ import {
   type NotificationStatus
 } from "@/lib/contractor-invoice/push";
 import {
-  getRecentNotifications,
+  getNotificationInbox,
   getUnreadNotificationCount,
-  markNotificationsRead,
   pruneRecentNotifications,
   type LocalNotificationRecord
 } from "@/lib/contractor-invoice/notification-history";
@@ -28,9 +27,9 @@ export function NotificationPanel({
   const [status, setStatus] = useState<NotificationStatus>("idle");
   const [message, setMessage] = useState("");
   const [notificationPhone, setNotificationPhone] = useState("");
-  const [recentNotifications, setRecentNotifications] = useState<LocalNotificationRecord[]>([]);
+  const [newNotifications, setNewNotifications] = useState<LocalNotificationRecord[]>([]);
+  const [previousNotifications, setPreviousNotifications] = useState<LocalNotificationRecord[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [showRecentNotifications, setShowRecentNotifications] = useState(false);
   const [platform, setPlatform] = useState<"ios" | "desktop" | "other">("other");
   const phoneForNotifications = notificationPhone.trim() || profilePhone?.trim() || "";
 
@@ -77,16 +76,18 @@ export function NotificationPanel({
     async function loadRecentNotifications() {
       try {
         await pruneRecentNotifications();
-        const records = await getRecentNotifications();
+        const inbox = await getNotificationInbox();
         const count = await getUnreadNotificationCount();
         if (active) {
-          setRecentNotifications(records);
+          setNewNotifications(inbox.unread);
+          setPreviousNotifications(inbox.previous);
           setUnreadCount(count);
           onUnreadCountChange?.(count);
         }
       } catch {
         if (active) {
-          setRecentNotifications([]);
+          setNewNotifications([]);
+          setPreviousNotifications([]);
           setUnreadCount(0);
           onUnreadCountChange?.(0);
         }
@@ -101,10 +102,16 @@ export function NotificationPanel({
       }
     }
 
+    function handleNotificationsRead() {
+      void loadRecentNotifications();
+    }
+
+    window.addEventListener("contractor-invoice-notifications-read", handleNotificationsRead);
     navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
 
     return () => {
       active = false;
+      window.removeEventListener("contractor-invoice-notifications-read", handleNotificationsRead);
       navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
     };
   }, [onUnreadCountChange]);
@@ -122,20 +129,6 @@ export function NotificationPanel({
     const result = await getContractorNotificationState({ displayName, phone: phoneForNotifications });
     setStatus(result.status);
     setMessage(result.message ?? "");
-  }
-
-  async function openRecentNotifications() {
-    setShowRecentNotifications((current) => !current);
-
-    if (!showRecentNotifications) {
-      setUnreadCount(0);
-      onUnreadCountChange?.(0);
-      try {
-        await markNotificationsRead();
-      } catch {
-        // Local notification history is a convenience and must not block the invoice app.
-      }
-    }
   }
 
   const label =
@@ -254,35 +247,44 @@ export function NotificationPanel({
           </span>
         </label>
       ) : null}
-      <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
-        <button
-          type="button"
-          className="flex min-h-10 w-full items-center justify-between gap-3 rounded-lg bg-white/10 px-3 py-2 text-left text-sm font-black text-white"
-          onClick={() => {
-            void openRecentNotifications();
-          }}
-        >
-          <span>View recent notifications</span>
-          <span className="text-xs text-slate-300">{showRecentNotifications ? "Hide" : "Open"}</span>
-        </button>
-        {showRecentNotifications ? (
-          recentNotifications.length > 0 ? (
-            <ul className="mt-3 grid max-h-56 gap-2 overflow-y-auto pr-1">
-              {recentNotifications.map((notification) => (
-                <li key={notification.id} className="rounded-lg bg-white/10 p-3">
-                  <p className="text-sm font-bold text-white">{notification.message}</p>
-                  <p className="mt-1 text-xs font-bold text-slate-300">
-                    {formatNotificationTime(notification.receivedAt)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm font-bold text-slate-300">No recent notifications.</p>
-          )
-        ) : null}
-      </div>
+      <NotificationList title="New notifications" emptyText="No new notifications." records={newNotifications} />
+      <NotificationList
+        title="Previous notifications"
+        emptyText="No previous notifications."
+        records={previousNotifications}
+      />
     </section>
+  );
+}
+
+function NotificationList({
+  title,
+  emptyText,
+  records
+}: {
+  title: string;
+  emptyText: string;
+  records: LocalNotificationRecord[];
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-white/10 bg-white/5 p-3">
+      <h2 className="text-sm font-black text-white">{title}</h2>
+      {records.length > 0 ? (
+        <ul className="mt-3 grid max-h-64 gap-2 overflow-y-auto pr-1">
+          {records.map((notification) => (
+            <li key={notification.id} className="rounded-lg bg-white/10 p-3">
+              <p className="text-xs font-black uppercase text-slate-300">{notification.title || "Still Partners"}</p>
+              <p className="mt-1 text-sm font-bold text-white">{notification.message}</p>
+              <p className="mt-1 text-xs font-bold text-slate-300">
+                {formatNotificationTime(notification.receivedAt)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm font-bold text-slate-300">{emptyText}</p>
+      )}
+    </div>
   );
 }
 

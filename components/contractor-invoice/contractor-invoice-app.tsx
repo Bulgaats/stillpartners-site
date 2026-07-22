@@ -27,7 +27,7 @@ import {
   saveDraft,
   saveProfile
 } from "@/lib/contractor-invoice/local-storage";
-import { getUnreadNotificationCount, markNotificationsRead } from "@/lib/contractor-invoice/notification-history";
+import { markNotificationsRead, syncAppBadgeToUnreadCount } from "@/lib/contractor-invoice/notification-history";
 import type {
   BillToDetails,
   ContractorProfile,
@@ -90,7 +90,7 @@ export function ContractorInvoiceApp() {
 
     async function refreshUnreadCount() {
       try {
-        const count = await getUnreadNotificationCount();
+        const count = await syncAppBadgeToUnreadCount();
         if (active) setUnreadNotifications(count);
       } catch {
         if (active) setUnreadNotifications(0);
