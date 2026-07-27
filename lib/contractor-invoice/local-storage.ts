@@ -43,11 +43,11 @@ export function saveDraft(draft: InvoiceDraft) {
 }
 
 export function loadHistory(): GeneratedInvoiceRecord[] {
-  return readJson(historyKey, [], Array.isArray).filter(isHistoryRecord).map(normalizeHistoryRecord);
+  return readJson(historyKey, [], Array.isArray).filter(isHistoryRecord).map(normalizeHistoryRecord).slice(0, 20);
 }
 
 export function saveHistory(records: GeneratedInvoiceRecord[]) {
-  window.localStorage.setItem(historyKey, JSON.stringify(records.slice(0, 50)));
+  window.localStorage.setItem(historyKey, JSON.stringify(records.slice(0, 20)));
 }
 
 export function addHistoryRecord(record: GeneratedInvoiceRecord) {

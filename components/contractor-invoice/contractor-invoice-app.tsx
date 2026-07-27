@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, FileText, History, UserRound } from "lucide-react";
+import { Bell, BookOpen, FileText, History, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ContactPanel } from "@/components/contractor-invoice/contact-panel";
 import { InvoiceForm } from "@/components/contractor-invoice/invoice-form";
@@ -27,6 +27,11 @@ import {
   saveDraft,
   saveProfile
 } from "@/lib/contractor-invoice/local-storage";
+import {
+  finalizeViewedNotifications,
+  markNotificationsRead,
+  syncAppBadgeToUnreadCount
+} from "@/lib/contractor-invoice/notification-history";
 import type {
   BillToDetails,
   ContractorProfile,
@@ -34,7 +39,7 @@ import type {
   InvoiceDraft
 } from "@/lib/contractor-invoice/types";
 
-type Tab = "invoice" | "profile" | "history" | "contact";
+type Tab = "invoice" | "profile" | "history" | "contact" | "notifications";
 type PdfAction = "download" | "share";
 type ActionStatus = {
   message: string;
@@ -48,6 +53,7 @@ export function ContractorInvoiceApp() {
   const [draft, setDraft] = useState<InvoiceDraft | null>(null);
   const [customBillTo, setCustomBillTo] = useState<BillToDetails>(emptyCustomBillTo);
   const [history, setHistory] = useState<GeneratedInvoiceRecord[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [savedStatus, setSavedStatus] = useState("Saved locally");
   const [errors, setErrors] = useState<string[]>([]);
   const [pdfAction, setPdfAction] = useState<PdfAction | null>(null);
@@ -63,6 +69,10 @@ export function ContractorInvoiceApp() {
     const localHostnames = new Set(["localhost", "127.0.0.1", "::1"]);
     setIsSecureBrowserContext(secureContext);
     setShowSecureContextWarning(!secureContext && !localHostnames.has(window.location.hostname));
+    const initialTab = new URLSearchParams(window.location.search).get("tab");
+    if (initialTab === "notifications") {
+      setTab("notifications");
+    }
 
     const loadedProfile = loadProfile();
     const loadedCustomBillTo = loadCustomBillTo();
@@ -78,6 +88,63 @@ export function ContractorInvoiceApp() {
     setHistory(loadHistory());
     setReady(true);
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function refreshUnreadCount() {
+      try {
+        const count = await syncAppBadgeToUnreadCount();
+        if (active) setUnreadNotifications(count);
+      } catch {
+        if (active) setUnreadNotifications(0);
+      }
+    }
+
+    void refreshUnreadCount();
+
+    function handleUnreadChanged() {
+      void refreshUnreadCount();
+    }
+
+    function handleServiceWorkerMessage(event: MessageEvent) {
+      if ((event.data as { type?: string } | null)?.type === "contractor-invoice-notification-saved") {
+        void refreshUnreadCount();
+      }
+    }
+
+    window.addEventListener("contractor-invoice-notifications-read", handleUnreadChanged);
+    navigator.serviceWorker?.addEventListener("message", handleServiceWorkerMessage);
+
+    return () => {
+      active = false;
+      window.removeEventListener("contractor-invoice-notifications-read", handleUnreadChanged);
+      navigator.serviceWorker?.removeEventListener("message", handleServiceWorkerMessage);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (tab !== "notifications") return;
+    setUnreadNotifications(0);
+    void markNotificationsRead();
+  }, [tab]);
+
+  useEffect(() => {
+    if (tab !== "notifications") return;
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        void finalizeViewedNotifications();
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      void finalizeViewedNotifications();
+    };
+  }, [tab]);
 
   useEffect(() => {
     return () => {
@@ -332,8 +399,6 @@ export function ContractorInvoiceApp() {
       </header>
 
       <div className="mx-auto grid w-full max-w-3xl gap-4 px-4 py-4">
-        <NotificationPanel />
-
         {tab === "invoice" ? (
           <InvoiceForm
             profile={profile}
@@ -370,11 +435,26 @@ export function ContractorInvoiceApp() {
         ) : null}
 
         {tab === "contact" ? <ContactPanel /> : null}
+
+        {tab === "notifications" ? (
+          <NotificationPanel
+            displayName={profile.fullName}
+            profilePhone={profile.phone}
+            onUnreadCountChange={setUnreadNotifications}
+          />
+        ) : null}
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-4 gap-1">
+        <div className="mx-auto grid max-w-3xl grid-cols-5 gap-1">
           <TabButton active={tab === "invoice"} label="Invoice" icon={<FileText />} onClick={() => setTab("invoice")} />
+          <TabButton
+            active={tab === "notifications"}
+            label="Notifications"
+            icon={<Bell />}
+            badgeCount={unreadNotifications}
+            onClick={() => setTab("notifications")}
+          />
           <TabButton active={tab === "profile"} label="Profile" icon={<UserRound />} onClick={() => setTab("profile")} />
           <TabButton active={tab === "history"} label="History" icon={<History />} onClick={() => setTab("history")} />
           <TabButton active={tab === "contact"} label="Contact" icon={<BookOpen />} onClick={() => setTab("contact")} />
@@ -396,13 +476,17 @@ function TabButton({
   active,
   label,
   icon,
+  badgeCount = 0,
   onClick
 }: {
   active: boolean;
   label: string;
   icon: React.ReactElement<{ className?: string; "aria-hidden"?: boolean }>;
+  badgeCount?: number;
   onClick: () => void;
 }) {
+  const badgeLabel = badgeCount > 99 ? "99+" : String(badgeCount);
+
   return (
     <button
       type="button"
@@ -412,8 +496,13 @@ function TabButton({
       onClick={onClick}
     >
       {icon && (
-        <span className="[&>svg]:size-5" aria-hidden="true">
+        <span className="relative [&>svg]:size-5" aria-hidden="true">
           {icon}
+          {badgeCount > 0 ? (
+            <span className="absolute -right-3 -top-2 min-w-5 rounded-full bg-red-600 px-1 text-center text-[10px] font-black leading-5 text-white">
+              {badgeLabel}
+            </span>
+          ) : null}
         </span>
       )}
       {label}
