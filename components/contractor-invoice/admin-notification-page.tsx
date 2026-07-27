@@ -260,6 +260,34 @@ export function AdminNotificationPage() {
     }
   }
 
+  async function reactivateSubscriber(subscriptionId: string) {
+    setBusy(true);
+    setStatus("");
+
+    try {
+      const response = await fetch("/api/contractor-invoice/push/reactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminName,
+          adminPassword: password,
+          subscriptionId
+        })
+      });
+      const result = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        setStatus(result?.error ?? "Notification device could not be reactivated.");
+        return;
+      }
+
+      setStatus("Notification device reactivated.");
+      await loadSubscribers({ preserveStatus: true });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function toggleSubscriber(id: string) {
     if (activeTab !== "send") return;
     setSelectedIds((current) =>
@@ -557,6 +585,13 @@ export function AdminNotificationPage() {
                                   Last seen: {subscriber.last_seen_at ? formatDateTime(subscriber.last_seen_at) : "Not recorded"}
                                 </span>
                                 <DeviceStatus subscriber={subscriber} />
+                                {activeTab === "inactive" ? (
+                                  <InactiveDeviceAction
+                                    subscriber={subscriber}
+                                    busy={busy}
+                                    onReactivate={reactivateSubscriber}
+                                  />
+                                ) : null}
                               </span>
                             </label>
                           ))}
@@ -695,6 +730,42 @@ function DeviceStatus({ subscriber }: { subscriber: Subscriber }) {
   }
 
   return null;
+}
+
+function InactiveDeviceAction({
+  subscriber,
+  busy,
+  onReactivate
+}: {
+  subscriber: Subscriber;
+  busy: boolean;
+  onReactivate: (subscriptionId: string) => void;
+}) {
+  if (!subscriber.notification_enabled) {
+    return (
+      <span className="mt-2 block">
+        <button
+          type="button"
+          className="min-h-9 rounded-lg border border-slate-300 px-3 text-xs font-black text-slate-950 disabled:cursor-wait disabled:text-slate-500"
+          onClick={() => {
+            onReactivate(subscriber.id);
+          }}
+          disabled={busy}
+        >
+          Reactivate
+        </button>
+        <span className="mt-2 block text-xs font-bold text-slate-500">
+          This device may need the contractor to open the app and update notifications.
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="mt-2 block text-xs font-bold text-slate-500">
+      This device may need the contractor to open the app and update notifications.
+    </span>
+  );
 }
 
 function isActiveSubscriber(subscriber: Subscriber) {

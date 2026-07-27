@@ -40,6 +40,7 @@ type ConfiguredAdmin = {
 
 const ADMIN_SESSION_COOKIE = "sp_invoice_admin_session";
 const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const MAX_NOTIFICATION_EVENTS = 100;
 
 export function verifyNotificationAdmin(credentials: AdminCredentials) {
   const adminName = normalizeAdminName(credentials.adminName);
@@ -239,6 +240,7 @@ export async function sendPushToSubscriptions({
         disabled_count: disabled
       })
       .eq("id", eventId);
+    await pruneNotificationEvents();
   }
 
   return {
@@ -270,6 +272,28 @@ export async function sendPushToSubscriptions({
       delivery_status: deliveryStatus,
       error_message: errorMessage
     });
+  }
+
+  async function pruneNotificationEvents() {
+    const { data } = await client
+      .from("contractor_notification_events")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .range(MAX_NOTIFICATION_EVENTS, 10000);
+    const oldEventIds = ((data ?? []) as { id?: string }[])
+      .map((event) => event.id)
+      .filter((id): id is string => Boolean(id));
+
+    if (oldEventIds.length === 0) return;
+
+    await client
+      .from("contractor_notification_event_recipients")
+      .delete()
+      .in("event_id", oldEventIds);
+    await client
+      .from("contractor_notification_events")
+      .delete()
+      .in("id", oldEventIds);
   }
 }
 
