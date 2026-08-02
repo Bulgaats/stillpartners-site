@@ -259,7 +259,6 @@ export async function saveOperationsDailyRecordsAction(
       job_id: parsed.data.jobId,
       work_date: parsed.data.workDate,
       hours: record.hours,
-      tonnes: Number((record.hours / 10).toFixed(3)),
       entered_by: session.userId,
       entry_role: session.profile.role === "admin" ? "admin" : "operations_admin",
       approved: false,

@@ -47,7 +47,7 @@ export async function getOperationsWorkspaceData({
         ? supabase
             .from("client_invoices")
             .select(
-              "id, client_id, invoice_number, period_start, period_end, payment_status, subtotal, gst_amount, total_amount, total, gst_applied, due_on, local_archive_status"
+              "id, client_id, invoice_number, status, period_start, period_end, payment_status, subtotal, gst_amount, total_amount, total, gst_applied, due_on, local_archive_status"
             )
             .order("created_at", { ascending: false })
             .limit(100)
@@ -103,7 +103,7 @@ export async function getOperationsWorkspaceData({
       invoiceNumber: String(invoice.invoice_number),
       periodStart: String(invoice.period_start),
       periodEnd: String(invoice.period_end),
-      status: String(invoice.payment_status ?? "draft"),
+      status: String(invoice.status ?? invoice.payment_status ?? "draft"),
       subtotal: Number(invoice.subtotal ?? 0),
       gstAmount: Number(invoice.gst_amount ?? 0),
       totalAmount: Number(invoice.total_amount ?? invoice.total ?? 0),

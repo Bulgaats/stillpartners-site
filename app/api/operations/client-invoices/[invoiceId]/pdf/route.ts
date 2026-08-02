@@ -26,7 +26,7 @@ export async function GET(
   const { data: invoice, error: invoiceError } = await supabase
     .from("client_invoices")
     .select(
-      "id, client_id, invoice_number, period_start, period_end, payment_status, subtotal, gst_amount, total_amount, total, gst_applied, due_on, created_at"
+      "id, client_id, invoice_number, status, period_start, period_end, payment_status, subtotal, gst_amount, total_amount, total, gst_applied, due_on, created_at"
     )
     .eq("id", invoiceId)
     .maybeSingle();
@@ -85,7 +85,7 @@ export async function GET(
     subtotal: Number(invoice.subtotal ?? 0),
     gst: Number(invoice.gst_amount ?? 0),
     total: Number(invoice.total_amount ?? invoice.total ?? 0),
-    status: String(invoice.payment_status ?? "draft"),
+    status: String(invoice.status ?? invoice.payment_status ?? "draft"),
     projectSummaries: [...grouped.values()]
   });
   const safeInvoiceNumber = String(invoice.invoice_number).replace(/[^a-zA-Z0-9._-]/g, "-");

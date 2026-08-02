@@ -1,6 +1,171 @@
--- Private operations workspace and finance-only fortnight client invoicing.
+-- Private operations workspace and finance-only flexible-period client invoicing.
+-- This migration is intentionally self-contained because production has a
+-- partially stabilised legacy schema. Every addition is safe to re-run.
 
 create extension if not exists pgcrypto;
+
+create or replace function public.set_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+alter table public.clients
+  add column if not exists address text,
+  add column if not exists payment_terms_days integer not null default 14;
+
+alter table public.clients
+  drop constraint if exists clients_payment_terms_days_check,
+  add constraint clients_payment_terms_days_check
+  check (payment_terms_days between 0 and 90) not valid;
+
+create table if not exists public.sites (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid references public.clients(id) on delete cascade,
+  name text not null,
+  address text not null default '',
+  suburb text,
+  state text not null default 'WA',
+  postcode text,
+  site_contact_name text,
+  site_contact_phone text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.sites enable row level security;
+
+drop policy if exists "sites admin all" on public.sites;
+create policy "sites admin all"
+on public.sites
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+drop trigger if exists sites_set_updated_at on public.sites;
+create trigger sites_set_updated_at
+before update on public.sites
+for each row execute function public.set_updated_at();
+
+create index if not exists sites_client_id_idx on public.sites(client_id);
+
+alter table public.jobs
+  add column if not exists client_id uuid,
+  add column if not exists site_id uuid,
+  add column if not exists title text,
+  add column if not exists trade text,
+  add column if not exists starts_on date,
+  add column if not exists ends_on date,
+  add column if not exists created_by uuid,
+  add column if not exists updated_at timestamptz not null default now();
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.jobs'::regclass
+      and conname = 'jobs_client_id_fkey'
+  ) then
+    alter table public.jobs
+      add constraint jobs_client_id_fkey
+      foreign key (client_id) references public.clients(id) on delete restrict not valid;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.jobs'::regclass
+      and conname = 'jobs_site_id_fkey'
+  ) then
+    alter table public.jobs
+      add constraint jobs_site_id_fkey
+      foreign key (site_id) references public.sites(id) on delete set null not valid;
+  end if;
+end $$;
+
+create index if not exists jobs_client_id_idx on public.jobs(client_id);
+create index if not exists jobs_site_id_idx on public.jobs(site_id);
+
+drop trigger if exists jobs_set_updated_at on public.jobs;
+create trigger jobs_set_updated_at
+before update on public.jobs
+for each row execute function public.set_updated_at();
+
+create table if not exists public.user_invitations (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  role text not null,
+  invited_by uuid references public.profiles(id) on delete set null,
+  accepted_by uuid references public.profiles(id) on delete set null,
+  accepted_at timestamptz,
+  expires_at timestamptz not null default now() + interval '14 days',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (email)
+);
+
+alter table public.user_invitations
+  drop constraint if exists user_invitations_role_check,
+  add constraint user_invitations_role_check
+  check (role in ('worker', 'leading_hand', 'operations_admin', 'admin')) not valid;
+
+alter table public.user_invitations enable row level security;
+
+drop policy if exists "user invitations admin manage" on public.user_invitations;
+create policy "user invitations admin manage"
+on public.user_invitations
+for all
+to authenticated
+using (public.is_admin())
+with check (public.is_admin());
+
+drop policy if exists "user invitations invited user read" on public.user_invitations;
+create policy "user invitations invited user read"
+on public.user_invitations
+for select
+to authenticated
+using (lower(email) = lower(auth.jwt() ->> 'email'));
+
+drop trigger if exists user_invitations_set_updated_at on public.user_invitations;
+create trigger user_invitations_set_updated_at
+before update on public.user_invitations
+for each row execute function public.set_updated_at();
+
+create index if not exists user_invitations_email_idx on public.user_invitations(lower(email));
+
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references public.profiles(id) on delete set null,
+  entity_table text not null,
+  entity_id uuid,
+  action text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+alter table public.audit_logs enable row level security;
+
+drop policy if exists "audit logs admin read" on public.audit_logs;
+create policy "audit logs admin read"
+on public.audit_logs
+for select
+to authenticated
+using (public.is_admin());
+
+drop policy if exists "audit logs operations insert own" on public.audit_logs;
+create policy "audit logs operations insert own"
+on public.audit_logs
+for insert
+to authenticated
+with check (actor_id = auth.uid());
+
+create index if not exists audit_logs_actor_created_idx on public.audit_logs(actor_id, created_at desc);
+create index if not exists audit_logs_entity_idx on public.audit_logs(entity_table, entity_id);
 
 create or replace function public.is_operations_admin()
 returns boolean
@@ -84,6 +249,13 @@ alter table public.client_invoices
   add constraint client_invoices_local_archive_status_check
   check (local_archive_status in ('pending', 'synced', 'error')) not valid;
 
+create index if not exists client_invoice_items_invoice_idx
+on public.client_invoice_items(client_invoice_id);
+
+create unique index if not exists client_invoice_items_work_entry_unique_idx
+on public.client_invoice_items(work_entry_id)
+where work_entry_id is not null;
+
 create sequence if not exists public.client_invoice_sequence start with 1;
 
 create or replace function public.create_operations_client_invoice(
@@ -112,6 +284,7 @@ declare
   v_subtotal numeric(12,2);
   v_gst numeric(12,2);
   v_total numeric(12,2);
+  v_total_tonnes numeric(12,3);
   v_entry_count integer;
   v_sequence bigint;
   v_payment_terms integer;
@@ -150,8 +323,9 @@ begin
 
   select
     count(*)::integer,
+    round(sum(round((we.hours / 10.0), 3)), 3),
     round(sum(round((we.hours / 10.0), 3) * p_rate_per_tonne), 2)
-  into v_entry_count, v_subtotal
+  into v_entry_count, v_total_tonnes, v_subtotal
   from public.work_entries we
   where we.job_id = any(p_project_ids)
     and we.work_date between p_period_start and p_period_end
@@ -166,6 +340,7 @@ begin
     raise exception 'No uninvoiced production records were found for this selection.';
   end if;
 
+  v_total_tonnes := coalesce(v_total_tonnes, 0);
   v_subtotal := coalesce(v_subtotal, 0);
   v_gst := case when p_gst_applied then round(v_subtotal * 0.10, 2) else 0 end;
   v_total := v_subtotal + v_gst;
@@ -175,13 +350,17 @@ begin
   insert into public.client_invoices (
     client_id,
     invoice_number,
+    status,
     period_start,
     period_end,
     payment_status,
     subtotal,
+    gst,
     gst_amount,
     total,
     total_amount,
+    rate_per_tonne,
+    total_tonnes,
     gst_applied,
     local_archive_status,
     due_on,
@@ -190,13 +369,17 @@ begin
   ) values (
     p_client_id,
     v_invoice_number,
+    'draft',
     p_period_start,
     p_period_end,
-    'draft',
+    'unpaid',
     v_subtotal,
+    v_gst,
     v_gst,
     v_total,
     v_total,
+    p_rate_per_tonne,
+    v_total_tonnes,
     p_gst_applied,
     'pending',
     current_date + v_payment_terms,
