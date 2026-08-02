@@ -43,6 +43,13 @@ export type OperationsClientInvoice = {
   localArchiveStatus: string;
 };
 
+export type OperationsClientWorkerRate = {
+  id: string;
+  clientId: string;
+  workerId: string;
+  ratePerTonne: number;
+};
+
 export type OperationsWorkspaceData = {
   currentUserId: string;
   isFinanceAdmin: boolean;
@@ -52,5 +59,6 @@ export type OperationsWorkspaceData = {
   projects: OperationsProject[];
   contractors: OperationsContractor[];
   workEntries: OperationsWorkEntry[];
+  clientWorkerRates: OperationsClientWorkerRate[];
   clientInvoices: OperationsClientInvoice[];
 };

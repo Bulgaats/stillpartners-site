@@ -60,8 +60,25 @@ const invoiceSchema = z.object({
   projectIds: z.array(z.string().uuid()).min(1).max(100),
   periodStart: z.string().date(),
   periodEnd: z.string().date(),
-  ratePerTonne: z.number().positive().max(100000),
+  workerRates: z
+    .array(
+      z.object({
+        workerId: z.string().uuid(),
+        ratePerTonne: z.number().positive().max(100000)
+      })
+    )
+    .min(1)
+    .max(200),
   gstApplied: z.boolean()
+}).superRefine((value, context) => {
+  const workerIds = value.workerRates.map((rate) => rate.workerId);
+  if (new Set(workerIds).size !== workerIds.length) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Each contractor may have only one client billing rate.",
+      path: ["workerRates"]
+    });
+  }
 });
 
 export async function createOperationsClientAction(
@@ -309,7 +326,10 @@ export async function generateOperationsClientInvoiceAction(
     p_project_ids: parsed.data.projectIds,
     p_period_start: parsed.data.periodStart,
     p_period_end: parsed.data.periodEnd,
-    p_rate_per_tonne: parsed.data.ratePerTonne,
+    p_worker_rates: parsed.data.workerRates.map((rate) => ({
+      worker_id: rate.workerId,
+      rate_per_tonne: rate.ratePerTonne
+    })),
     p_gst_applied: parsed.data.gstApplied
   });
 
@@ -332,6 +352,7 @@ export async function generateOperationsClientInvoiceAction(
       projectIds: parsed.data.projectIds,
       periodStart: parsed.data.periodStart,
       periodEnd: parsed.data.periodEnd,
+      rateGroupCount: new Set(parsed.data.workerRates.map((rate) => rate.ratePerTonne)).size,
       gstApplied: parsed.data.gstApplied
     }
   });

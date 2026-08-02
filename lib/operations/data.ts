@@ -19,7 +19,14 @@ export async function getOperationsWorkspaceData({
   const userSupabase = await createServerSupabaseClient();
   const supabase = createServiceRoleSupabaseClient() ?? userSupabase;
   const isFinanceAdmin = session.profile.role === "admin";
-  const [clientsResult, projectsResult, contractorsResult, entriesResult, invoicesResult] =
+  const [
+    clientsResult,
+    projectsResult,
+    contractorsResult,
+    entriesResult,
+    clientWorkerRatesResult,
+    invoicesResult
+  ] =
     await Promise.all([
       supabase
         .from("clients")
@@ -45,6 +52,11 @@ export async function getOperationsWorkspaceData({
         .order("work_date", { ascending: false }),
       isFinanceAdmin
         ? supabase
+            .from("client_worker_rates")
+            .select("id, client_id, worker_id, rate_per_tonne")
+        : Promise.resolve({ data: [], error: null }),
+      isFinanceAdmin
+        ? supabase
             .from("client_invoices")
             .select(
               "id, client_id, invoice_number, status, period_start, period_end, payment_status, subtotal, gst_amount, total_amount, total, gst_applied, due_on, local_archive_status"
@@ -59,6 +71,7 @@ export async function getOperationsWorkspaceData({
     projectsResult.error,
     contractorsResult.error,
     entriesResult.error,
+    clientWorkerRatesResult.error,
     invoicesResult.error
   ].find(Boolean);
 
@@ -96,6 +109,12 @@ export async function getOperationsWorkspaceData({
       approved: Boolean(entry.approved),
       locked: Boolean(entry.locked),
       updatedAt: String(entry.updated_at ?? "")
+    })),
+    clientWorkerRates: (clientWorkerRatesResult.data ?? []).map((rate) => ({
+      id: String(rate.id),
+      clientId: String(rate.client_id),
+      workerId: String(rate.worker_id),
+      ratePerTonne: Number(rate.rate_per_tonne ?? 0)
     })),
     clientInvoices: (invoicesResult.data ?? []).map((invoice) => ({
       id: String(invoice.id),

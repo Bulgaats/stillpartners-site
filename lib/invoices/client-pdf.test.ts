@@ -15,17 +15,24 @@ describe("client invoice PDF documents", () => {
       clientName: "Westkon Civil Pty Ltd",
       clientAbn: "12 345 678 901",
       gstApplied: true,
-      subtotal: 2465,
-      gst: 246.5,
-      total: 2711.5,
+      subtotal: 35812.5,
+      gst: 3581.25,
+      total: 39393.75,
       status: "draft",
       projectSummaries: [
         {
-          projectName: "Burswood Point - Precinct A",
-          location: "Burswood, Western Australia",
-          tonnes: 4.25,
-          ratePerTonne: 580,
-          subtotal: 2465
+          projectName: "3 project locations",
+          location: "Burswood Point, Belmont, Airport",
+          tonnes: 9.375,
+          ratePerTonne: 700,
+          subtotal: 6562.5
+        },
+        {
+          projectName: "3 project locations",
+          location: "Burswood Point, Belmont, Airport",
+          tonnes: 45,
+          ratePerTonne: 650,
+          subtotal: 29250
         }
       ]
     });
@@ -35,7 +42,11 @@ describe("client invoice PDF documents", () => {
     expect(content).toContain("TAX INVOICE");
     expect(content).toContain("Westkon Civil Pty Ltd");
     expect(content).toContain("GST \\(10%\\)");
-    expect(content).toContain("$2711.50");
+    expect(content).toContain("9.375");
+    expect(content).toContain("45.000");
+    expect(content).toContain("$700.00");
+    expect(content).toContain("$650.00");
+    expect(content).toContain("$39,393.75");
   });
 
   it("paginates a price-free production summary", () => {

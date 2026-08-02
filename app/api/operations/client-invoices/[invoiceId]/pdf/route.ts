@@ -56,23 +56,52 @@ export async function GET(
   const projectsById = new Map((projects ?? []).map((project) => [String(project.id), project]));
   const grouped = new Map<
     string,
-    { projectName: string; location: string; tonnes: number; ratePerTonne: number; subtotal: number }
+    {
+      projectNames: Set<string>;
+      locations: Set<string>;
+      tonnes: number;
+      ratePerTonne: number;
+      subtotal: number;
+    }
   >();
 
   for (const item of items ?? []) {
     const jobId = String(item.job_id ?? "other");
     const project = projectsById.get(jobId);
-    const current = grouped.get(jobId) ?? {
-      projectName: String(project?.site_name ?? project?.title ?? item.description ?? "Project scope"),
-      location: String(project?.location ?? item.site_name ?? "Project site"),
+    const ratePerTonne = Number(item.rate ?? 0);
+    const rateKey = ratePerTonne.toFixed(2);
+    const current = grouped.get(rateKey) ?? {
+      projectNames: new Set<string>(),
+      locations: new Set<string>(),
       tonnes: 0,
-      ratePerTonne: Number(item.rate ?? 0),
+      ratePerTonne,
       subtotal: 0
     };
+    current.projectNames.add(
+      String(project?.site_name ?? project?.title ?? item.description ?? "Project scope")
+    );
+    current.locations.add(String(project?.location ?? item.site_name ?? "Project site"));
     current.tonnes += Number(item.tonnes ?? 0);
     current.subtotal += Number(item.total ?? 0);
-    grouped.set(jobId, current);
+    grouped.set(rateKey, current);
   }
+
+  const rateSummaries = [...grouped.values()]
+    .map((group) => {
+      const projectNames = [...group.projectNames];
+      const locations = [...group.locations];
+      return {
+        projectName:
+          projectNames.length === 1
+            ? projectNames[0]
+            : `${projectNames.length} project locations`,
+        location: projectNames.length > 1 ? projectNames.join(", ") : locations.join(", "),
+        tonnes: group.tonnes,
+        ratePerTonne: group.ratePerTonne,
+        subtotal: group.subtotal
+      };
+    })
+    .sort((left, right) => right.ratePerTonne - left.ratePerTonne);
 
   const branding = await getClientPdfBranding();
   const pdf = generateClientInvoicePdf({
@@ -89,7 +118,7 @@ export async function GET(
     total: Number(invoice.total_amount ?? invoice.total ?? 0),
     status: String(invoice.status ?? invoice.payment_status ?? "draft"),
     branding,
-    projectSummaries: [...grouped.values()]
+    projectSummaries: rateSummaries
   });
   const safeInvoiceNumber = String(invoice.invoice_number).replace(/[^a-zA-Z0-9._-]/g, "-");
 

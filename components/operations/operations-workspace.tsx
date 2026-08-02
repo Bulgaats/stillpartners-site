@@ -30,6 +30,7 @@ import {
   type OperationsActionResult
 } from "@/app/actions/operations";
 import { addIsoDays, getInclusiveIsoDayCount } from "@/lib/operations/dates";
+import { calculateClientRateGroups } from "@/lib/operations/invoice-calculations";
 import { type OperationsWorkspaceData } from "@/lib/operations/types";
 import { cn } from "@/lib/utils";
 
@@ -453,30 +454,71 @@ function ClientInvoicesPanel({ data, isPending, runAction, today }: { data: Oper
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [periodStart, setPeriodStart] = useState(addIsoDays(today, -13));
   const [periodEnd, setPeriodEnd] = useState(today);
-  const [rate, setRate] = useState("");
+  const [rateOverrides, setRateOverrides] = useState<Record<string, string>>({});
   const [gstApplied, setGstApplied] = useState(true);
   const periodDays = getInclusiveIsoDayCount(periodStart, periodEnd);
   const projects = data.projects.filter((project) => project.clientId === clientId);
   const entries = data.workEntries.filter((entry) => projectIds.includes(entry.jobId) && entry.workDate >= periodStart && entry.workDate <= periodEnd && !entry.locked && !entry.approved);
-  const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
-  const tonnes = entries.reduce((sum, entry) => sum + entry.hours / 10, 0);
-  const subtotal = tonnes * (Number(rate) || 0);
+  const involvedWorkerIds = [...new Set(entries.map((entry) => entry.workerId))];
+  const workerRates = involvedWorkerIds.map((workerId) => ({
+    workerId,
+    ratePerTonne: Number(getRateValue(workerId)) || 0
+  }));
+  const missingRateCount = workerRates.filter((rate) => rate.ratePerTonne <= 0).length;
+  const rateGroups = calculateClientRateGroups(entries, workerRates);
+  const tonnes = rateGroups.reduce((sum, group) => sum + group.tonnes, 0);
+  const subtotal = rateGroups.reduce((sum, group) => sum + group.subtotal, 0);
   const gst = gstApplied ? subtotal * 0.1 : 0;
 
-  function changeClient(nextClientId: string) { setClientId(nextClientId); setProjectIds([]); }
+  function getRateValue(workerId: string) {
+    if (Object.prototype.hasOwnProperty.call(rateOverrides, workerId)) {
+      return rateOverrides[workerId];
+    }
+    const savedRate = data.clientWorkerRates.find(
+      (rate) => rate.clientId === clientId && rate.workerId === workerId
+    );
+    return savedRate?.ratePerTonne ? savedRate.ratePerTonne.toString() : "";
+  }
+
+  function changeClient(nextClientId: string) {
+    setClientId(nextClientId);
+    setProjectIds([]);
+    setRateOverrides({});
+  }
   function toggleProject(projectId: string) { setProjectIds((current) => current.includes(projectId) ? current.filter((id) => id !== projectId) : [...current, projectId]); }
-  function submit() { runAction(() => generateOperationsClientInvoiceAction({ clientId, projectIds, periodStart, periodEnd, ratePerTonne: Number(rate), gstApplied })); }
+  function submit() {
+    runAction(() =>
+      generateOperationsClientInvoiceAction({
+        clientId,
+        projectIds,
+        periodStart,
+        periodEnd,
+        workerRates,
+        gstApplied
+      })
+    );
+  }
 
   return <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
     <section className="dashboard-card">
       <div className="dashboard-card-header"><div className="dashboard-icon"><FileText className="size-5" /></div><div><h2 className="dashboard-card-title">Create client invoice</h2><p className="dashboard-muted">The default period is 14 days. Choose any start and end dates, including a single day.</p></div></div>
       <div className="grid gap-4"><Field label="Client"><select value={clientId} onChange={(event) => changeClient(event.target.value)}><option value="">Select client</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><div className="grid gap-3 sm:grid-cols-2"><Field label="Period start"><input value={periodStart} onChange={(event) => setPeriodStart(event.target.value)} type="date" /></Field><Field label="Period end"><input value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} type="date" /></Field></div><div className={cn("rounded-lg px-3 py-3 text-sm font-bold", periodDays > 0 ? "bg-gray-100 text-blue-950" : "bg-red-50 text-red-800")}>{periodDays > 0 ? `${periodDays} day${periodDays === 1 ? "" : "s"} selected` : "End date must be on or after start date"}</div>
         <fieldset><legend className="mb-2 text-sm font-bold text-gray-800">Locations included</legend><div className="grid gap-2">{projects.map((project) => <label className="flex min-h-11 items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold" key={project.id}><input checked={projectIds.includes(project.id)} onChange={() => toggleProject(project.id)} type="checkbox" /> <span>{project.name}<span className="block text-xs font-normal text-gray-500">{project.location}</span></span></label>)}</div>{projects.length === 0 ? <p className="text-sm text-gray-500">No locations for this client.</p> : null}</fieldset>
-        <Field label="Rate per tonne (AUD)"><input inputMode="decimal" min="0" onChange={(event) => setRate(event.target.value)} placeholder="0.00" step="0.01" type="number" value={rate} /></Field>
+        <fieldset>
+          <legend className="mb-2 text-sm font-bold text-gray-800">Client billing rate by contractor</legend>
+          <div className="grid gap-2">
+            {involvedWorkerIds.map((workerId) => {
+              const contractor = data.contractors.find((item) => item.id === workerId);
+              return <label className="grid min-h-12 grid-cols-[minmax(0,1fr)_8rem] items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold" key={workerId}><span>{contractor?.fullName ?? "Contractor"}</span><span className="relative"><span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span><input className="pl-7" inputMode="decimal" min="0" onChange={(event) => setRateOverrides((current) => ({ ...current, [workerId]: event.target.value }))} placeholder="0.00" step="0.01" type="number" value={getRateValue(workerId)} /></span></label>;
+            })}
+          </div>
+          {involvedWorkerIds.length === 0 ? <p className="text-sm text-gray-500">Select locations and a period to load contractor rates.</p> : <p className="mt-2 text-xs text-gray-500">Rates are saved for this client and automatically reused on the next invoice.</p>}
+          {missingRateCount > 0 ? <p className="mt-2 text-sm font-bold text-red-700">Enter a billing rate for every contractor.</p> : null}
+        </fieldset>
         <label className="flex min-h-12 items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-bold"><input checked={gstApplied} onChange={(event) => setGstApplied(event.target.checked)} type="checkbox" /> Add GST (10%)</label>
       </div>
-      <div className="mt-5 rounded-xl bg-blue-950 p-4 text-white"><p className="text-xs font-black uppercase tracking-wide text-blue-200">Invoice preview</p><dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><SummaryValue label="Records" value={entries.length.toString()} /><SummaryValue label="Hours" value={totalHours.toFixed(2)} /><SummaryValue label="Tonnes" value={tonnes.toFixed(3)} /><SummaryValue label="Subtotal" value={formatMoney(subtotal)} /><SummaryValue label="GST" value={formatMoney(gst)} /><SummaryValue label="Total" value={formatMoney(subtotal + gst)} strong /></dl></div>
-      <button className="dashboard-button dashboard-button-orange mt-4 w-full" disabled={isPending || !clientId || projectIds.length === 0 || periodDays < 1 || entries.length === 0 || Number(rate) <= 0} onClick={submit} type="button">{isPending ? "Creating…" : "Create and lock invoice"}</button>
+      <div className="mt-5 rounded-xl bg-blue-950 p-4 text-white"><p className="text-xs font-black uppercase tracking-wide text-blue-200">Invoice preview</p><div className="mt-3 grid gap-2">{rateGroups.map((group) => <div className="flex items-center justify-between rounded-lg bg-white/10 px-3 py-2 text-sm" key={group.ratePerTonne}><span>{group.workerCount} contractor{group.workerCount === 1 ? "" : "s"} · {group.tonnes.toFixed(3)}t @ {formatMoney(group.ratePerTonne)}</span><strong>{formatMoney(group.subtotal)}</strong></div>)}</div><dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><SummaryValue label="Records" value={entries.length.toString()} /><SummaryValue label="Contractors" value={involvedWorkerIds.length.toString()} /><SummaryValue label="Rate groups" value={rateGroups.length.toString()} /><SummaryValue label="Tonnes" value={tonnes.toFixed(3)} /><SummaryValue label="Subtotal" value={formatMoney(subtotal)} /><SummaryValue label="GST" value={formatMoney(gst)} /><SummaryValue label="Total" value={formatMoney(subtotal + gst)} strong /></dl></div>
+      <button className="dashboard-button dashboard-button-orange mt-4 w-full" disabled={isPending || !clientId || projectIds.length === 0 || periodDays < 1 || entries.length === 0 || missingRateCount > 0} onClick={submit} type="button">{isPending ? "Creating…" : "Create and lock invoice"}</button>
     </section>
     <section className="dashboard-card"><div className="dashboard-card-header"><div className="dashboard-icon"><DollarSign className="size-5" /></div><div><h2 className="dashboard-card-title">Client invoices</h2><p className="dashboard-muted">Private finance view for Bulgaa and Zaya. Each invoice has two separate PDF files.</p></div></div><div className="grid gap-3">{data.clientInvoices.map((invoice) => { const client = data.clients.find((item) => item.id === invoice.clientId); return <article className="rounded-xl border border-gray-200 p-4" key={invoice.id}><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-black text-blue-950">{invoice.invoiceNumber}</p><p className="mt-1 text-sm text-gray-600">{client?.name} · {formatDate(invoice.periodStart)}–{formatDate(invoice.periodEnd)}</p><span className="mt-2 inline-block rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">{invoice.status}</span></div><div className="sm:text-right"><p className="text-xl font-black text-blue-950">{formatMoney(invoice.totalAmount)}</p><p className="text-xs text-gray-500">GST {formatMoney(invoice.gstAmount)}</p><div className="mt-3 flex flex-wrap gap-2 sm:justify-end"><a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm font-bold text-orange-800 hover:bg-orange-100" href={`/api/operations/client-invoices/${invoice.id}/pdf`}><Download className="size-4" /> Invoice PDF</a><a className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-bold text-blue-950 hover:bg-gray-50" href={`/api/operations/client-invoices/${invoice.id}/production-summary`}><Download className="size-4" /> Production summary PDF</a></div></div></div></article>; })}</div>{data.clientInvoices.length === 0 ? <EmptyState text="No client invoices have been created yet." /> : null}</section>
   </div>;

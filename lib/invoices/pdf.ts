@@ -422,7 +422,7 @@ function drawClientInvoiceProjects(
   const columns = [50, 185, 355, 415, 480, 545];
 
   page.fillRect(50, headerBottom, 495, tableTop - headerBottom, CLIENT_ORANGE);
-  page.text("Project", 56, 606, { color: CLIENT_WHITE, font: "F2", size: 9 });
+  page.text("Project locations", 56, 606, { color: CLIENT_WHITE, font: "F2", size: 8 });
   page.text("Scope completed", 191, 606, { color: CLIENT_WHITE, font: "F2", size: 9 });
   page.text("Production", 361, 610, { color: CLIENT_WHITE, font: "F2", size: 8 });
   page.text("delivered", 361, 599, { color: CLIENT_WHITE, font: "F2", size: 8 });
@@ -944,7 +944,10 @@ function buildPdf(objects: string[]) {
 }
 
 function formatMoney(value: number) {
-  return `$${value.toFixed(2)}`;
+  return `$${new Intl.NumberFormat("en-AU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value)}`;
 }
 
 function valueOrNotProvided(value?: string) {
