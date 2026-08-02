@@ -22,6 +22,10 @@ export default async function DashboardPage() {
   }
 
   const sessionProfile = sessionResult.sessionProfile;
+
+  if (sessionProfile.profile.role === "operations_admin") {
+    redirect("/operations");
+  }
   const data = await getSupabaseDashboardData(sessionProfile);
 
   return (

@@ -1,7 +1,7 @@
-// The production access model is worker/admin. `leading_hand` remains only as a
-// legacy/demo view label; daily leading-hand authority is derived from job
-// assignment data, not from a permanent profile role.
-export const roles = ["worker", "leading_hand", "admin"] as const;
+// Finance authority remains exclusive to `admin`. `operations_admin` may use
+// the non-financial production workspace. `leading_hand` remains a legacy/demo
+// label; daily leading-hand authority is derived from project assignment data.
+export const roles = ["worker", "leading_hand", "operations_admin", "admin"] as const;
 
 export type Role = (typeof roles)[number];
 
@@ -15,4 +15,8 @@ export function canManageCrew(role: Role) {
 
 export function canManageAdmin(role: Role) {
   return role === "admin";
+}
+
+export function canAccessOperations(role: Role) {
+  return role === "admin" || role === "operations_admin";
 }
