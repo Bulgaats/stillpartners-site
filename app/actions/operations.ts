@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getSessionProfile, type SessionProfile } from "@/lib/auth/session";
 import { canAccessOperations } from "@/lib/auth/roles";
-import {
-  createServerSupabaseClient,
-  createServiceRoleSupabaseClient
-} from "@/lib/supabase/server";
+import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
 import { getInclusiveIsoDayCount, getPerthIsoDate } from "@/lib/operations/dates";
 import { getAuthCallbackUrl } from "@/lib/site-url";
@@ -320,7 +317,7 @@ export async function generateOperationsClientInvoiceAction(
     return { ok: false, error: "The period end date must be on or after the start date." };
   }
 
-  const supabase = await createServerSupabaseClient();
+  const supabase = getPrivilegedClient();
   const { data, error } = await supabase.rpc("create_operations_client_invoice", {
     p_client_id: parsed.data.clientId,
     p_project_ids: parsed.data.projectIds,
@@ -330,6 +327,7 @@ export async function generateOperationsClientInvoiceAction(
       worker_id: rate.workerId,
       rate_per_tonne: rate.ratePerTonne
     })),
+    p_actor_id: session.userId,
     p_gst_applied: parsed.data.gstApplied
   });
 
