@@ -127,9 +127,9 @@ export const getSessionProfileResult = cache(async (): Promise<SessionProfileRes
     return { ok: false, reason: "inactive_profile" };
   }
 
-  if (profile?.role === "admin") {
+  if (profile?.role === "admin" || profile?.role === "operations_admin") {
     console.info("Dashboard authorization branch", {
-      branch: "admin",
+      branch: profile.role,
       authUserEmail: maskEmail(user.email),
       profileFound: true,
       role: profile.role,

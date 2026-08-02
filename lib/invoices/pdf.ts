@@ -87,6 +87,106 @@ export type ContractorInvoicePdfInput = {
   totalAmount?: number;
 };
 
+export type ClientInvoicePdfInput = {
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  periodStart: string;
+  periodEnd: string;
+  clientName: string;
+  clientAbn?: string;
+  gstApplied: boolean;
+  subtotal: number;
+  gst: number;
+  total: number;
+  status: string;
+  projectSummaries: {
+    projectName: string;
+    location: string;
+    tonnes: number;
+    ratePerTonne: number;
+    subtotal: number;
+  }[];
+};
+
+export function generateClientInvoicePdf(input: ClientInvoicePdfInput) {
+  const pdf = new PdfPage();
+  const accent = "0.19 0.27 0.35";
+  const dark = "0.08 0.10 0.12";
+  const muted = "0.38 0.42 0.48";
+
+  pdf.text(input.gstApplied ? "TAX INVOICE" : "INVOICE", 50, 786, {
+    size: 30,
+    font: "F2",
+    color: dark
+  });
+  pdf.line(50, 760, 545, 760, accent, 0.8);
+
+  pdf.text("From", 50, 728, { size: 10, font: "F2", color: muted });
+  pdf.text("Still Partners Pty Ltd", 50, 710, { size: 13, font: "F2", color: dark });
+  pdf.text("ABN: 62 687 072 420", 50, 692);
+  pdf.text("Perth, Western Australia", 50, 676);
+
+  pdf.text("Bill To", 335, 728, { size: 10, font: "F2", color: muted });
+  pdf.text(input.clientName, 335, 710, { size: 13, font: "F2", color: dark });
+  pdf.text(`ABN: ${valueOrNotProvided(input.clientAbn)}`, 335, 692);
+
+  pdf.infoPair("Invoice Number", input.invoiceNumber, 50, 616);
+  pdf.infoPair("Status", input.status, 50, 574);
+  pdf.infoPair("Issue Date", input.issueDate, 335, 616);
+  pdf.infoPair("Due Date", input.dueDate, 335, 574);
+
+  pdf.line(50, 530, 545, 530, accent, 0.5);
+  pdf.text("Reinforcement subcontract services", 50, 504, {
+    size: 12,
+    font: "F2",
+    color: dark
+  });
+  pdf.text("Production delivered", 50, 486, { size: 9, color: muted });
+  pdf.text("Tonnes", 304, 504, { size: 9, font: "F2", color: muted });
+  pdf.text("Rate", 390, 504, { size: 9, font: "F2", color: muted });
+  pdf.text("Subtotal", 478, 504, { size: 9, font: "F2", color: muted });
+
+  input.projectSummaries.slice(0, 5).forEach((project, index) => {
+    const y = 456 - index * 40;
+    pdf.text(project.projectName.slice(0, 38), 50, y, { size: 10, font: "F2", color: dark });
+    pdf.text(project.location.slice(0, 48), 50, y - 15, { size: 8, color: muted });
+    pdf.text(project.tonnes.toFixed(3), 304, y, { size: 10, color: dark });
+    pdf.text(formatMoney(project.ratePerTonne), 390, y, { size: 10, color: dark });
+    pdf.text(formatMoney(project.subtotal), 478, y, { size: 10, color: dark });
+  });
+
+  const shownProjects = Math.min(input.projectSummaries.length, 5);
+  const tableBottom = 438 - Math.max(0, shownProjects - 1) * 40;
+  pdf.line(50, tableBottom, 545, tableBottom, "0.75 0.78 0.82", 0.4);
+  if (input.projectSummaries.length > 5) {
+    pdf.text(`Plus ${input.projectSummaries.length - 5} additional project summaries`, 50, tableBottom - 18, {
+      size: 8,
+      color: muted
+    });
+  }
+
+  const totalsY = Math.max(108, tableBottom - 50);
+  pdf.totalRow("Subtotal", input.subtotal, totalsY);
+  if (input.gstApplied) {
+    pdf.totalRow("GST (10%)", input.gst, totalsY - 22);
+  }
+  pdf.line(375, totalsY - (input.gstApplied ? 38 : 16), 545, totalsY - (input.gstApplied ? 38 : 16), accent, 0.5);
+  pdf.totalRow("Total", input.total, totalsY - (input.gstApplied ? 60 : 38), true);
+
+  pdf.text("Production Summary", 50, 116, {
+    size: 10,
+    font: "F2",
+    color: muted
+  });
+  pdf.text(`Invoice period: ${input.periodStart} to ${input.periodEnd}`, 50, 98, {
+    size: 9,
+    color: dark
+  });
+
+  return Buffer.from(pdf.render());
+}
+
 export function generateContractorInvoicePdf(input: ContractorInvoicePdfInput) {
   const title = input.gstRegistered ? "TAX INVOICE" : "INVOICE";
   const subtotal = input.subtotal ?? 0;

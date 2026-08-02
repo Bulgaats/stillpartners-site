@@ -130,7 +130,7 @@ export async function login(formData: FormData) {
   }
 
   const authResult =
-    profile?.role === "admin"
+    profile?.role === "admin" || profile?.role === "operations_admin"
       ? { ok: true as const, role: profile.role }
       : await completeInternalAuthForUser({
           authUserEmail: user.email,
@@ -168,7 +168,7 @@ export async function login(formData: FormData) {
     profileFoundByUserId: Boolean(profile),
     profileRole: profile?.role,
     profileIsActive: profile?.is_active,
-    adminBranchSelected: authResult.role === "admin",
+    adminBranchSelected: authResult.role === "admin" || authResult.role === "operations_admin",
     contractorBranchSelected: authResult.role === "worker",
     redirectReason: "authorized"
   });

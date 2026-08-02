@@ -1,6 +1,7 @@
 "use client";
 
 import { type MouseEvent, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -2996,15 +2997,26 @@ export function DashboardShell({
           </div>
           <div className="grid gap-3">
             {!demoMode ? (
-              <form action={logout} className="justify-self-end">
+              <div className="flex flex-wrap justify-end gap-2">
+                {role === "admin" ? (
+                  <Link
+                    className="inline-flex items-center gap-2 rounded-md border border-blue-900/20 bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
+                    href="/operations"
+                  >
+                    <CalendarDays className="size-4" />
+                    Operations
+                  </Link>
+                ) : null}
+                <form action={logout}>
                 <button
-                  className="inline-flex items-center gap-2 rounded-md border border-white/30 bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur hover:bg-white/20"
+                  className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-bold text-blue-950 hover:bg-gray-50"
                   type="submit"
                 >
                   <LogOut className="size-4" />
                   Sign out
                 </button>
-              </form>
+                </form>
+              </div>
             ) : null}
 	            <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-4", role === "admin" ? "hidden md:grid" : "")}>
 	              <Stat label="Tonnes" value={weekTonnes.toFixed(2)} />
@@ -7825,7 +7837,7 @@ function inductionTone(status: string) {
 }
 
 function roleToDemoUserId(role: Role) {
-  return demoUserIdForAccessView(role, demoUserIds);
+  return demoUserIdForAccessView(role === "operations_admin" ? "admin" : role, demoUserIds);
 }
 
 function formatAccessLabel(role: Role) {

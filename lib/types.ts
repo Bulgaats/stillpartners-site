@@ -311,7 +311,7 @@ export type WorkEntry = {
   hours: number;
   tonnes: number;
   enteredBy?: string;
-  entryRole: "admin" | "leading_hand" | "worker";
+  entryRole: "admin" | "operations_admin" | "leading_hand" | "worker";
   approved: boolean;
   approvedBy?: string;
   approvedAt?: string;

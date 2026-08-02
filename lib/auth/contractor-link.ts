@@ -1,7 +1,7 @@
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
 type CompleteAuthResult =
-  | { ok: true; role: "admin" | "worker"; workerId?: string }
+  | { ok: true; role: "admin" | "operations_admin" | "worker"; workerId?: string }
   | { ok: false; reason: "inactive" | "no_access" | "service_unavailable" };
 type CompleteAuthFailureReason = Extract<CompleteAuthResult, { ok: false }>["reason"];
 
@@ -18,17 +18,58 @@ export async function completeInternalAuthForUser({
     return { ok: false, reason: "service_unavailable" };
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: internalProfile } = await supabase
     .from("profiles")
     .select("id, role, is_active")
     .eq("id", authUserId)
-    .eq("role", "admin")
+    .in("role", ["admin", "operations_admin"])
     .maybeSingle();
 
-  if (adminProfile) {
-    return adminProfile.is_active === false
+  if (internalProfile) {
+    return internalProfile.is_active === false
       ? { ok: false, reason: "inactive" }
-      : { ok: true, role: "admin" };
+      : { ok: true, role: internalProfile.role as "admin" | "operations_admin" };
+  }
+
+  if (authUserEmail) {
+    const { data: invitation } = await supabase
+      .from("user_invitations")
+      .select("id, role, email, expires_at")
+      .ilike("email", authUserEmail)
+      .in("role", ["admin", "operations_admin"])
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+
+    if (invitation?.role === "admin" || invitation?.role === "operations_admin") {
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: authUserId,
+        role: invitation.role,
+        full_name: authUserEmail,
+        is_active: true
+      });
+
+      if (profileError) {
+        console.error("Internal admin profile bootstrap failed", {
+          code: profileError.code,
+          message: profileError.message
+        });
+        return { ok: false, reason: "no_access" };
+      }
+
+      const { error: invitationError } = await supabase
+        .from("user_invitations")
+        .update({ accepted_by: authUserId, accepted_at: new Date().toISOString() })
+        .eq("id", invitation.id);
+
+      if (invitationError) {
+        console.warn("Internal admin invitation acceptance was not marked", {
+          code: invitationError.code,
+          message: invitationError.message
+        });
+      }
+
+      return { ok: true, role: invitation.role };
+    }
   }
 
   const { data: existingWorker } = await supabase
