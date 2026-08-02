@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionProfile } from "@/lib/auth/session";
+import { getClientPdfBranding } from "@/lib/invoices/client-branding";
 import { generateClientInvoicePdf } from "@/lib/invoices/pdf";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
@@ -73,6 +74,7 @@ export async function GET(
     grouped.set(jobId, current);
   }
 
+  const branding = await getClientPdfBranding();
   const pdf = generateClientInvoicePdf({
     invoiceNumber: String(invoice.invoice_number),
     issueDate: String(invoice.created_at).slice(0, 10),
@@ -86,6 +88,7 @@ export async function GET(
     gst: Number(invoice.gst_amount ?? 0),
     total: Number(invoice.total_amount ?? invoice.total ?? 0),
     status: String(invoice.status ?? invoice.payment_status ?? "draft"),
+    branding,
     projectSummaries: [...grouped.values()]
   });
   const safeInvoiceNumber = String(invoice.invoice_number).replace(/[^a-zA-Z0-9._-]/g, "-");
