@@ -56,6 +56,7 @@ describe("client invoice PDF documents", () => {
     expect(content).not.toContain("STILL PARTNERS");
     expect(content).not.toContain("Westkon Civil Pty Ltd");
     expect(content).not.toContain("CINV-20260803-0012");
+    expect(content).not.toContain("Total hours");
     expect(content).not.toContain("0.969 0.376 0.122");
     expect(content).not.toContain("/Subtype /Image");
     expect(content).not.toContain("Rate / tonne");

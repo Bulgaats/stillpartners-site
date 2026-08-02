@@ -168,21 +168,6 @@ export function generateClientProductionSummaryPdf(input: ClientProductionSummar
     const page = document.addPage();
     drawProductionSummaryHeader(page);
     drawProductionSummaryRows(page, rows);
-    if (pageIndex === groups.length - 1) {
-      const totalHours = input.rows.reduce((sum, row) => sum + row.hours, 0);
-      page.text("Total hours", 455, 100, {
-        align: "right",
-        color: SUMMARY_DARK,
-        font: "F2",
-        size: 10
-      });
-      page.text(formatHours(totalHours), 540, 100, {
-        align: "right",
-        color: SUMMARY_DARK,
-        font: "F2",
-        size: 10
-      });
-    }
     page.text(`Page ${pageIndex + 1} of ${groups.length}`, 545, 42, {
       align: "right",
       color: SUMMARY_MUTED,
