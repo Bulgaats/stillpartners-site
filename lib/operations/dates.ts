@@ -14,3 +14,12 @@ export function addIsoDays(dateValue: string, days: number) {
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 }
+
+export function getInclusiveIsoDayCount(periodStart: string, periodEnd: string) {
+  const start = new Date(`${periodStart}T00:00:00Z`).getTime();
+  const end = new Date(`${periodEnd}T00:00:00Z`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
+    return 0;
+  }
+  return Math.floor((end - start) / 86_400_000) + 1;
+}

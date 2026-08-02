@@ -124,9 +124,9 @@ begin
     or coalesce(array_length(p_project_ids, 1), 0) = 0
     or p_period_start is null
     or p_period_end is null
-    or p_period_end - p_period_start <> 13
+    or p_period_end < p_period_start
     or coalesce(p_rate_per_tonne, 0) <= 0 then
-    raise exception 'Client, project, 14-day period and positive rate are required.';
+    raise exception 'Client, project, valid invoice period and positive rate are required.';
   end if;
 
   if exists (
@@ -200,7 +200,7 @@ begin
     p_gst_applied,
     'pending',
     current_date + v_payment_terms,
-    'Generated from approved fortnight operational records.',
+    'Generated from operational records in the selected invoice period.',
     auth.uid()
   ) returning id into v_invoice_id;
 

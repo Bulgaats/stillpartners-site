@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canAccessOperations } from "@/lib/auth/roles";
-import { addIsoDays } from "@/lib/operations/dates";
+import { addIsoDays, getInclusiveIsoDayCount } from "@/lib/operations/dates";
 
 describe("operations access", () => {
   it("allows finance and operations admins", () => {
@@ -21,5 +21,17 @@ describe("fortnight dates", () => {
 
   it("handles month and leap-year boundaries", () => {
     expect(addIsoDays("2028-02-25", 4)).toBe("2028-02-29");
+  });
+
+  it("allows a single-day client invoice period", () => {
+    expect(getInclusiveIsoDayCount("2026-08-02", "2026-08-02")).toBe(1);
+  });
+
+  it("allows a manually selected multi-day client invoice period", () => {
+    expect(getInclusiveIsoDayCount("2026-08-02", "2026-08-04")).toBe(3);
+  });
+
+  it("rejects an end date before the start date", () => {
+    expect(getInclusiveIsoDayCount("2026-08-04", "2026-08-02")).toBe(0);
   });
 });

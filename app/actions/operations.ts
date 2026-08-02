@@ -9,7 +9,7 @@ import {
   createServiceRoleSupabaseClient
 } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
-import { getPerthIsoDate } from "@/lib/operations/dates";
+import { getInclusiveIsoDayCount, getPerthIsoDate } from "@/lib/operations/dates";
 import { getAuthCallbackUrl } from "@/lib/site-url";
 
 export type OperationsActionResult = {
@@ -300,10 +300,8 @@ export async function generateOperationsClientInvoiceAction(
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Check the invoice details." };
   }
 
-  const start = new Date(`${parsed.data.periodStart}T00:00:00Z`);
-  const end = new Date(`${parsed.data.periodEnd}T00:00:00Z`);
-  if (Math.round((end.getTime() - start.getTime()) / 86_400_000) !== 13) {
-    return { ok: false, error: "The client invoice period must be exactly 14 days." };
+  if (getInclusiveIsoDayCount(parsed.data.periodStart, parsed.data.periodEnd) < 1) {
+    return { ok: false, error: "The period end date must be on or after the start date." };
   }
 
   const supabase = await createServerSupabaseClient();
