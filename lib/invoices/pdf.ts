@@ -122,11 +122,6 @@ export type ClientPdfBranding = {
 };
 
 export type ClientProductionSummaryPdfInput = {
-  invoiceNumber: string;
-  periodStart: string;
-  periodEnd: string;
-  clientName: string;
-  branding?: ClientPdfBranding;
   rows: {
     workDate: string;
     siteName: string;
@@ -164,23 +159,33 @@ export function generateClientInvoicePdf(input: ClientInvoicePdfInput) {
 }
 
 export function generateClientProductionSummaryPdf(input: ClientProductionSummaryPdfInput) {
-  const document = new BrandedPdfDocument(input.branding?.logoJpeg);
+  const document = new BrandedPdfDocument();
   const rowsPerPage = 27;
   const rowGroups = chunk(input.rows, rowsPerPage);
   const groups = rowGroups.length > 0 ? rowGroups : [[]];
 
   groups.forEach((rows, pageIndex) => {
     const page = document.addPage();
-    drawProductionSummaryHeader(page, input, pageIndex + 1, groups.length);
+    drawProductionSummaryHeader(page);
     drawProductionSummaryRows(page, rows);
     if (pageIndex === groups.length - 1) {
       const totalHours = input.rows.reduce((sum, row) => sum + row.hours, 0);
-      page.text("Total hours", 455, 92, { align: "right", font: "F2", size: 10 });
-      page.text(formatHours(totalHours), 540, 92, { align: "right", font: "F2", size: 10 });
+      page.text("Total hours", 455, 100, {
+        align: "right",
+        color: SUMMARY_DARK,
+        font: "F2",
+        size: 10
+      });
+      page.text(formatHours(totalHours), 540, 100, {
+        align: "right",
+        color: SUMMARY_DARK,
+        font: "F2",
+        size: 10
+      });
     }
     page.text(`Page ${pageIndex + 1} of ${groups.length}`, 545, 42, {
       align: "right",
-      color: CLIENT_MUTED,
+      color: SUMMARY_MUTED,
       size: 8
     });
   });
@@ -319,6 +324,10 @@ const CLIENT_DARK = "0.067 0.145 0.196";
 const CLIENT_MUTED = "0.36 0.40 0.45";
 const CLIENT_BORDER = "0.78 0.80 0.82";
 const CLIENT_WHITE = "1 1 1";
+const SUMMARY_DARK = "0.16 0.17 0.18";
+const SUMMARY_MUTED = "0.38 0.40 0.42";
+const SUMMARY_HEADER = "0.28 0.30 0.32";
+const SUMMARY_BORDER = "0.76 0.77 0.78";
 
 function drawClientInvoiceHeader(
   page: BrandedPdfPage,
@@ -561,79 +570,61 @@ function drawClientInvoiceFooter(page: BrandedPdfPage, pageNumber: number, pageC
   });
 }
 
-function drawProductionSummaryHeader(
-  page: BrandedPdfPage,
-  input: ClientProductionSummaryPdfInput,
-  pageNumber: number,
-  pageCount: number
-) {
-  drawStillPartnersBrand(page, input.branding);
-  page.text("PRODUCTION SUMMARY", 50, 710, {
-    color: CLIENT_ORANGE,
+function drawProductionSummaryHeader(page: BrandedPdfPage) {
+  page.text("PRODUCTION SUMMARY", 50, 793, {
+    color: SUMMARY_DARK,
     font: "F2",
     size: 17
   });
-  page.text(`Invoice: ${input.invoiceNumber}`, 50, 684, {
-    color: CLIENT_DARK,
-    font: "F2",
-    size: 9
-  });
-  page.text(`Client: ${truncatePdfText(input.clientName, 48)}`, 50, 667, {
-    color: CLIENT_DARK,
-    size: 9
-  });
-  page.text(
-    `Period: ${formatPdfDate(input.periodStart)} - ${formatPdfDate(input.periodEnd)}`,
-    545,
-    684,
-    { align: "right", color: CLIENT_DARK, size: 9 }
-  );
-  page.text(`Page ${pageNumber} of ${pageCount}`, 545, 667, {
-    align: "right",
-    color: CLIENT_MUTED,
-    size: 8
-  });
+  page.line(50, 774, 545, 774, SUMMARY_HEADER, 0.8);
 }
 
 function drawProductionSummaryRows(
   page: BrandedPdfPage,
   rows: ClientProductionSummaryPdfInput["rows"]
 ) {
-  const tableTop = 642;
-  const headerBottom = 612;
-  const rowHeight = 18;
+  const tableTop = 752;
+  const headerBottom = 720;
+  const rowHeight = 21;
   const columns = [50, 145, 340, 480, 545];
-  page.fillRect(50, headerBottom, 495, tableTop - headerBottom, CLIENT_ORANGE);
-  page.text("Date", 56, 624, { color: CLIENT_WHITE, font: "F2", size: 9 });
-  page.text("Job site", 151, 624, { color: CLIENT_WHITE, font: "F2", size: 9 });
-  page.text("Contractor", 346, 624, { color: CLIENT_WHITE, font: "F2", size: 9 });
-  page.text("Hours", 539, 624, { align: "right", color: CLIENT_WHITE, font: "F2", size: 9 });
+  page.fillRect(50, headerBottom, 495, tableTop - headerBottom, SUMMARY_HEADER);
+  page.text("Date", 56, 732, { color: CLIENT_WHITE, font: "F2", size: 9 });
+  page.text("Job site", 151, 732, { color: CLIENT_WHITE, font: "F2", size: 9 });
+  page.text("Contractor", 346, 732, { color: CLIENT_WHITE, font: "F2", size: 9 });
+  page.text("Hours", 539, 732, {
+    align: "right",
+    color: CLIENT_WHITE,
+    font: "F2",
+    size: 9
+  });
 
   rows.forEach((row, index) => {
     const rowTop = headerBottom - index * rowHeight;
     const rowBottom = rowTop - rowHeight;
-    page.text(formatPdfDate(row.workDate), 56, rowTop - 12, { color: CLIENT_DARK, size: 8 });
-    page.text(truncatePdfText(row.siteName, 38), 151, rowTop - 12, {
-      color: CLIENT_DARK,
+    page.text(formatPdfDate(row.workDate), 56, rowTop - 14, { color: SUMMARY_DARK, size: 8 });
+    page.text(truncatePdfText(row.siteName, 38), 151, rowTop - 14, {
+      color: SUMMARY_DARK,
       size: 8
     });
-    page.text(truncatePdfText(row.contractorName, 28), 346, rowTop - 12, {
-      color: CLIENT_DARK,
+    page.text(truncatePdfText(row.contractorName, 28), 346, rowTop - 14, {
+      color: SUMMARY_DARK,
       size: 8
     });
-    page.text(formatHours(row.hours), 539, rowTop - 12, {
+    page.text(formatHours(row.hours), 539, rowTop - 14, {
       align: "right",
-      color: CLIENT_DARK,
+      color: SUMMARY_DARK,
       size: 8
     });
-    page.line(50, rowBottom, 545, rowBottom, CLIENT_BORDER, 0.3);
+    page.line(50, rowBottom, 545, rowBottom, SUMMARY_BORDER, 0.3);
   });
 
   const tableBottom = headerBottom - rows.length * rowHeight;
-  columns.forEach((column) => page.line(column, tableTop, column, tableBottom, CLIENT_BORDER, 0.3));
+  columns.forEach((column) =>
+    page.line(column, tableTop, column, tableBottom, SUMMARY_BORDER, 0.3)
+  );
   if (rows.length === 0) {
-    page.text("No production records are attached to this invoice.", 56, 586, {
-      color: CLIENT_MUTED,
+    page.text("No production records are available.", 56, 691, {
+      color: SUMMARY_MUTED,
       size: 9
     });
   }

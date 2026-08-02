@@ -46,10 +46,6 @@ describe("client invoice PDF documents", () => {
       hours: 8.5
     }));
     const pdf = generateClientProductionSummaryPdf({
-      invoiceNumber: "CINV-20260803-0012",
-      periodStart: "2026-08-01",
-      periodEnd: "2026-08-14",
-      clientName: "Westkon Civil Pty Ltd",
       rows
     });
     const content = pdf.toString("latin1");
@@ -57,6 +53,11 @@ describe("client invoice PDF documents", () => {
     expect(content).toContain("/Count 3");
     expect(content).toContain("PRODUCTION SUMMARY");
     expect(content).toContain("Contractor 55");
+    expect(content).not.toContain("STILL PARTNERS");
+    expect(content).not.toContain("Westkon Civil Pty Ltd");
+    expect(content).not.toContain("CINV-20260803-0012");
+    expect(content).not.toContain("0.969 0.376 0.122");
+    expect(content).not.toContain("/Subtype /Image");
     expect(content).not.toContain("Rate / tonne");
     expect(content).not.toContain("GST \(10%\)");
     expect(content).not.toContain("$2711.50");

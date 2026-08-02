@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionProfile } from "@/lib/auth/session";
-import { getClientPdfBranding } from "@/lib/invoices/client-branding";
 import { generateClientProductionSummaryPdf } from "@/lib/invoices/pdf";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 
@@ -26,7 +25,7 @@ export async function GET(
   const { invoiceId } = await params;
   const { data: invoice, error: invoiceError } = await supabase
     .from("client_invoices")
-    .select("id, client_id, invoice_number, period_start, period_end")
+    .select("id")
     .eq("id", invoiceId)
     .maybeSingle();
 
@@ -34,16 +33,13 @@ export async function GET(
     return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
   }
 
-  const [{ data: client }, { data: items, error: itemsError }] = await Promise.all([
-    supabase.from("clients").select("name").eq("id", invoice.client_id).maybeSingle(),
-    supabase
-      .from("client_invoice_items")
-      .select("work_entry_id, job_id, work_date, hours, site_name")
-      .eq("client_invoice_id", invoiceId)
-      .order("work_date")
-  ]);
+  const { data: items, error: itemsError } = await supabase
+    .from("client_invoice_items")
+    .select("work_entry_id, job_id, work_date, hours, site_name")
+    .eq("client_invoice_id", invoiceId)
+    .order("work_date");
 
-  if (itemsError || !client) {
+  if (itemsError) {
     return NextResponse.json({ error: "Production summary could not be loaded." }, { status: 500 });
   }
 
@@ -109,21 +105,12 @@ export async function GET(
         left.contractorName.localeCompare(right.contractorName)
     );
 
-  const branding = await getClientPdfBranding();
-  const pdf = generateClientProductionSummaryPdf({
-    invoiceNumber: String(invoice.invoice_number),
-    periodStart: String(invoice.period_start),
-    periodEnd: String(invoice.period_end),
-    clientName: String(client.name ?? "Client"),
-    branding,
-    rows
-  });
-  const safeInvoiceNumber = String(invoice.invoice_number).replace(/[^a-zA-Z0-9._-]/g, "-");
+  const pdf = generateClientProductionSummaryPdf({ rows });
 
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Cache-Control": "private, no-store",
-      "Content-Disposition": `attachment; filename="${safeInvoiceNumber}-production-summary.pdf"`,
+      "Content-Disposition": 'attachment; filename="production-summary.pdf"',
       "Content-Type": "application/pdf"
     }
   });
