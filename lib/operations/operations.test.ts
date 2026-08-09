@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { canAccessOperations } from "@/lib/auth/roles";
 import { addIsoDays, getInclusiveIsoDayCount } from "@/lib/operations/dates";
 import { calculateClientRateGroups } from "@/lib/operations/invoice-calculations";
+import {
+  isOperationsContractorActive,
+  isOperationsProjectActive
+} from "@/lib/operations/lifecycle";
 
 describe("operations access", () => {
   it("allows finance and operations admins", () => {
@@ -12,6 +16,31 @@ describe("operations access", () => {
   it("does not grant operations access to contractor roles", () => {
     expect(canAccessOperations("worker")).toBe(false);
     expect(canAccessOperations("leading_hand")).toBe(false);
+  });
+});
+
+describe("operations lifecycle", () => {
+  it("keeps archived contractors available to history but out of daily entry", () => {
+    expect(
+      isOperationsContractorActive({
+        id: "worker-1",
+        fullName: "One-day contractor",
+        isActive: false,
+        accountEnabled: true
+      })
+    ).toBe(false);
+  });
+
+  it("keeps completed locations out of the active location list", () => {
+    expect(
+      isOperationsProjectActive({
+        id: "job-1",
+        clientId: "client-1",
+        name: "Fremantle",
+        location: "Fremantle WA",
+        status: "completed"
+      })
+    ).toBe(false);
   });
 });
 

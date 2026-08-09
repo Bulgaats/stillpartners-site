@@ -40,9 +40,7 @@ export async function getOperationsWorkspaceData({
         .order("site_name"),
       supabase
         .from("workers")
-        .select("id, full_name")
-        .eq("account_enabled", true)
-        .eq("is_active", true)
+        .select("id, full_name, email, phone, trade, is_active, account_enabled")
         .order("full_name"),
       supabase
         .from("work_entries")
@@ -97,7 +95,16 @@ export async function getOperationsWorkspaceData({
     })),
     contractors: (contractorsResult.data ?? []).map((contractor) => ({
       id: String(contractor.id),
-      fullName: String(contractor.full_name ?? "Unnamed contractor")
+      fullName: String(contractor.full_name ?? "Unnamed contractor"),
+      ...(isFinanceAdmin
+        ? {
+            email: contractor.email ? String(contractor.email) : undefined,
+            phone: contractor.phone ? String(contractor.phone) : undefined,
+            trade: contractor.trade ? String(contractor.trade) : undefined
+          }
+        : {}),
+      isActive: contractor.is_active !== false,
+      accountEnabled: contractor.account_enabled !== false
     })),
     workEntries: (entriesResult.data ?? []).map((entry) => ({
       id: String(entry.id),

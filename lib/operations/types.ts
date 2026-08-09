@@ -14,6 +14,11 @@ export type OperationsProject = {
 export type OperationsContractor = {
   id: string;
   fullName: string;
+  email?: string;
+  phone?: string;
+  trade?: string;
+  isActive: boolean;
+  accountEnabled: boolean;
 };
 
 export type OperationsWorkEntry = {
