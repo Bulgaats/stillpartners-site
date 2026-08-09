@@ -7,6 +7,7 @@ import { canAccessOperations } from "@/lib/auth/roles";
 import { createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { writeAuditLog } from "@/lib/audit";
 import { getInclusiveIsoDayCount, getPerthIsoDate } from "@/lib/operations/dates";
+import { isOperationsProjectStatusActive } from "@/lib/operations/lifecycle";
 import { getAuthCallbackUrl } from "@/lib/site-url";
 
 export type OperationsActionResult = {
@@ -27,6 +28,23 @@ const locationSchema = z.object({
   clientId: z.string().uuid(),
   name: z.string().trim().min(2).max(160),
   address: z.string().trim().min(2).max(240)
+});
+
+const contractorSchema = z.object({
+  fullName: z.string().trim().min(2).max(160),
+  email: z.string().trim().email().or(z.literal("")),
+  phone: z.string().trim().max(40),
+  trade: z.string().trim().min(2).max(120).default("Steelfixer")
+});
+
+const contractorStatusSchema = z.object({
+  contractorId: z.string().uuid(),
+  isActive: z.boolean()
+});
+
+const locationStatusSchema = z.object({
+  locationId: z.string().uuid(),
+  status: z.enum(["active", "completed"])
 });
 
 const dailyRecordsSchema = z.object({
@@ -126,6 +144,102 @@ export async function createOperationsClientAction(
   return { ok: true, message: "Client created." };
 }
 
+export async function createOperationsContractorAction(
+  input: z.input<typeof contractorSchema>
+): Promise<OperationsActionResult> {
+  const session = await requireFinanceSession();
+  const parsed = contractorSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Check the contractor details."
+    };
+  }
+
+  const supabase = getPrivilegedClient();
+  const escapedName = parsed.data.fullName.replace(/[%_]/g, "\\$&");
+  const { data: existing, error: existingError } = await supabase
+    .from("workers")
+    .select("id, is_active")
+    .ilike("full_name", escapedName)
+    .limit(1);
+
+  if (existingError) {
+    return { ok: false, error: existingError.message };
+  }
+  if (existing?.length) {
+    return {
+      ok: false,
+      error: existing[0]?.is_active
+        ? "A contractor with this name already exists."
+        : "This contractor already exists in the archived list. Reactivate them instead."
+    };
+  }
+
+  const { data: contractor, error } = await supabase
+    .from("workers")
+    .insert({
+      full_name: parsed.data.fullName,
+      email: parsed.data.email || null,
+      phone: parsed.data.phone || null,
+      trade: parsed.data.trade,
+      is_active: true,
+      account_enabled: true
+    })
+    .select("id")
+    .single();
+
+  if (error || !contractor) {
+    return { ok: false, error: error?.message ?? "Could not create the contractor." };
+  }
+
+  await writeAuditLog({
+    action: "operations.contractor_created",
+    actorId: session.userId,
+    entityId: String(contractor.id),
+    entityTable: "workers",
+    metadata: { fullName: parsed.data.fullName, trade: parsed.data.trade }
+  });
+  revalidatePath("/operations");
+  return { ok: true, message: "Contractor added." };
+}
+
+export async function setOperationsContractorActiveAction(
+  input: z.input<typeof contractorStatusSchema>
+): Promise<OperationsActionResult> {
+  const session = await requireFinanceSession();
+  const parsed = contractorStatusSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Check the contractor selection." };
+  }
+
+  const supabase = getPrivilegedClient();
+  const { data: contractor, error } = await supabase
+    .from("workers")
+    .update({ is_active: parsed.data.isActive })
+    .eq("id", parsed.data.contractorId)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !contractor) {
+    return { ok: false, error: error?.message ?? "The contractor could not be found." };
+  }
+
+  await writeAuditLog({
+    action: parsed.data.isActive
+      ? "operations.contractor_reactivated"
+      : "operations.contractor_archived",
+    actorId: session.userId,
+    entityId: parsed.data.contractorId,
+    entityTable: "workers"
+  });
+  revalidatePath("/operations");
+  return {
+    ok: true,
+    message: parsed.data.isActive ? "Contractor reactivated." : "Contractor archived."
+  };
+}
+
 export async function createOperationsLocationAction(
   input: z.input<typeof locationSchema>
 ): Promise<OperationsActionResult> {
@@ -202,6 +316,46 @@ export async function createOperationsLocationAction(
   return { ok: true, message: "Location added." };
 }
 
+export async function setOperationsLocationStatusAction(
+  input: z.input<typeof locationStatusSchema>
+): Promise<OperationsActionResult> {
+  const session = await requireOperationsSession();
+  const parsed = locationStatusSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "Check the location selection." };
+  }
+
+  const supabase = getPrivilegedClient();
+  const { data: location, error } = await supabase
+    .from("jobs")
+    .update({
+      status: parsed.data.status,
+      project_status: parsed.data.status
+    })
+    .eq("id", parsed.data.locationId)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !location) {
+    return { ok: false, error: error?.message ?? "The location could not be found." };
+  }
+
+  await writeAuditLog({
+    action:
+      parsed.data.status === "active"
+        ? "operations.location_reactivated"
+        : "operations.location_completed",
+    actorId: session.userId,
+    entityId: parsed.data.locationId,
+    entityTable: "jobs"
+  });
+  revalidatePath("/operations");
+  return {
+    ok: true,
+    message: parsed.data.status === "active" ? "Location reactivated." : "Location completed."
+  };
+}
+
 export async function saveOperationsDailyRecordsAction(
   input: z.input<typeof dailyRecordsSchema>
 ): Promise<OperationsActionResult> {
@@ -215,7 +369,11 @@ export async function saveOperationsDailyRecordsAction(
   const workerIds = [...new Set(parsed.data.records.map((record) => record.workerId))];
   const [{ data: job }, { data: workers, error: workersError }, { data: existing, error: existingError }] =
     await Promise.all([
-      supabase.from("jobs").select("id").eq("id", parsed.data.jobId).maybeSingle(),
+      supabase
+        .from("jobs")
+        .select("id, status, project_status")
+        .eq("id", parsed.data.jobId)
+        .maybeSingle(),
       supabase
         .from("workers")
         .select("id")
@@ -232,6 +390,9 @@ export async function saveOperationsDailyRecordsAction(
 
   if (!job) {
     return { ok: false, error: "The selected location could not be found." };
+  }
+  if (!isOperationsProjectStatusActive(String(job.project_status ?? job.status ?? "active"))) {
+    return { ok: false, error: "Completed locations cannot receive new daily records." };
   }
   if (workersError || workers?.length !== workerIds.length) {
     return { ok: false, error: "One or more selected contractors are inactive or unavailable." };

@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import {
+  Archive,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -15,6 +15,7 @@ import {
   LogOut,
   MapPin,
   Plus,
+  RotateCcw,
   Save,
   ShieldCheck,
   UserPlus,
@@ -23,18 +24,31 @@ import {
 import { logout } from "@/app/actions/auth";
 import {
   createOperationsClientAction,
+  createOperationsContractorAction,
   createOperationsLocationAction,
   generateOperationsClientInvoiceAction,
   inviteOperationsAdminAction,
   saveOperationsDailyRecordsAction,
+  setOperationsContractorActiveAction,
+  setOperationsLocationStatusAction,
   type OperationsActionResult
 } from "@/app/actions/operations";
 import { addIsoDays, getInclusiveIsoDayCount } from "@/lib/operations/dates";
 import { calculateClientRateGroups } from "@/lib/operations/invoice-calculations";
+import {
+  isOperationsContractorActive,
+  isOperationsProjectActive
+} from "@/lib/operations/lifecycle";
 import { type OperationsWorkspaceData } from "@/lib/operations/types";
 import { cn } from "@/lib/utils";
 
-type OperationsTab = "daily" | "history" | "locations" | "finance" | "access";
+type OperationsTab =
+  | "daily"
+  | "history"
+  | "contractors"
+  | "locations"
+  | "finance"
+  | "access";
 
 export function OperationsWorkspace({
   currentUserName,
@@ -49,17 +63,25 @@ export function OperationsWorkspace({
   const [isPending, startTransition] = useTransition();
   const [tab, setTab] = useState<OperationsTab>("daily");
   const [notice, setNotice] = useState<OperationsActionResult | null>(null);
+  const activeContractors = useMemo(
+    () => initialData.contractors.filter(isOperationsContractorActive),
+    [initialData.contractors]
+  );
+  const activeProjects = useMemo(
+    () => initialData.projects.filter(isOperationsProjectActive),
+    [initialData.projects]
+  );
   const firstClientId = initialData.clients[0]?.id ?? "";
   const firstProjectId =
-    initialData.projects.find((project) => project.clientId === firstClientId)?.id ?? "";
+    activeProjects.find((project) => project.clientId === firstClientId)?.id ?? "";
   const [dailyDate, setDailyDate] = useState(today);
   const [dailyClientId, setDailyClientId] = useState(firstClientId);
   const [dailyProjectId, setDailyProjectId] = useState(firstProjectId);
   const [hoursByContractor, setHoursByContractor] = useState<Record<string, string>>({});
 
   const dailyProjects = useMemo(
-    () => initialData.projects.filter((project) => project.clientId === dailyClientId),
-    [dailyClientId, initialData.projects]
+    () => activeProjects.filter((project) => project.clientId === dailyClientId),
+    [activeProjects, dailyClientId]
   );
   const selectedEntries = useMemo(
     () =>
@@ -75,18 +97,27 @@ export function OperationsWorkspace({
 
   useEffect(() => {
     const nextValues = Object.fromEntries(
-      initialData.contractors.map((contractor) => [
+      activeContractors.map((contractor) => [
         contractor.id,
         selectedEntryByWorker.get(contractor.id)?.hours.toString() ?? ""
       ])
     );
     setHoursByContractor(nextValues);
-  }, [initialData.contractors, selectedEntryByWorker]);
+  }, [activeContractors, selectedEntryByWorker]);
+
+  useEffect(() => {
+    if (dailyProjectId && activeProjects.some((project) => project.id === dailyProjectId)) {
+      return;
+    }
+    setDailyProjectId(
+      activeProjects.find((project) => project.clientId === dailyClientId)?.id ?? ""
+    );
+  }, [activeProjects, dailyClientId, dailyProjectId]);
 
   function changeDailyClient(clientId: string) {
     setDailyClientId(clientId);
     setDailyProjectId(
-      initialData.projects.find((project) => project.clientId === clientId)?.id ?? ""
+      activeProjects.find((project) => project.clientId === clientId)?.id ?? ""
     );
   }
 
@@ -114,7 +145,7 @@ export function OperationsWorkspace({
       saveOperationsDailyRecordsAction({
         jobId: dailyProjectId,
         workDate: dailyDate,
-        records: initialData.contractors.map((contractor) => ({
+        records: activeContractors.map((contractor) => ({
           workerId: contractor.id,
           hours: Number(hoursByContractor[contractor.id] || 0)
         }))
@@ -133,6 +164,7 @@ export function OperationsWorkspace({
     { id: "locations" as const, label: "Locations", icon: MapPin },
     ...(initialData.isFinanceAdmin
       ? [
+          { id: "contractors" as const, label: "Contractors", icon: Users },
           { id: "finance" as const, label: "Client invoices", icon: FileText },
           { id: "access" as const, label: "Clients & access", icon: ShieldCheck }
         ]
@@ -154,14 +186,6 @@ export function OperationsWorkspace({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {initialData.isFinanceAdmin ? (
-                <Link
-                  className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 px-4 py-2 text-sm font-bold hover:bg-white/10"
-                  href="/dashboard"
-                >
-                  Main dashboard
-                </Link>
-              ) : null}
               <form action={logout}>
                 <button
                   className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 px-4 py-2 text-sm font-bold hover:bg-white/10"
@@ -176,8 +200,8 @@ export function OperationsWorkspace({
         </section>
 
         <section className="grid gap-3 sm:grid-cols-3">
-          <StatCard icon={Users} label="Active contractors" value={initialData.contractors.length} />
-          <StatCard icon={MapPin} label="Active locations" value={initialData.projects.length} />
+          <StatCard icon={Users} label="Active contractors" value={activeContractors.length} />
+          <StatCard icon={MapPin} label="Active locations" value={activeProjects.length} />
           <StatCard
             icon={ClipboardList}
             label="Records in view"
@@ -224,7 +248,7 @@ export function OperationsWorkspace({
           <DailyRecordsPanel
             clientId={dailyClientId}
             clients={initialData.clients}
-            contractors={initialData.contractors}
+            contractors={activeContractors}
             date={dailyDate}
             hoursByContractor={hoursByContractor}
             isPending={isPending}
@@ -243,6 +267,9 @@ export function OperationsWorkspace({
         ) : null}
 
         {tab === "history" ? <HistoryPanel data={initialData} /> : null}
+        {tab === "contractors" && initialData.isFinanceAdmin ? (
+          <ContractorsPanel data={initialData} isPending={isPending} runAction={runAction} />
+        ) : null}
         {tab === "locations" ? (
           <LocationsPanel data={initialData} isPending={isPending} runAction={runAction} />
         ) : null}
@@ -429,10 +456,182 @@ function HistoryPanel({ data }: { data: OperationsWorkspaceData }) {
   );
 }
 
+function ContractorsPanel({
+  data,
+  isPending,
+  runAction
+}: {
+  data: OperationsWorkspaceData;
+  isPending: boolean;
+  runAction: (action: () => Promise<OperationsActionResult>) => void;
+}) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [trade, setTrade] = useState("Steelfixer");
+  const activeContractors = data.contractors.filter(isOperationsContractorActive);
+  const archivedContractors = data.contractors.filter(
+    (contractor) => !isOperationsContractorActive(contractor)
+  );
+
+  function createContractor() {
+    runAction(async () => {
+      const result = await createOperationsContractorAction({ fullName, email, phone, trade });
+      if (result.ok) {
+        setFullName("");
+        setEmail("");
+        setPhone("");
+        setTrade("Steelfixer");
+      }
+      return result;
+    });
+  }
+
+  function setContractorActive(contractorId: string, isActive: boolean) {
+    runAction(() => setOperationsContractorActiveAction({ contractorId, isActive }));
+  }
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <section className="dashboard-card">
+        <div className="dashboard-card-header">
+          <div className="dashboard-icon"><UserPlus className="size-5" /></div>
+          <div>
+            <h2 className="dashboard-card-title">Add contractor</h2>
+            <p className="dashboard-muted">
+              Internal production record only. The contractor invoice app remains separate.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4">
+          <Field label="Full name">
+            <input
+              onChange={(event) => setFullName(event.target.value)}
+              placeholder="Contractor name"
+              value={fullName}
+            />
+          </Field>
+          <Field label="Trade">
+            <input onChange={(event) => setTrade(event.target.value)} value={trade} />
+          </Field>
+          <Field label="Phone (optional)">
+            <input onChange={(event) => setPhone(event.target.value)} value={phone} />
+          </Field>
+          <Field label="Email (optional)">
+            <input onChange={(event) => setEmail(event.target.value)} type="email" value={email} />
+          </Field>
+          <button
+            className="dashboard-button dashboard-button-primary"
+            disabled={isPending || fullName.trim().length < 2 || trade.trim().length < 2}
+            onClick={createContractor}
+            type="button"
+          >
+            {isPending ? "Adding…" : "Add contractor"}
+          </button>
+        </div>
+        <div className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-950">
+          <p className="font-black">One-day contractor</p>
+          <p className="mt-1 leading-6">
+            Add the person here, record only their worked date and hours, then archive them after
+            saving the record. Their name remains available for history and client invoicing.
+          </p>
+        </div>
+      </section>
+
+      <section className="dashboard-card">
+        <div className="dashboard-card-header">
+          <div className="dashboard-icon"><Users className="size-5" /></div>
+          <div>
+            <h2 className="dashboard-card-title">Contractors</h2>
+            <p className="dashboard-muted">
+              Only active contractors appear on the daily entry screen.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3">
+          {activeContractors.map((contractor) => (
+            <ContractorCard
+              actionLabel="Archive"
+              contractor={contractor}
+              disabled={isPending}
+              icon={Archive}
+              key={contractor.id}
+              onAction={() => setContractorActive(contractor.id, false)}
+            />
+          ))}
+          {activeContractors.length === 0 ? (
+            <EmptyState text="No active contractors are available." />
+          ) : null}
+        </div>
+
+        {archivedContractors.length > 0 ? (
+          <div className="mt-6 border-t border-gray-200 pt-5">
+            <h3 className="font-black text-blue-950">Archived contractors</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Kept for production and invoice history. Reactivate when they return.
+            </p>
+            <div className="mt-3 grid gap-3">
+              {archivedContractors.map((contractor) => (
+                <ContractorCard
+                  actionLabel="Reactivate"
+                  contractor={contractor}
+                  disabled={isPending || !contractor.accountEnabled}
+                  icon={RotateCcw}
+                  key={contractor.id}
+                  onAction={() => setContractorActive(contractor.id, true)}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function ContractorCard({
+  actionLabel,
+  contractor,
+  disabled,
+  icon: Icon,
+  onAction
+}: {
+  actionLabel: string;
+  contractor: OperationsWorkspaceData["contractors"][number];
+  disabled: boolean;
+  icon: typeof Archive;
+  onAction: () => void;
+}) {
+  return (
+    <article className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="font-black text-blue-950">{contractor.fullName}</p>
+        <p className="mt-1 text-sm text-gray-600">
+          {contractor.trade ?? "Steelfixer"}
+          {contractor.phone ? ` · ${contractor.phone}` : ""}
+        </p>
+        {!contractor.accountEnabled ? (
+          <p className="mt-1 text-xs font-bold text-red-700">Account access is disabled.</p>
+        ) : null}
+      </div>
+      <button
+        className="dashboard-button dashboard-button-outline inline-flex items-center justify-center gap-2"
+        disabled={disabled}
+        onClick={onAction}
+        type="button"
+      >
+        <Icon className="size-4" /> {actionLabel}
+      </button>
+    </article>
+  );
+}
+
 function LocationsPanel({ data, isPending, runAction }: { data: OperationsWorkspaceData; isPending: boolean; runAction: (action: () => Promise<OperationsActionResult>) => void }) {
   const [clientId, setClientId] = useState(data.clients[0]?.id ?? "");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const activeProjects = data.projects.filter(isOperationsProjectActive);
+  const completedProjects = data.projects.filter((project) => !isOperationsProjectActive(project));
   function submit() {
     runAction(async () => {
       const result = await createOperationsLocationAction({ clientId, name, address });
@@ -440,12 +639,15 @@ function LocationsPanel({ data, isPending, runAction }: { data: OperationsWorksp
       return result;
     });
   }
+  function setLocationStatus(locationId: string, status: "active" | "completed") {
+    runAction(() => setOperationsLocationStatusAction({ locationId, status }));
+  }
   return <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
     <section className="dashboard-card">
       <div className="dashboard-card-header"><div className="dashboard-icon"><Plus className="size-5" /></div><div><h2 className="dashboard-card-title">Add a location</h2><p className="dashboard-muted">All operations users can add a new work location under an existing client.</p></div></div>
       <div className="grid gap-4"><Field label="Client"><select value={clientId} onChange={(event) => setClientId(event.target.value)}><option value="">Select client</option>{data.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select></Field><Field label="Location / project name"><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Example: Tonkin Highway package" /></Field><Field label="Site address"><input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Street, suburb, WA" /></Field><button className="dashboard-button dashboard-button-primary" disabled={isPending || !clientId || !name.trim() || !address.trim()} onClick={submit} type="button">{isPending ? "Adding…" : "Add location"}</button></div>
     </section>
-    <section className="dashboard-card"><div className="dashboard-card-header"><div className="dashboard-icon"><MapPin className="size-5" /></div><div><h2 className="dashboard-card-title">Current locations</h2><p className="dashboard-muted">Locations available for daily records.</p></div></div><div className="grid gap-3 sm:grid-cols-2">{data.projects.map((project) => { const client = data.clients.find((item) => item.id === project.clientId); return <article className="rounded-xl border border-gray-200 bg-gray-50 p-4" key={project.id}><p className="font-black text-blue-950">{project.name}</p><p className="mt-1 text-sm font-bold text-orange-600">{client?.name}</p><p className="mt-2 text-sm text-gray-600">{project.location}</p></article>; })}</div>{data.projects.length === 0 ? <EmptyState text="No locations have been added yet." /> : null}</section>
+    <section className="dashboard-card"><div className="dashboard-card-header"><div className="dashboard-icon"><MapPin className="size-5" /></div><div><h2 className="dashboard-card-title">Current locations</h2><p className="dashboard-muted">Only active locations are available for new daily records.</p></div></div><div className="grid gap-3 sm:grid-cols-2">{activeProjects.map((project) => { const client = data.clients.find((item) => item.id === project.clientId); return <article className="rounded-xl border border-gray-200 bg-gray-50 p-4" key={project.id}><p className="font-black text-blue-950">{project.name}</p><p className="mt-1 text-sm font-bold text-orange-600">{client?.name}</p><p className="mt-2 text-sm text-gray-600">{project.location}</p><button className="dashboard-button dashboard-button-outline mt-4 inline-flex items-center justify-center gap-2" disabled={isPending} onClick={() => setLocationStatus(project.id, "completed")} type="button"><Archive className="size-4" /> Mark completed</button></article>; })}</div>{activeProjects.length === 0 ? <EmptyState text="No active locations are available." /> : null}{completedProjects.length > 0 ? <div className="mt-6 border-t border-gray-200 pt-5"><h3 className="font-black text-blue-950">Completed locations</h3><p className="mt-1 text-sm text-gray-500">History remains available. Reactivate a location if work resumes.</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{completedProjects.map((project) => { const client = data.clients.find((item) => item.id === project.clientId); return <article className="rounded-xl border border-gray-200 bg-gray-50 p-4" key={project.id}><p className="font-black text-blue-950">{project.name}</p><p className="mt-1 text-sm font-bold text-gray-600">{client?.name}</p><p className="mt-2 text-sm text-gray-600">{project.location}</p><button className="dashboard-button dashboard-button-outline mt-4 inline-flex items-center justify-center gap-2" disabled={isPending} onClick={() => setLocationStatus(project.id, "active")} type="button"><RotateCcw className="size-4" /> Reactivate</button></article>; })}</div></div> : null}</section>
   </div>;
 }
 
@@ -529,7 +731,7 @@ function ClientsAndAccessPanel({ data, isPending, runAction }: { data: Operation
   function createClient() { runAction(async () => { const result = await createOperationsClientAction({ name, abn, billingEmail: email, paymentTermsDays: Number(terms) }); if (result.ok) { setName(""); setAbn(""); setEmail(""); setTerms("14"); } return result; }); }
   function inviteAdmin() { runAction(async () => { const result = await inviteOperationsAdminAction(inviteEmail); if (result.ok) setInviteEmail(""); return result; }); }
   return <div className="grid gap-4 lg:grid-cols-2"><section className="dashboard-card"><div className="dashboard-card-header"><div className="dashboard-icon"><Building2 className="size-5" /></div><div><h2 className="dashboard-card-title">Create client</h2><p className="dashboard-muted">Client setup is restricted to Bulgaa and Zaya.</p></div></div><div className="grid gap-4"><Field label="Client name"><input value={name} onChange={(event) => setName(event.target.value)} /></Field><Field label="ABN (optional)"><input value={abn} onChange={(event) => setAbn(event.target.value)} /></Field><Field label="Billing email"><input value={email} onChange={(event) => setEmail(event.target.value)} type="email" /></Field><Field label="Payment terms (days)"><input min="0" max="90" value={terms} onChange={(event) => setTerms(event.target.value)} type="number" /></Field><button className="dashboard-button dashboard-button-primary" disabled={isPending || name.trim().length < 2} onClick={createClient} type="button">Create client</button></div><div className="mt-5 grid gap-2">{data.clients.map((client) => <div className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-bold" key={client.id}>{client.name}</div>)}</div></section>
-    <section className="dashboard-card"><div className="dashboard-card-header"><div className="dashboard-icon"><UserPlus className="size-5" /></div><div><h2 className="dashboard-card-title">Invite operations admin</h2><p className="dashboard-muted">This role can manage locations and records, but receives no finance access.</p></div></div><div className="grid gap-4"><Field label="Email address"><input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} type="email" /></Field><button className="dashboard-button dashboard-button-primary" disabled={isPending || !inviteEmail.includes("@")} onClick={inviteAdmin} type="button">{isPending ? "Sending…" : "Send restricted invite"}</button></div><div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="inline-flex items-center gap-2 font-black text-emerald-900"><ShieldCheck className="size-5" /> Access boundary</p><ul className="mt-3 grid gap-2 text-sm text-emerald-950"><li>✓ May add locations under existing clients</li><li>✓ May record and review contractor hours</li><li>× Cannot create clients</li><li>× Cannot view rates, GST, invoices or payments</li></ul></div></section></div>;
+    <section className="dashboard-card"><div className="dashboard-card-header"><div className="dashboard-icon"><UserPlus className="size-5" /></div><div><h2 className="dashboard-card-title">Invite operations admin</h2><p className="dashboard-muted">This role can manage locations and records, but receives no finance access.</p></div></div><div className="grid gap-4"><Field label="Email address"><input value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} type="email" /></Field><button className="dashboard-button dashboard-button-primary" disabled={isPending || !inviteEmail.includes("@")} onClick={inviteAdmin} type="button">{isPending ? "Sending…" : "Send restricted invite"}</button></div><div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="inline-flex items-center gap-2 font-black text-emerald-900"><ShieldCheck className="size-5" /> Access boundary</p><ul className="mt-3 grid gap-2 text-sm text-emerald-950"><li>✓ May add and complete locations under existing clients</li><li>✓ May record and review contractor hours</li><li>× Cannot create clients or contractors</li><li>× Cannot view rates, GST, invoices or payments</li></ul></div></section></div>;
 }
 
 function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: number }) { return <article className="dashboard-card flex items-center gap-4"><div className="dashboard-icon"><Icon className="size-5" /></div><div><p className="dashboard-stat-label">{label}</p><p className="dashboard-stat-value">{value}</p></div></article>; }

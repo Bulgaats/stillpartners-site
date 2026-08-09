@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { getSessionProfileResult } from "@/lib/auth/session";
-import { getDemoDashboardData, getSupabaseDashboardData } from "@/lib/data/dashboard";
+import { getDemoDashboardData } from "@/lib/data/dashboard";
 import { demoUserIds } from "@/lib/mock/dashboard-data";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -23,16 +23,11 @@ export default async function DashboardPage() {
 
   const sessionProfile = sessionResult.sessionProfile;
 
-  if (sessionProfile.profile.role === "operations_admin") {
+  if (
+    sessionProfile.profile.role === "admin" ||
+    sessionProfile.profile.role === "operations_admin"
+  ) {
     redirect("/operations");
   }
-  const data = await getSupabaseDashboardData(sessionProfile);
-
-  return (
-    <DashboardShell
-      demoMode={false}
-      initialData={data}
-      initialRole={sessionProfile.profile.role}
-    />
-  );
+  redirect("/contractor-invoice");
 }
