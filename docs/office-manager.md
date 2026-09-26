@@ -1,24 +1,31 @@
-# Office Manager
+# Still Partners Office Manager
 
-Open /office after signing in with an active admin or operations admin account.
+Open https://www.stillpartners.net/office with the finance admin account. On iPhone use Safari, Share, Add to Home Screen. Operations admins retain the site/day work tools; financial records and Assistant are finance-admin only.
 
-- Daily work: choose the work date, client and location; save actual hours per contractor. Finance admins can record separately agreed contractor payable hours and client billable hours with a reason.
-- Work history: load a date range and filter by contractor or client. Pay and bill estimates exclude GST and use the rate effective on the work date.
-- Contractors: finance admins can maintain Full Name, Phone, Email and supplier ABN, copy contact details, and order Regular and Occasional contractors separately. Archived contacts remain in history.
-- Agreed rates: enter current agreements with effective dates. A client-specific contractor agreement takes precedence over the base contractor rate. Correct an incorrect rate by voiding it with a reason and adding a replacement; history is retained.
+## Current workflows
 
-Existing spreadsheet rates are not imported. Missing office rates display Rate needed. These estimates do not approve invoices or record payments. Automatic invoice matching and client invoice generation from the new agreed hours are a later integration step.
+- Today: choose the site, add contractors, enter actual hours. Finance can separately record contractor payable and client billable hours with an agreement note.
+- Company: contractor directory, client/site records, effective-dated agreed rates, work history, incoming invoice metadata and client invoice drafts.
+- Assistant: answers from the request-time company snapshot; prepares reviewed client, contractor, site and client invoice proposals. A fresh-invoice request invokes only the fixed read-only Gmail importer. The model has no shell, browser, email-send, file or database tools.
+- Check latest invoices: queued Gmail import on the Mac, all result pages, existing 14-day overlap and local originals. Self-addressed invoice mail is included. Review warnings are retained; this is not a guarantee that every unreadable attachment was extracted.
+- Invoice reconciliation: exact full-name and supplier-ABN match, valid work period, effective contractor rates, payable hours, explicit GST and overlapping-source checks. A calculation match does not verify completeness of time records or confirm payment.
+- Client drafts: recorded client billable hours, client-specific office rates, owner-selected dates/GST; no spreadsheet/legacy tonne rates. Review and approve freezes the source and locks work against duplicate invoicing. Repeated submissions are idempotent. Rates are entered excluding GST.
+- PDF invoice and separate production summary: actual and agreed client hours in the summary, no monetary values or rates. No conversion from hours to physical tonnage. The existing PDF font currently supports English/ASCII names; an unsupported name stops export instead of corrupting it.
+- Cancellation preserves history. An approved invoice can only be cancelled after the owner confirms it has never been sent. Previously sent invoices need a separate correction/credit workflow.
+- Record payment: records an actual transfer already made by the owner, not a bank transfer. Mac synchronization verifies original/checksummed Paid copies; partial payments stay out of Paid.
 
-Operations admins can read contractor names and location names, and save actual hours. They cannot read office rates or agreed payable/billable hours. Finance actions require the admin role in both server actions and database policies.
+## Mac runtime
 
-The migrations are additive. Existing invoices, work records and the local Mac invoice assistant remain available. Apply migrations in chronological order only to an appropriately baselined database; do not replay historical migrations against an existing production database.
+Install source is scripts/office_mac_sync.py and scripts/office_assistant_worker.py. Their per-user launch agents run on one authorised Mac while logged in, awake and online. Requests wait while offline. The assistant uses the Mac's existing Codex login and gpt-6-astra with xhigh reasoning. Invoice checks run locally without a model.
 
-Validation: production build including lint/type checks, 32 unit tests, and rollback-only database checks for contact edits, ABN validation, stale work updates, immutable rate history, audit records and operations/contractor access restrictions.
+Credentials stay outside the repository in the user's Application Support directory. Never print or commit OAuth tokens, the scoped device token, invoice source files or private snapshots. This repository is public.
 
-## Contact import review
+## Remaining dependencies
 
-Import review keeps source observations separate from confirmed directory contacts. Search by name, ABN, email or phone, compare original variants and open the Gmail source. Confirm a new contractor with a Regular or Occasional group, link to an existing contact without overwriting its details, or exclude a test/non-supplier source with a reason. Completed reviews and original observations are immutable and audited. An admin can edit the resulting directory contact separately.
+Gmail is currently authorised for read-only access. Sending client invoices or greetings is not enabled. It requires a reviewed outgoing-message workflow and separate Google sending consent. Missing client rates, incomplete time records, unknown GST and unresolved supplier identities must be supplied/reviewed before reliable invoice matching or real invoice issuance. Historical paid totals require actual dated payment evidence.
 
-The private Mac export script scripts/office_contact_export.py reads a register and writes a metadata-only review file to a private path outside this repository. It excludes payment, bank and rate fields. Every unassigned document remains a separate observation. Uploading observations does not confirm identity, approve invoices, mark paid, invite users or verify GST registration. The review table is finance-admin only.
+## Validation
 
-Contact-review validation: 34 unit tests, two Python export tests, production build, and rollback-only database checks for create/link actions, source immutability, repeated submission and operations/anonymous access isolation.
+Production builds; unit tests for monetary calculation, reconciliation, PDF output, queue retry and payment sync. Transactional database checks roll back synthetic clients/work: missing rates, separate 8-hour actual versus 10-hour billable calculation, changed-rate refusal, replay, duplicate billing, cancellation and finance permissions. Synthetic PDFs are rendered for visual QA. Authenticated owner-screen visual testing is separate from these checks.
+
+GST rounding reference: https://www.ato.gov.au/businesses-and-organisations/gst-excise-and-indirect-taxes/gst/tax-invoices

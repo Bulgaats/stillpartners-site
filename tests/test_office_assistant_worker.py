@@ -4,7 +4,8 @@ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 import office_assistant_worker as worker
 class WorkerBoundaries(unittest.TestCase):
  def test_model_cannot_add_executable_actions(self):
-  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','section':'none'}
+  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','gstMode':'exclusive','section':'none'}
+  self.assertEqual(worker.validate(payload),payload)
   for key,value in [('action','send_email'),('section','https://example.test')]:
    with self.subTest(key=key),self.assertRaises(ValueError):worker.validate({**payload,key:value})
   with self.assertRaises(ValueError):worker.validate({**payload,'command':'anything'})
