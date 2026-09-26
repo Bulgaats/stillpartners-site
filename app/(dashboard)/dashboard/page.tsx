@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     sessionProfile.profile.role === "admin" ||
     sessionProfile.profile.role === "operations_admin"
   ) {
-    redirect("/operations");
+    redirect("/office");
   }
   redirect("/contractor-invoice");
 }
