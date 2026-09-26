@@ -29,3 +29,16 @@ Gmail is currently authorised for read-only access. Sending client invoices or g
 Production builds; unit tests for monetary calculation, reconciliation, PDF output, queue retry and payment sync. Transactional database checks roll back synthetic clients/work: missing rates, separate 8-hour actual versus 10-hour billable calculation, changed-rate refusal, replay, duplicate billing, cancellation and finance permissions. Synthetic PDFs are rendered for visual QA. Authenticated owner-screen visual testing is separate from these checks.
 
 GST rounding reference: https://www.ato.gov.au/businesses-and-organisations/gst-excise-and-indirect-taxes/gst/tax-invoices
+
+
+## Reviewed client invoice email
+
+After approving a client invoice, open **Email invoice · review & send**. Prepare a preview, inspect its saved recipient, subject, message and both exact PDFs, then use **Approve & send**. Changing a client billing email before sending starts blocks the queued message for a fresh review. Each outgoing message is approved individually. The assistant cannot approve or send an email by itself.
+
+The scoped Mac mail worker runs each minute while awake and online. Run `scripts/install_office_mail_schedule.py <invoice-assistant-folder>` to install. The owner then runs `ENABLE_GMAIL_SEND.command` in the assistant folder and grants Gmail read/send access to the correct work account. Existing login is preserved until verification succeeds; tokens stay in macOS Application Support, outside Git. Read-only Gmail imports preserve granted scopes.
+
+Generated client invoice PDFs are stored privately with the frozen preview. Original subcontractor files stay on Mac. Approved outgoing files and MIME messages are saved under `Client_Invoices/<client>/<invoice>/Prepared`, with confirmed deliveries copied to `Sent`. Phone approvals wait for the Mac if offline.
+
+A durable local journal is written before the sole Gmail send attempt. Gmail confirmation is recorded separately from queuing. An ambiguous timeout or crash becomes **unknown**, never an automatic resend; inspect Gmail Sent and resolve delivery before a replacement. Queued messages can be cancelled before sending starts. Queued, sent or uncertain mail blocks invoice cancellation. Sent invoice credits/correction handling needs owner review; it is not automated.
+
+Validation uses synthetic PDF/message fixtures and a mocked Gmail sender; no customer email is sent by tests. Live sending requires the owner consent step and a real reviewed invoice.
