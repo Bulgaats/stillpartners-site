@@ -12,7 +12,7 @@ ABN verification reads the official current public ABN Lookup page at a fixed or
 
 The Mac uses the owner's existing Codex login with GPT-6 Astra at xhigh effort. For an enabled company task, requested record details and extracted source text may be sent to OpenAI through Codex for processing. Original files remain on the Mac; this does not mean the extracted text stays exclusively on the Mac.
 
-The live-data pilot was stopped by automatic approval review pending explicit owner consent for that processing. The production worker has NOT been replaced by this change. Complete the synthetic tests and preview first. Only after that consent, install the three reviewed files below and run a read-only real-data task. Do not bypass the approval by another execution path.
+The owner explicitly approved this processing on 27 September 2026 before the live-data pilot. The read-only pilot then successfully searched real saved invoices, read source PDFs, checked official ABN holder records and ran the shared calculator. It correctly reported missing time records and unreadable source formats rather than asserting a verified total. Install and activate only the reviewed files; preserve the existing device scope and payment/email approval boundaries.
 
 Model access is limited to the advertised read-only tools. It cannot select arbitrary file paths, run shell/SQL, change rates, send email or mark invoices paid. Existing authenticated record proposals and exact email approvals remain separate.
 
@@ -29,10 +29,10 @@ No database migration, invoice deletion or payment-state change is required.
 ## Verified
 
 - 20 TypeScript tests cover the existing calculation plus dated tonne rates, split rate periods, stale-rate prevention, client overrides, GST, quantities and flagged documents.
-- 12 Python retrieval tests cover pagination, source boundaries/checksums, duplicate/revision preservation, buyer ABN rejection and unavailable/mismatching registry results.
+- 13 Python retrieval tests cover pagination, source boundaries/checksums, duplicate/revision preservation, buyer ABN rejection and unavailable/mismatching registry results.
 - Existing 3 assistant-worker tests still pass.
 - A real Codex run on wholly synthetic records searched, read the source, computed 600 + 650 = 1,250 AUD over a rate-change boundary, and correctly rejected an ABN holder-name mismatch.
-- Production Next.js build passes. Live private-data model processing is not yet verified.
+- Production Next.js build and TypeScript checking pass. A consented live company-data pilot completed all five retrieval/check tool types without changing records, payment states or sending mail.
 
 ## Current limits
 

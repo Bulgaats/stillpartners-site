@@ -218,7 +218,7 @@ def serve(root,context_path,audit_path):
     except Exception as exc:
      safe=str(exc) if isinstance(exc,ValueError) else 'Company record tool unavailable; no action was performed.'
      result={'content':[{'type':'text','text':json.dumps({'error':safe[:300]})}],'isError':True}
-    with open(audit_path,'a') as log:log.write(json.dumps({'tool':name,'ok':not result['isError'],'at':dt.datetime.now(dt.timezone.utc).isoformat()})+'\n')
+    with open(audit_path,'a') as log:log.write(json.dumps({'tool':name,'ok':not result['isError'] and not (name=='read_invoice_source' and value.get('readable') is False),'at':dt.datetime.now(dt.timezone.utc).isoformat()})+'\n')
    else:raise ValueError('Unsupported method')
    response={'jsonrpc':'2.0','id':request['id'],'result':result}
   except Exception:response={'jsonrpc':'2.0','id':request.get('id') if isinstance(request,dict) else None,'error':{'code':-32602,'message':'Invalid request'}}

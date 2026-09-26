@@ -54,6 +54,15 @@ class KnowledgeTests(unittest.TestCase):
   source=self.root/'scan.pdf';writer=PdfWriter();writer.add_blank_page(width=100,height=100);writer.write(source)
   d={**document('a'),'file':'scan.pdf','sha256':hashlib.sha256(source.read_bytes()).hexdigest()}
   self.assertFalse(self.knowledge([d]).read_source('a',0)['readable'])
+ def test_unreadable_source_is_not_labelled_successful_evidence(self):
+  import io
+  from office_knowledge_tools import serve
+  self.knowledge([document('a')])
+  context=self.root/'context.json';context.write_text('{}');audit=self.root/'audit.jsonl'
+  request={'jsonrpc':'2.0','id':1,'method':'tools/call','params':{'name':'read_invoice_source','arguments':{'documentId':'a'}}}
+  with patch('sys.stdin',io.StringIO(json.dumps(request)+'\n')),patch('sys.stdout',io.StringIO()),patch.object(Knowledge,'read_source',return_value={'readable':False,'issue':'Needs OCR'}):
+   serve(self.root,context,audit)
+  self.assertFalse(json.loads(audit.read_text())['ok'])
  def test_tonnage_from_other_source_is_flagged(self):
   k=self.knowledge([{**document('a'),'tonnage_source_sha256':'b'*64}])
   self.assertIn('different source hash',' '.join(k.docs[0]['flags']))
