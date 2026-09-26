@@ -1,3 +1,4 @@
+import type {InvoiceEvent} from "@/lib/office/invoice-events";
 import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {title:"Still Partners Office",manifest:"/office.webmanifest",appleWebApp:{capable:true,title:"SP Office",statusBarStyle:"black-translucent"}};
 export const viewport: Viewport = {themeColor:"#0c0e11",width:"device-width",initialScale:1};
@@ -24,5 +25,7 @@ export default async function OfficePage({searchParams}:{searchParams?:Promise<{
   const management={clients:existing.clients,projects:existing.projects,clientInvoices:existing.clientInvoices,isFinanceAdmin:existing.isFinanceAdmin};
   let snapshot:InvoiceSnapshot|null=null;
   if(data.finance){const db=await createServerSupabaseClient();const {data:row}=await db.from("office_invoice_snapshots").select("payload").order("exported_at",{ascending:false}).limit(1).maybeSingle();const parsed=invoiceSnapshotSchema.safeParse(row?.payload);if(parsed.success)snapshot=parsed.data;}
-  return <OfficeWorkspace snapshot={snapshot} management={management} data={data} today={today} initialTab={params?.view==="history"?"history":"daily"} />;
+  const invoiceEvents:InvoiceEvent[]=[];
+  if(data.finance){const db=await createServerSupabaseClient();for(let offset=0;;offset+=1000){const {data:rows,error}=await db.from("office_invoice_events").select("id,document_id,kind,source_digest,amount_cents,payment_date,reason,target_id,created_at").order("created_at").order("id").range(offset,offset+999);if(error)throw new Error("Payment history unavailable. Reload before recording payments.");invoiceEvents.push(...(rows??[]) as InvoiceEvent[]);if(!rows||rows.length<1000)break;}}
+  return <OfficeWorkspace invoiceEvents={invoiceEvents} snapshot={snapshot} management={management} data={data} today={today} initialTab={params?.view==="history"?"history":"daily"} />;
 }
