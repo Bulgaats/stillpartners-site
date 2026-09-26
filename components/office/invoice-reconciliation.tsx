@@ -1,0 +1,7 @@
+import {reconcileInvoice} from '@/lib/office/reconciliation';
+import type {OfficeData} from '@/lib/office/foundation';
+import type {InvoiceSnapshot} from '@/lib/office/invoice-snapshot';
+const money=(n:number)=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(n/100);
+export function InvoiceReconciliation({document,data,documents}:{document:InvoiceSnapshot['documents'][number];data:OfficeData;documents:InvoiceSnapshot['documents']}){
+ const r=reconcileInvoice(document,data,documents);return <section className="ember-panel"><strong>{r.status==='match'?'Calculation matched':r.status==='difference'?'Amount difference':'Time & rate review'}</strong><p>{r.message}</p>{r.actualHours!==null&&<p>{r.rows} recorded work entries · Actual {r.actualHours} h · Contractor payable {r.payableHours} h</p>}{r.expectedFeeCents!==null&&<p>Expected fee excluding GST: {money(r.expectedFeeCents)}{r.expectedTotalCents!==null&&<> · With source GST: {money(r.expectedTotalCents)}</>}</p>}{r.differenceCents!==null&&r.differenceCents!==0&&<p className="error">Invoice minus calculation: {money(r.differenceCents)}</p>}{r.issues.length>0&&<ul>{r.issues.map((issue,i)=><li key={i}>{issue}</li>)}</ul>}{r.period&&(r.period.from<data.from||r.period.to>data.to)&&<a className="ember-link" href={`/office?from=${r.period.from}&to=${r.period.to}&view=invoices`}>Load these work dates</a>}<p className="ember-footnote">Compares against recorded time only; check that the time records are complete. This does not approve the source or confirm payment.</p></section>;
+}

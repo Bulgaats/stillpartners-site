@@ -7,3 +7,5 @@
 .ember .dashboard-icon{background:var(--input);color:var(--accent)}
 
 .ember textarea { display:block; width:100%; resize:vertical; background:#161a20; color:#f4f0ea; border:1px solid #464139; border-radius:12px; padding:12px; margin:10px 0; font:inherit; }
+
+.ember .office-draft-table {width:100%;min-width:700px;border-collapse:collapse;font-size:13px}.ember .office-draft-table th {position:sticky;top:0;background:#23262d;z-index:1;text-align:left}.ember .office-draft-table td,.ember .office-draft-table th{padding:10px;border-bottom:1px solid #393a3d}.ember .office-draft-table small{display:block;color:#a8a3a0}.ember details summary small{display:block;margin-top:4px}

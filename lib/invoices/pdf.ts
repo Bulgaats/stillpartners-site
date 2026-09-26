@@ -953,3 +953,47 @@ function formatMoney(value: number) {
 function valueOrNotProvided(value?: string) {
   return value?.trim() ? value : "Not provided";
 }
+
+export type OfficeInvoicePdfInput = {
+  number:string;status:'draft'|'approved'|'cancelled';clientName:string;clientAbn:string;
+  issueDate:string;dueDate:string;periodStart:string;periodEnd:string;subtotalCents:number;gstCents:number;totalCents:number;
+  gstMode:'exclusive'|'inclusive'|'none';branding?:ClientPdfBranding;
+  rows:{workDate:string;siteName:string;fullName:string;actualHours:number;clientHours:number}[];
+};
+function officePdfText(value:string){
+  const text=value.replace(/[–—]/g,'-').replace(/[’‘]/g,"'").replace(/[“”]/g,'"');
+  if(/[^\x20-\x7E\r\n\t]/.test(text))throw new Error('Some names require a Unicode PDF font. Review this document on screen; the original names have been preserved.');
+  return text;
+}
+export function generateOfficeClientInvoicePdf(input:OfficeInvoicePdfInput){
+  const doc=new BrandedPdfDocument(input.branding?.logoJpeg),page=doc.addPage();
+  drawStillPartnersBrand(page,input.branding);
+  page.text(input.gstMode==='none'?'INVOICE':'TAX INVOICE',545,716,{align:'right',color:CLIENT_ORANGE,font:'F2',size:17});
+  page.text('Bill to',50,704,{font:'F2',size:10});
+  wrapPdfText(officePdfText(input.clientName),270,12,'F2').slice(0,4).forEach((line,i)=>page.text(line,50,684-i*15,{font:'F2',size:12}));
+  page.text('ABN: '+officePdfText(input.clientAbn||'Not supplied'),50,617,{size:9});
+  [['Invoice number',input.number],['Issue date',formatPdfDate(input.issueDate)],['Due date',formatPdfDate(input.dueDate)]].forEach(([label,value],i)=>{page.text(label,355,695-i*20,{font:'F2',size:8});page.text(value,545,695-i*20,{align:'right',size:8});});
+  page.text(`Service period: ${formatPdfDate(input.periodStart)} - ${formatPdfDate(input.periodEnd)}`,50,596,{size:9});
+  if(input.status!=='approved'){page.fillRect(50,544,495,30,CLIENT_ORANGE);page.text(input.status==='cancelled'?'CANCELLED - DO NOT PAY':'DRAFT - NOT ISSUED',62,554,{color:CLIENT_WHITE,font:'F2',size:12});}
+  page.fillRect(50,494,495,30,CLIENT_DARK);page.text('Description',62,505,{color:CLIENT_WHITE,font:'F2',size:10});page.text('Amount AUD',533,505,{align:'right',color:CLIENT_WHITE,font:'F2',size:10});
+  page.text('Reinforcement subcontract services',62,467,{font:'F2',size:11});
+  page.text('Services for the period shown above.',62,448,{size:9});
+  page.text(formatMoney(input.subtotalCents/100),533,467,{align:'right',font:'F2',size:11});
+  page.line(50,425,545,425,CLIENT_ORANGE,0.7);
+  [['Subtotal',input.subtotalCents],['GST'+(input.gstMode==='none'?' (not charged)':' (10%)'),input.gstCents],['Total AUD',input.totalCents]].forEach(([label,amount],i)=>{page.text(String(label),355,395-i*27,{font:'F2',size:i===2?13:10});page.text(formatMoney(Number(amount)/100),533,395-i*27,{align:'right',font:'F2',size:i===2?13:10});});
+  page.text('The separate work summary contains no rates or monetary amounts.',50,283,{color:CLIENT_MUTED,size:8});
+  drawClientInvoicePaymentDetails(page,input.branding);drawClientInvoiceFooter(page,1,1);
+  return doc.render();
+}
+export function generateOfficeWorkSummaryPdf(input:OfficeInvoicePdfInput){
+  const doc=new BrandedPdfDocument();let page:BrandedPdfPage;let y=0;let number=0;
+  const header=()=>{page=doc.addPage();number++;page.text('PRODUCTION SUMMARY',50,793,{font:'F2',size:17});const names=wrapPdfText(officePdfText(input.clientName),495,10,'F2');names.forEach((line,i)=>page.text(line,50,770-i*13,{font:'F2',size:10}));const dateY=770-names.length*13-7;page.text(`${input.periodStart} to ${input.periodEnd} | ${input.number}`,50,dateY,{size:9});const tableY=dateY-47;page.fillRect(50,tableY,495,30,CLIENT_DARK);[['Date',56],['Job site',128],['Contractor',297],['Actual h',461],['Billable h',538]].forEach(([text,x],i)=>page.text(String(text),Number(x),tableY+11,{size:8,font:'F2',color:CLIENT_WHITE,align:i>=3?'right':'left'}));page.text('Work and agreed billable hours only. No rates or amounts.',50,44,{size:8,color:CLIENT_MUTED});page.text(`Page ${number}`,545,44,{align:'right',size:8});y=tableY;};
+  header();
+  for(const row of input.rows){
+    const site=wrapPdfText(officePdfText(row.siteName),159,8,'F1'),name=wrapPdfText(officePdfText(row.fullName),115,8,'F1');
+    const height=Math.max(24,Math.max(site.length,name.length)*11+12);if(y-height<70)header();
+    page!.text(row.workDate.split('-').reverse().join('/'),56,y-15,{size:8});site.forEach((line,i)=>page!.text(line,128,y-15-i*11,{size:8}));name.forEach((line,i)=>page!.text(line,297,y-15-i*11,{size:8}));
+    page!.text(formatHours(row.actualHours),461,y-15,{align:'right',size:8});page!.text(formatHours(row.clientHours),538,y-15,{align:'right',size:8});y-=height;page!.line(50,y,545,y,SUMMARY_BORDER,0.3);
+  }
+  return doc.render();
+}
