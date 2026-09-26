@@ -1,3 +1,4 @@
+import type { ContactImport } from './contact-import';
 export type Contractor = {
   id: string; fullName: string; phone: string; email: string; abn: string;
   group: "regular" | "occasional"; active: boolean;
@@ -16,7 +17,7 @@ export type OfficeData = {
   contractors: Contractor[];
   clients: {id: string; name: string; active: boolean}[];
   projects: {id: string; clientId: string; name: string; active: boolean}[];
-  entries: OfficeEntry[]; rates: OfficeRate[];
+  entries: OfficeEntry[]; rates: OfficeRate[]; contactImports?: ContactImport[];
 };
 
 export function contactText(person: Contractor) {

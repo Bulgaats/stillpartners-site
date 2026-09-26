@@ -9,3 +9,6 @@ tsconfig.tsbuildinfo
 supabase/.branches
 supabase/.temp
 .vercel
+
+# Python contact-export test caches
+__pycache__/

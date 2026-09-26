@@ -24,6 +24,15 @@ export async function saveOfficeContractor(input:z.input<typeof personSchema>):P
   const response=await db.rpc("office_save_contractor",{p_id:p.id,p_name:p.fullName,p_email:p.email,p_phone:p.phone,p_abn:p.abn,p_group:p.group,p_active:p.active});
   return result(response.error,"Contractor contact saved.");
 }
+const importSchema=z.object({id:z.string().uuid(),action:z.enum(['create','link','dismiss']),note:z.string().trim().min(3).max(2000),workerId:z.string().uuid().nullable(),contact:personSchema.omit({id:true}).nullable()});
+export async function resolveOfficeContactImport(input:z.input<typeof importSchema>):Promise<OfficeResult> {
+  const db=await access();const parsed=importSchema.safeParse(input);
+  if(!parsed.success)return {ok:false,message:parsed.error.issues[0].message};
+  const v=parsed.data;
+  if((v.action==='create'&&!v.contact)||(v.action==='link'&&!v.workerId))return {ok:false,message:'Choose the contractor details for this review.'};
+  const response=await db.rpc('office_resolve_contact_import',{p_import:v.id,p_action:v.action,p_note:v.note,p_worker:v.workerId,p_contact:v.contact});
+  return result(response.error,v.action==='create'?'Contact added. Original source details retained.':v.action==='link'?'Source linked to the existing contact. Existing details were not overwritten.':'Source excluded from the directory; original details retained.');
+}
 const rateSchema=z.object({workerId:z.string().uuid(),clientId:z.string().uuid().nullable(),kind:z.enum(["contractor","client"]),hourlyRateCents:z.number().int().min(1).max(10000000),effectiveFrom:z.string().date(),agreementNote:z.string().trim().min(3).max(2000)}).refine(v=>v.kind!=="client" || !!v.clientId,"Select a client for the billing rate.");
 export async function addOfficeRate(input:z.input<typeof rateSchema>):Promise<OfficeResult> {
   const db=await access();const parsed=rateSchema.safeParse(input);
