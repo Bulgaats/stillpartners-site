@@ -1,3 +1,6 @@
+import type { Metadata, Viewport } from "next";
+export const metadata: Metadata = {title:"Still Partners Office",manifest:"/office.webmanifest",appleWebApp:{capable:true,title:"SP Office",statusBarStyle:"black-translucent"}};
+export const viewport: Viewport = {themeColor:"#0c0e11",width:"device-width",initialScale:1};
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
 import { canAccessOperations } from "@/lib/auth/roles";
