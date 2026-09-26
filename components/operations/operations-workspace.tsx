@@ -186,6 +186,7 @@ export function OperationsWorkspace({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <a className="inline-flex min-h-11 items-center rounded-lg border border-white/25 px-4 py-2 text-sm font-bold hover:bg-white/10" href="/office">Office Manager</a>
               <form action={logout}>
                 <button
                   className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/25 px-4 py-2 text-sm font-bold hover:bg-white/10"
