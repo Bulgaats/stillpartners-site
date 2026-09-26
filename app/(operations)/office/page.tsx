@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {title:"Still Partners Office",manifest:"/office.webmanifest",appleWebApp:{capable:true,title:"SP Office",statusBarStyle:"black-translucent"}};
 export const viewport: Viewport = {themeColor:"#0c0e11",width:"device-width",initialScale:1};
+import {createServerSupabaseClient} from "@/lib/supabase/server";
+import {invoiceSnapshotSchema, type InvoiceSnapshot} from "@/lib/office/invoice-snapshot";
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
 import { canAccessOperations } from "@/lib/auth/roles";
@@ -20,5 +22,7 @@ export default async function OfficePage({searchParams}:{searchParams?:Promise<{
   const data=await officeData(session.profile.role==="admin",a<b?a:b,a<b?b:a);
   const existing=await getOperationsWorkspaceData({session,rangeStart:data.from,rangeEnd:data.to,includeLegacyWork:false});
   const management={clients:existing.clients,projects:existing.projects,clientInvoices:existing.clientInvoices,isFinanceAdmin:existing.isFinanceAdmin};
-  return <OfficeWorkspace management={management} data={data} today={today} initialTab={params?.view==="history"?"history":"daily"} />;
+  let snapshot:InvoiceSnapshot|null=null;
+  if(data.finance){const db=await createServerSupabaseClient();const {data:row}=await db.from("office_invoice_snapshots").select("payload").order("exported_at",{ascending:false}).limit(1).maybeSingle();const parsed=invoiceSnapshotSchema.safeParse(row?.payload);if(parsed.success)snapshot=parsed.data;}
+  return <OfficeWorkspace snapshot={snapshot} management={management} data={data} today={today} initialTab={params?.view==="history"?"history":"daily"} />;
 }

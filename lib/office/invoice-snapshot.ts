@@ -1,0 +1,6 @@
+import { z } from "zod";
+const s=z.string().max(2000);const amount=z.number().int().min(-999999999999).max(999999999999).nullable();
+const documentSchema=z.object({id:s.min(1),supplierId:s,name:s,abn:s,email:s,phone:s,invoiceNumber:s,issueDate:s,workPeriod:s,received:s,amountCents:amount,gst:s,currency:s,tonnage:s,recordType:s,approved:z.boolean(),duplicateOf:s,flags:z.array(s).max(100),source:s.refine(v=>!v||(()=>{try{const u=new URL(v);return u.protocol==='https:'&&u.hostname==='mail.google.com'}catch{return false}})()),filename:s,paidCents:z.number().int(),paymentStatus:z.enum(['Unknown','Paid','Part-paid']),payments:z.array(z.object({id:s,date:s,amountCents:amount})).max(1000)});
+export const invoiceSnapshotSchema=z.object({version:z.literal(1),account:z.literal('work@stillpartners.net'),sourceDigest:z.string().regex(/^[a-f0-9]{64}$/),exportedAt:z.string().datetime({offset:true}),paymentsComplete:z.boolean(),documents:z.array(documentSchema).max(10000)}).refine(v=>new Set(v.documents.map(d=>d.id)).size===v.documents.length,'Duplicate source document IDs');
+export type InvoiceSnapshot=z.infer<typeof invoiceSnapshotSchema>;
+export function supplierGroupKey(d:InvoiceSnapshot['documents'][number]){return JSON.stringify([d.supplierId||`unassigned:${d.id}`,d.name,d.abn]);}
