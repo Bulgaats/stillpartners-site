@@ -1,9 +1,7 @@
 "use client";
-import { useMemo, useState, useTransition, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { addOfficeRate, saveOfficeContractor, saveOfficeWork, voidOfficeRate, type OfficeResult } from "@/app/actions/office";
-import { contactText, directory, effectiveRate, hoursAmountCents, type Contractor, type OfficeData, type OfficeEntry } from "@/lib/office/foundation";
-import { ContactImportReview } from './contact-import-review';
+import { useMemo, useState, type ReactNode } from "react";
+import { addOfficeRate, saveOfficeContractor, voidOfficeRate, type OfficeResult } from "@/app/actions/office";
+import { contactText, directory, effectiveRate, hoursAmountCents, type Contractor, type OfficeData } from "@/lib/office/foundation";
 
 const button="dashboard-button dashboard-button-primary";
 const secondary="dashboard-button dashboard-button-outline";
@@ -12,24 +10,9 @@ const date=(value:string)=>value.split("-").reverse().join("/");
 function Field({label,children}:{label:string;children:ReactNode}) {return <label className="grid gap-1.5 text-sm font-semibold text-slate-700">{label}{children}</label>;}
 type Run=(action:()=>Promise<OfficeResult>)=>void;
 
-export function OfficeWorkspace({data,today,initialTab="daily"}:{data:OfficeData;today:string;initialTab?:"daily"|"history"}) {
-  const router=useRouter();const [pending,start]=useTransition();
-  const [tab,setTab]=useState(initialTab as string);const [notice,setNotice]=useState<OfficeResult|null>(null);
-  const run:Run=action=>{setNotice(null);start(async()=>{try{const outcome=await action();setNotice(outcome);if(outcome.ok)router.refresh();}catch(error){setNotice({ok:false,message:error instanceof Error?error.message:"Could not save. Please try again."});}});};
-  return <main className="dashboard-page"><div className="dashboard-shell">
-    <header className="dashboard-hero bg-blue-950 text-white"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-orange-300">Still Partners</p><h1 className="mt-2 text-3xl font-black">Office Manager</h1><p className="mt-2 text-blue-100">Contractors, daily work and agreed rates</p></div><a className="rounded-lg border border-white/30 px-4 py-3 text-sm font-semibold" href="/operations">Existing operations</a></div></header>
-    <div className="grid gap-3 sm:grid-cols-3">{[["Active contractors",data.contractors.filter(p=>p.active).length],["Work records",data.entries.length],["Actual hours in view",data.entries.reduce((n,e)=>n+e.actualHours,0).toFixed(2)]].map(([label,value])=><section className="dashboard-card" key={label}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-blue-950">{value}</p></section>)}</div>
-    <nav className="dashboard-tabs" aria-label="Office sections">{[["daily","Daily work"],["history","Work history"],...(data.finance?[["contacts","Contractors"],["imports",`Import review (${(data.contactImports??[]).filter(i=>i.status==='pending').length})`],["rates","Agreed rates"]]:[])].map(([id,label])=><button key={id} type="button" onClick={()=>{setTab(id);setNotice(null);}} className={`dashboard-tab ${tab===id?"dashboard-tab-active":"dashboard-tab-idle"}`}>{label}</button>)}</nav>
-    {notice?<p role="status" className={`rounded-xl border p-4 ${notice.ok?"border-emerald-200 bg-emerald-50 text-emerald-900":"border-amber-300 bg-amber-50 text-amber-950"}`}>{notice.message}</p>:null}
-    {tab==="daily"?<Daily data={data} today={today} pending={pending} run={run}/>:null}
-    {tab==="history"?<History data={data}/>:null}
-    {tab==="contacts" && data.finance?<Contacts data={data} pending={pending} run={run}/>:null}
-    {tab==="imports" && data.finance?<ContactImportReview items={data.contactImports??[]} people={data.contractors} pending={pending} run={run}/>:null}
-    {tab==="rates" && data.finance?<Rates data={data} today={today} pending={pending} run={run}/>:null}
-  </div></main>;
-}
+export { EmberWorkspace as OfficeWorkspace } from "./ember-workspace";
 
-function Contacts({data,pending,run}:{data:OfficeData;pending:boolean;run:Run}) {
+export function Contacts({data,pending,run}:{data:OfficeData;pending:boolean;run:Run}) {
   const empty:Contractor={id:"",fullName:"",phone:"",email:"",abn:"",group:"regular",active:true};
   const [person,setPerson]=useState<Contractor>(empty);const [search,setSearch]=useState("");const [copied,setCopied]=useState("");const [fallback,setFallback]=useState("");
   const list=useMemo(()=>directory(data.contractors,search),[data.contractors,search]);
@@ -51,27 +34,7 @@ function Contacts({data,pending,run}:{data:OfficeData;pending:boolean;run:Run}) 
   </div>;
 }
 
-function Daily({data,today,pending,run}:{data:OfficeData;today:string;pending:boolean;run:Run}) {
-  const [workDate,setDate]=useState(data.from===data.to?data.from:today);const [clientId,setClient]=useState(data.clients.find(c=>c.active)?.id||"");const [jobId,setJob]=useState("");
-  const projects=data.projects.filter(p=>p.clientId===clientId&&p.active);
-  const selectedJob=projects.find(p=>p.id===jobId)?.id||projects[0]?.id||"";
-  const entries=data.entries.filter(e=>e.jobId===selectedJob&&e.workDate===workDate);
-  const outside=workDate<data.from||workDate>data.to;
-  return <section className="dashboard-card"><h2 className="dashboard-card-title">Daily work record</h2><p className="mt-1 text-sm text-slate-500">Record actual time at the location. Enter separately agreed payable and billable hours where needed.</p>
-    <div className="my-5 grid gap-4 md:grid-cols-3"><Field label="Work date"><input type="date" max={today} value={workDate} onChange={e=>setDate(e.target.value)}/></Field><Field label="Client"><select value={clientId} onChange={e=>{setClient(e.target.value);setJob("");}}><option value="">Select client</option>{data.clients.filter(c=>c.active).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Field><Field label="Location / project"><select value={selectedJob} onChange={e=>setJob(e.target.value)}><option value="">Select location</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field></div>
-    {outside?<p className="rounded-lg bg-amber-50 p-4">Load this date before editing existing records. <a className="font-bold underline" href={`/office?from=${workDate}&to=${workDate}`}>Load {date(workDate)}</a></p>:<div className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200"><table className={`w-full text-left text-sm ${data.finance?"min-w-[1000px]":"min-w-[500px]"}`}><thead className="sticky top-0 z-10 bg-slate-100 text-xs uppercase text-slate-600"><tr>{["Contractor","Actual hours",...(data.finance?["Contractor hours","Client hours","Agreement / reason"]:[]),"Action"].map(s=><th className="p-3" key={s}>{s}</th>)}</tr></thead><tbody>{directory(data.contractors).filter(p=>p.active).map(person=>{const entry=entries.find(e=>e.workerId===person.id);return <WorkRow key={`${person.id}:${selectedJob}:${workDate}:${entry?.updatedAt||"new"}`} person={person} entry={entry} finance={data.finance} jobId={selectedJob} workDate={workDate} pending={pending} run={run}/>;})}</tbody></table></div>}
-    <p className="mt-4 text-sm text-slate-500">Saving work records does not approve an invoice or mark a payment as paid.</p>
-  </section>;
-}
-function WorkRow({person,entry,finance,jobId,workDate,pending,run}:{person:Contractor;entry?:OfficeEntry;finance:boolean;jobId:string;workDate:string;pending:boolean;run:Run}) {
-  const [actual,setActual]=useState(entry?String(entry.actualHours):"");const [pay,setPay]=useState(entry?String(entry.contractorHours ?? entry.actualHours):"");const [bill,setBill]=useState(entry?String(entry.clientHours ?? entry.actualHours):"");const [note,setNote]=useState(entry?.agreementNote||"");
-  const disabled=pending||!!entry?.locked||!jobId||!workDate;
-  const changeActual=(value:string)=>{if(pay===""||pay===actual)setPay(value);if(bill===""||bill===actual)setBill(value);setActual(value);};
-  const input=(label:string,value:string,onChange:(v:string)=>void)=><input className="w-28" aria-label={`${person.fullName} ${label}`} disabled={disabled} min="0" max="24" step="0.01" type="number" inputMode="decimal" placeholder="0" value={value} onChange={e=>onChange(e.target.value)}/>;
-  return <tr className="border-t border-slate-200"><td className="p-3 font-bold text-blue-950">{person.fullName}{person.group==="occasional"?<small className="block font-normal text-slate-500">Occasional</small>:null}</td><td className="p-3">{input("actual hours",actual,changeActual)}</td>{finance?<><td className="p-3">{input("contractor hours",pay,setPay)}</td><td className="p-3">{input("client hours",bill,setBill)}</td><td className="p-3"><input aria-label={`${person.fullName} agreement reason`} disabled={disabled} placeholder="Required if hours differ" value={note} onChange={e=>setNote(e.target.value)}/></td></>:null}<td className="p-3">{entry?.locked?<span className="text-xs font-bold text-emerald-700">Locked / invoiced</span>:<button className={button} disabled={disabled||actual===""||(finance&&(pay===""||bill===""))} type="button" onClick={()=>run(()=>saveOfficeWork({workerId:person.id,jobId,workDate,actualHours:Number(actual),contractorHours:finance?Number(pay):null,clientHours:finance?Number(bill):null,agreementNote:finance?note:null,expectedUpdatedAt:entry?.updatedAt??null}))}>Save</button>}</td></tr>;
-}
-
-function History({data}:{data:OfficeData}) {
+export function History({data}:{data:OfficeData}) {
   const [from,setFrom]=useState(data.from);const [to,setTo]=useState(data.to);const [worker,setWorker]=useState("");const [client,setClient]=useState("");
   const entries=data.entries.filter(e=>(!worker||e.workerId===worker)&&(!client||data.projects.find(p=>p.id===e.jobId)?.clientId===client)).sort((a,b)=>b.workDate.localeCompare(a.workDate)||a.workerId.localeCompare(b.workerId));
   return <section className="dashboard-card"><h2 className="dashboard-card-title">Work history</h2><form action="/office" className="my-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]"><input type="hidden" name="view" value="history"/><Field label="From"><input required type="date" name="from" value={from} onChange={e=>setFrom(e.target.value)}/></Field><Field label="To"><input required type="date" name="to" value={to} onChange={e=>setTo(e.target.value)}/></Field><button className={`${secondary} self-end`} type="submit">Load range</button></form><div className="mb-4 grid gap-3 sm:grid-cols-2"><Field label="Contractor"><select value={worker} onChange={e=>setWorker(e.target.value)}><option value="">All contractors</option>{directory(data.contractors).map(p=><option key={p.id} value={p.id}>{p.fullName}</option>)}</select></Field><Field label="Client"><select value={client} onChange={e=>setClient(e.target.value)}><option value="">All clients</option>{data.clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Field></div>
@@ -79,7 +42,7 @@ function History({data}:{data:OfficeData}) {
   </section>;
 }
 
-function Rates({data,today,pending,run}:{data:OfficeData;today:string;pending:boolean;run:Run}) {
+export function Rates({data,today,pending,run}:{data:OfficeData;today:string;pending:boolean;run:Run}) {
   const [workerId,setWorker]=useState(data.contractors[0]?.id||"");const [kind,setKind]=useState<"contractor"|"client">("contractor");const [clientId,setClient]=useState("");const [amount,setAmount]=useState("");const [from,setFrom]=useState(today);const [note,setNote]=useState("");const [voidId,setVoid]=useState("");const [reason,setReason]=useState("");
   const history=data.rates.filter(r=>!workerId||r.workerId===workerId).sort((a,b)=>b.effectiveFrom.localeCompare(a.effectiveFrom));
   return <div className="grid items-start gap-5 lg:grid-cols-[350px_1fr]"><section className="dashboard-card"><h2 className="dashboard-card-title">Add an agreed rate</h2><p className="mt-2 text-sm text-slate-500">A new effective date preserves earlier rates. Contractor base rates apply unless a client-specific contractor rate exists.</p><form className="mt-4 grid gap-4" onSubmit={e=>{e.preventDefault();if(!/^\d+(\.\d{1,2})?$/.test(amount))return;run(async()=>{const r=await addOfficeRate({workerId,kind,clientId:clientId||null,hourlyRateCents:Math.round(Number(amount)*100),effectiveFrom:from,agreementNote:note});if(r.ok){setAmount("");setNote("");}return r;});}}>
