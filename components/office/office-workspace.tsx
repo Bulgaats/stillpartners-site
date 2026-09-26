@@ -3,6 +3,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { addOfficeRate, saveOfficeContractor, saveOfficeWork, voidOfficeRate, type OfficeResult } from "@/app/actions/office";
 import { contactText, directory, effectiveRate, hoursAmountCents, type Contractor, type OfficeData, type OfficeEntry } from "@/lib/office/foundation";
+import { ContactImportReview } from './contact-import-review';
 
 const button="dashboard-button dashboard-button-primary";
 const secondary="dashboard-button dashboard-button-outline";
@@ -18,11 +19,12 @@ export function OfficeWorkspace({data,today,initialTab="daily"}:{data:OfficeData
   return <main className="dashboard-page"><div className="dashboard-shell">
     <header className="dashboard-hero bg-blue-950 text-white"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-widest text-orange-300">Still Partners</p><h1 className="mt-2 text-3xl font-black">Office Manager</h1><p className="mt-2 text-blue-100">Contractors, daily work and agreed rates</p></div><a className="rounded-lg border border-white/30 px-4 py-3 text-sm font-semibold" href="/operations">Existing operations</a></div></header>
     <div className="grid gap-3 sm:grid-cols-3">{[["Active contractors",data.contractors.filter(p=>p.active).length],["Work records",data.entries.length],["Actual hours in view",data.entries.reduce((n,e)=>n+e.actualHours,0).toFixed(2)]].map(([label,value])=><section className="dashboard-card" key={label}><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-3xl font-bold text-blue-950">{value}</p></section>)}</div>
-    <nav className="dashboard-tabs" aria-label="Office sections">{[["daily","Daily work"],["history","Work history"],...(data.finance?[["contacts","Contractors"],["rates","Agreed rates"]]:[])].map(([id,label])=><button key={id} type="button" onClick={()=>{setTab(id);setNotice(null);}} className={`dashboard-tab ${tab===id?"dashboard-tab-active":"dashboard-tab-idle"}`}>{label}</button>)}</nav>
+    <nav className="dashboard-tabs" aria-label="Office sections">{[["daily","Daily work"],["history","Work history"],...(data.finance?[["contacts","Contractors"],["imports",`Import review (${(data.contactImports??[]).filter(i=>i.status==='pending').length})`],["rates","Agreed rates"]]:[])].map(([id,label])=><button key={id} type="button" onClick={()=>{setTab(id);setNotice(null);}} className={`dashboard-tab ${tab===id?"dashboard-tab-active":"dashboard-tab-idle"}`}>{label}</button>)}</nav>
     {notice?<p role="status" className={`rounded-xl border p-4 ${notice.ok?"border-emerald-200 bg-emerald-50 text-emerald-900":"border-amber-300 bg-amber-50 text-amber-950"}`}>{notice.message}</p>:null}
     {tab==="daily"?<Daily data={data} today={today} pending={pending} run={run}/>:null}
     {tab==="history"?<History data={data}/>:null}
     {tab==="contacts" && data.finance?<Contacts data={data} pending={pending} run={run}/>:null}
+    {tab==="imports" && data.finance?<ContactImportReview items={data.contactImports??[]} people={data.contractors} pending={pending} run={run}/>:null}
     {tab==="rates" && data.finance?<Rates data={data} today={today} pending={pending} run={run}/>:null}
   </div></main>;
 }

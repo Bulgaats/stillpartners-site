@@ -14,3 +14,11 @@ Operations admins can read contractor names and location names, and save actual 
 The migrations are additive. Existing invoices, work records and the local Mac invoice assistant remain available. Apply migrations in chronological order only to an appropriately baselined database; do not replay historical migrations against an existing production database.
 
 Validation: production build including lint/type checks, 32 unit tests, and rollback-only database checks for contact edits, ABN validation, stale work updates, immutable rate history, audit records and operations/contractor access restrictions.
+
+## Contact import review
+
+Import review keeps source observations separate from confirmed directory contacts. Search by name, ABN, email or phone, compare original variants and open the Gmail source. Confirm a new contractor with a Regular or Occasional group, link to an existing contact without overwriting its details, or exclude a test/non-supplier source with a reason. Completed reviews and original observations are immutable and audited. An admin can edit the resulting directory contact separately.
+
+The private Mac export script scripts/office_contact_export.py reads a register and writes a metadata-only review file to a private path outside this repository. It excludes payment, bank and rate fields. Every unassigned document remains a separate observation. Uploading observations does not confirm identity, approve invoices, mark paid, invite users or verify GST registration. The review table is finance-admin only.
+
+Contact-review validation: 34 unit tests, two Python export tests, production build, and rollback-only database checks for create/link actions, source immutability, repeated submission and operations/anonymous access isolation.
