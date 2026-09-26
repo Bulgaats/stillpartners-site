@@ -173,7 +173,7 @@ export async function login(formData: FormData) {
     redirectReason: "authorized"
   });
 
-  redirect(authResult.role === "worker" ? "/contractor-invoice" : "/operations");
+  redirect(authResult.role === "worker" ? "/contractor-invoice" : "/office");
 }
 
 export async function loginWithGoogle() {

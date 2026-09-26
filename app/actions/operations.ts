@@ -141,6 +141,7 @@ export async function createOperationsClientAction(
     metadata: { name: parsed.data.name }
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return { ok: true, message: "Client created." };
 }
 
@@ -201,6 +202,7 @@ export async function createOperationsContractorAction(
     metadata: { fullName: parsed.data.fullName, trade: parsed.data.trade }
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return { ok: true, message: "Contractor added." };
 }
 
@@ -234,6 +236,7 @@ export async function setOperationsContractorActiveAction(
     entityTable: "workers"
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return {
     ok: true,
     message: parsed.data.isActive ? "Contractor reactivated." : "Contractor archived."
@@ -313,6 +316,7 @@ export async function createOperationsLocationAction(
     }
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return { ok: true, message: "Location added." };
 }
 
@@ -350,6 +354,7 @@ export async function setOperationsLocationStatusAction(
     entityTable: "jobs"
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return {
     ok: true,
     message: parsed.data.status === "active" ? "Location reactivated." : "Location completed."
@@ -462,6 +467,7 @@ export async function saveOperationsDailyRecordsAction(
     }
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return { ok: true, message: "Daily contractor records saved." };
 }
 
@@ -516,6 +522,7 @@ export async function generateOperationsClientInvoiceAction(
     }
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return {
     ok: true,
     message: `Invoice ${String(invoice.invoice_number)} created.`,
@@ -574,6 +581,7 @@ export async function inviteOperationsAdminAction(email: string): Promise<Operat
     metadata: { email: normalizedEmail, role: "operations_admin" }
   });
   revalidatePath("/operations");
+  revalidatePath("/office");
   return { ok: true, message: "Restricted operations invite sent." };
 }
 

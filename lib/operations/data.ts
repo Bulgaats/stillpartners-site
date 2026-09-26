@@ -6,11 +6,13 @@ import { type OperationsWorkspaceData } from "@/lib/operations/types";
 export async function getOperationsWorkspaceData({
   session,
   rangeStart,
-  rangeEnd
+  rangeEnd,
+  includeLegacyWork = true
 }: {
   session: SessionProfile;
   rangeStart: string;
   rangeEnd: string;
+  includeLegacyWork?: boolean;
 }): Promise<OperationsWorkspaceData> {
   if (!canAccessOperations(session.profile.role)) {
     throw new Error("Operations access required.");
@@ -38,17 +40,17 @@ export async function getOperationsWorkspaceData({
         .select("id, client_id, title, site_name, location, status, project_status")
         .not("client_id", "is", null)
         .order("site_name"),
-      supabase
+      includeLegacyWork ? supabase
         .from("workers")
         .select("id, full_name, email, phone, trade, is_active, account_enabled")
-        .order("full_name"),
-      supabase
+        .order("full_name") : Promise.resolve({ data: [], error: null }),
+      includeLegacyWork ? supabase
         .from("work_entries")
         .select("id, worker_id, job_id, work_date, hours, tonnes, approved, locked, updated_at")
         .gte("work_date", rangeStart)
         .lte("work_date", rangeEnd)
-        .order("work_date", { ascending: false }),
-      isFinanceAdmin
+        .order("work_date", { ascending: false }) : Promise.resolve({ data: [], error: null }),
+      isFinanceAdmin && includeLegacyWork
         ? supabase
             .from("client_worker_rates")
             .select("id, client_id, worker_id, rate_per_tonne")
