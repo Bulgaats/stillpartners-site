@@ -44,3 +44,13 @@ Generated client invoice PDFs are stored privately with the frozen preview. Orig
 A durable local journal is written before the sole Gmail send attempt. Gmail confirmation is recorded separately from queuing. An ambiguous timeout or crash becomes **unknown**, never an automatic resend; inspect Gmail Sent and resolve delivery before a replacement. Queued messages can be cancelled before sending starts. Queued, sent or uncertain mail blocks invoice cancellation. Sent invoice credits/correction handling needs owner review; it is not automated.
 
 Validation uses synthetic PDF/message fixtures and a mocked Gmail sender; no customer email is sent by tests. Live sending requires the owner consent step and a real reviewed invoice.
+
+## Company memory and work registry — 27 September 2026
+
+Stage 1 is implemented: Company → Company memory and Work inbox persist confirmed decisions and unfinished work independently of chat conversations. Finance admins can create/review records and inspect their version history. Every nonterminal work record requires a next action or waiting reason; closing requires an outcome/evidence note. Closure is owner-recorded, not independent proof of an external action.
+
+New assistant requests include a task-time snapshot of company memory and work items. Read-only retrieval tools can search and read them, and the assistant can prepare one memory/work proposal for owner confirmation. A new chat preserves access to these records. Superseded/future agreements must not be applied; agreed rates remain in Agreed rates. Saving a standing rule does not activate execution authority.
+
+Stable action IDs, transactional change events and optimistic versions prevent duplicate saves and stale overwrites. Completed assistant proposals remain proposals until applied_id is recorded. No email, bank transfer or invoice payment state is changed by saving these records. Hosted records remain accessible with the Mac off; model reasoning and local-source access still wait for the Mac. General issue detection, automatic follow-up and a standing-rule executor are not yet enabled.
+
+Verification: rollback database checks for replay, history, stale edits and closure evidence; anonymous/direct-write denial; six worker tests; phone/desktop synthetic UI checks; actual local Codex retrieval of memory and unfinished work from a new conversation; production build. No synthetic business records retained.
