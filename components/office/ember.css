@@ -105,3 +105,5 @@
 .office-record-history summary{cursor:pointer}
 .office-record-history>div{padding:12px;border-left:2px solid #614432;margin:12px 0}
 .office-record-history small{display:block;margin-top:5px}
+
+.office-main-nav{display:flex;justify-content:space-around}.office-main-nav button{flex:1;min-width:0}.office-main-nav .office-assistant-tab svg{color:var(--accent)}.office-home-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 30px}.office-home-actions button{text-align:left;border:1px solid var(--line);background:var(--panel);padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;min-width:0}.office-home-actions svg{color:var(--accent)}.office-home-actions strong{font-size:14px}.office-home-actions small{font-size:12px;line-height:1.5}.office-count{display:inline-block;border-radius:20px;background:#493021;color:#ffbc92;padding:2px 7px;font-size:12px}@media(max-width:600px){.office-main-nav button{font-size:10px;padding:9px 3px}.office-home-actions button{padding:14px}.office-home-actions strong{font-size:13px}}

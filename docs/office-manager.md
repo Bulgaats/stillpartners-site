@@ -54,3 +54,11 @@ New assistant requests include a task-time snapshot of company memory and work i
 Stable action IDs, transactional change events and optimistic versions prevent duplicate saves and stale overwrites. Completed assistant proposals remain proposals until applied_id is recorded. No email, bank transfer or invoice payment state is changed by saving these records. Hosted records remain accessible with the Mac off; model reasoning and local-source access still wait for the Mac. General issue detection, automatic follow-up and a standing-rule executor are not yet enabled.
 
 Verification: rollback database checks for replay, history, stale edits and closure evidence; anonymous/direct-write denial; six worker tests; phone/desktop synthetic UI checks; actual local Codex retrieval of memory and unfinished work from a new conversation; production build. No synthetic business records retained.
+
+## Mobile navigation — 27 September 2026
+
+Owner-approved layout: Today is the default landing screen. Finance users have Today, Sites, Assistant, Money and Company in the bottom navigation; operational users retain only their permitted operational sections. Today links directly to contact reviews, contractor payments, client invoice review and Work inbox, and lists active sites (not a claimed schedule). Sites holds daily entry, work history and site management. Money holds contractor invoice/payment records, client invoices and agreed rates. Company holds contacts, clients/access, work and memory. Assistant links route to these destinations.
+
+Daily-entry state remains mounted across tab changes, preserving unsaved hours. Existing invoice/history entry links still select their corresponding screen. No payment, approval, database, source-file or email policy changes are included. Documents/global search/contextual AI are not added by this navigation release.
+
+Verified with phone and desktop synthetic browser flows: five tabs, source-to-destination links, contact reviews, client/contractor invoice separation and unsaved work retention. Production build required before release.
