@@ -4,6 +4,10 @@ Mobile-first PWA for Still Partners Pty Ltd, a Perth construction subcontract
 services company supporting commercial projects with reinforcement scope delivery,
 project administration, and completion records.
 
+## Office Manager direction
+
+The owner-approved goal, current capability gaps, proactive workflow plan and delivery gates are in [Office Manager direction](docs/OFFICE_MANAGER_DIRECTION.md).
+
 ## Stack
 
 - Next.js 15 App Router

@@ -1,12 +1,14 @@
 # Still Partners Office Manager
 
+Product direction and delivery priorities: [Office Manager direction](OFFICE_MANAGER_DIRECTION.md). Planned monitoring and cross-chat memory are distinguished there from implemented behaviour.
+
 Open https://www.stillpartners.net/office with the finance admin account. On iPhone use Safari, Share, Add to Home Screen. Operations admins retain the site/day work tools; financial records and Assistant are finance-admin only.
 
 ## Current workflows
 
 - Today: choose the site, add contractors, enter actual hours. Finance can separately record contractor payable and client billable hours with an agreement note.
 - Company: contractor directory, client/site records, effective-dated agreed rates, work history, incoming invoice metadata and client invoice drafts.
-- Assistant: answers from the request-time company snapshot; prepares reviewed client, contractor, site and client invoice proposals. A fresh-invoice request invokes only the fixed read-only Gmail importer. The model has no shell, browser, email-send, file or database tools.
+- Assistant: separate persisted conversations and a fixed composer; company-record retrieval, selected verified source text, invoice reconciliation and ABN lookup. It prepares client/site/invoice proposals and single or batch contractor registrations. A fresh-invoice request invokes the fixed Gmail importer. The model has bounded read-only company tools, not arbitrary shell, file, email-send or database access. Durable cross-chat decision memory and proactive case detection remain planned.
 - Check latest invoices: queued Gmail import on the Mac, all result pages, existing 14-day overlap and local originals. Self-addressed invoice mail is included. Review warnings are retained; this is not a guarantee that every unreadable attachment was extracted.
 - Invoice reconciliation: exact full-name and supplier-ABN match, valid work period, effective contractor rates, payable hours, explicit GST and overlapping-source checks. A calculation match does not verify completeness of time records or confirm payment.
 - Client drafts: recorded client billable hours, client-specific office rates, owner-selected dates/GST; no spreadsheet/legacy tonne rates. Review and approve freezes the source and locks work against duplicate invoicing. Repeated submissions are idempotent. Rates are entered excluding GST.
@@ -22,7 +24,7 @@ Credentials stay outside the repository in the user's Application Support direct
 
 ## Remaining dependencies
 
-Gmail is currently authorised for read-only access. Sending client invoices or greetings is not enabled. It requires a reviewed outgoing-message workflow and separate Google sending consent. Missing client rates, incomplete time records, unknown GST and unresolved supplier identities must be supplied/reviewed before reliable invoice matching or real invoice issuance. Historical paid totals require actual dated payment evidence.
+The reviewed client-invoice email workflow and authorised Mac sender are installed. Each outgoing message requires explicit approval. General correspondence ingestion, greetings and standing sending rules are not implemented. Missing client rates, incomplete time records, unknown GST and unresolved supplier identities must be supplied/reviewed before reliable invoice matching or real invoice issuance. Historical paid totals require actual dated payment evidence.
 
 ## Validation
 
