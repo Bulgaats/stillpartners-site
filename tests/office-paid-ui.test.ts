@@ -10,20 +10,20 @@ const props={document,digest:'a'.repeat(64),events:[],today:'2026-09-27',receipt
 describe('Payment controls rendered for the owner',()=>{
  it('shows amount/date and direct Paid without a separate Approve or checkbox',()=>{
   const html=renderToStaticMarkup(createElement(InvoicePaymentControls,{...props,readiness:{status:'ready',issues:[]}}));
-  expect(html).toContain('>Paid</button>');expect(html).toContain('>Review</button>');expect(html).toContain('value="120.00"');expect(html).toContain('2026-09-27');
+  expect(html).toContain('>Mark as paid</button>');expect(html).toContain('>Review</button>');expect(html).toContain('value="120.00"');expect(html).toContain('2026-09-27');
   expect(html).not.toContain('Approve invoice');expect(html).not.toContain('type="checkbox"');
   expect(html).toContain('Amount paid (AUD)');expect(html).toContain('Actual payment date');
  });
  it('keeps Review separate and Paid enabled with optional comments despite warnings',()=>{
   const html=renderToStaticMarkup(createElement(InvoicePaymentControls,{...props,readiness:{status:'review',issues:['Revised invoice number']}}));
-  expect(html).toContain('>Review</button>');expect(html).toContain('class="ember-primary">Paid</button>');expect(html).toContain('Add comments');expect(html).not.toContain('Review &amp; mark paid');expect(html).not.toContain('Resolution / why payment is correct');expect(html).not.toContain(' required');
+  expect(html).toContain('>Review</button>');expect(html).toContain('class="ember-primary">Mark as paid</button>');expect(html).toContain('Add comments');expect(html).not.toContain('Review &amp; mark paid');expect(html).not.toContain('Resolution / why payment is correct');expect(html).not.toContain(' required');
  });
  it('does not offer a payment action for a duplicate or invalid source',()=>{
   const html=renderToStaticMarkup(createElement(InvoicePaymentControls,{...props,readiness:{status:'blocked',issues:['Duplicate source']}}));
-  expect(html).toContain('Source needs correction');expect(html).not.toContain('>Paid</button>');expect(html).not.toContain('Amount paid (AUD)');
+  expect(html).toContain('Source needs correction');expect(html).not.toContain('>Mark as paid</button>');expect(html).not.toContain('Amount paid (AUD)');
  });
  it('hides payment entry when the remaining balance is zero',()=>{
   const html=renderToStaticMarkup(createElement(InvoicePaymentControls,{...props,document:{...document,paidCents:12000},readiness:{status:'ready',issues:[]}}));
-  expect(html).toContain('<strong>Paid</strong>');expect(html).not.toContain('Amount paid (AUD)');
+  expect(html).toContain('<strong>Paid</strong>');expect(html).toContain('class="office-paid-complete" disabled="">Paid ✓</button>');expect(html).not.toContain('Mark as paid');expect(html).not.toContain('Amount paid (AUD)');
  });
 });
