@@ -13,7 +13,7 @@ export type OfficeEntry = {
   locked: boolean; updatedAt: string;
 };
 export type OfficeData = {
-  finance: boolean; from: string; to: string;
+  finance: boolean; from: string; to: string; viewerId?:string;
   contractors: Contractor[];
   clients: {id: string; name: string; active: boolean}[];
   projects: {id: string; clientId: string; name: string; active: boolean}[];

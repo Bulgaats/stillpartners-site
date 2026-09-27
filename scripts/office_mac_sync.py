@@ -1,5 +1,5 @@
 """Scoped Office/Mac sync. Install beside engine.py; credentials remain on this Mac."""
-import argparse,fcntl,hashlib,json,os,pathlib,sys,urllib.request,urllib.error
+import argparse,fcntl,hashlib,json,os,pathlib,sys,urllib.request,urllib.error,time,socket,ssl
 import datetime as dt
 from decimal import Decimal
 
@@ -47,12 +47,42 @@ def apply_event(engine,event):
     else:file_state='reversed' if kind=='void' else 'partial' if status=='Part-paid' else 'reviewed'
     return {'event_id':event_id,'status':'applied','file_state':file_state,'message':'Mac register and source file verified'}
 
-def exchange(config,request):
+def exchange(config,request,attempts=3):
     url=config['url']
     if url!='https://wafebkzjotnyfqeloieo.supabase.co':raise ValueError('Unexpected Office server')
     data=json.dumps({'p_token':config['token'],'p_request':request},ensure_ascii=False,allow_nan=False).encode()
-    req=urllib.request.Request(url+'/rest/v1/rpc/office_mac_exchange',data=data,headers={'Content-Type':'application/json','apikey':config['anon_key'],'Authorization':'Bearer '+config['anon_key']})
-    with urllib.request.urlopen(req,timeout=30) as response:return json.load(response)
+    for attempt in range(attempts):
+        req=urllib.request.Request(url+'/rest/v1/rpc/office_mac_exchange',data=data,headers={'Content-Type':'application/json','apikey':config['anon_key'],'Authorization':'Bearer '+config['anon_key']})
+        try:
+            with urllib.request.urlopen(req,timeout=30) as response:return json.load(response)
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (408,429,500,502,503,504) or attempt+1==attempts:raise
+        except (urllib.error.URLError,TimeoutError,ConnectionError):
+            if attempt+1==attempts:raise
+        time.sleep((1,3)[min(attempt,1)])
+
+
+def write_status(root,result):
+    target=root/'Reports/office_sync_status.json';target.parent.mkdir(exist_ok=True)
+    try:prior=json.loads(target.read_text())
+    except (OSError,ValueError):prior={}
+    result['last_success_at']=result.get('finished_at') if result['status']=='ok' else prior.get('last_success_at') or (prior.get('finished_at') if prior.get('status')=='ok' else None)
+    temp=target.with_suffix('.tmp');temp.write_text(json.dumps(result));os.chmod(temp,0o600);os.replace(temp,target)
+    return result
+
+
+def safe_error(exc):
+    cause=getattr(exc,'reason',exc)
+    if isinstance(exc,urllib.error.HTTPError):return 'HTTP_'+str(exc.code)
+    if isinstance(cause,ssl.SSLError):return 'TLS_ERROR'
+    if isinstance(cause,socket.gaierror):return 'DNS_ERROR'
+    if isinstance(cause,(TimeoutError,socket.timeout)):return 'NETWORK_TIMEOUT'
+    return type(exc).__name__
+
+
+def publish_health(config,result):
+    try:exchange(config,{'action':'health','health':result},attempts=1)
+    except (OSError,ValueError):pass # Local failure state remains durable if server is unreachable.
 
 def sync(root,config_path):
     sys.path.insert(0,str(root));import engine
@@ -61,6 +91,11 @@ def sync(root,config_path):
     with (root/'data/office-sync.lock').open('a') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:return {'status':'already_running'}
+        return sync_locked(root,config,engine,export_snapshot)
+
+def sync_locked(root,config,engine,export_snapshot):
+    stage='pull';started=dt.datetime.now(dt.timezone.utc).isoformat()
+    try:
         response=exchange(config,{'action':'pull'});receipts=[]
         for event in response['events']:
             try:receipt=apply_event(engine,event)
@@ -69,11 +104,28 @@ def sync(root,config_path):
                 safe=str(exc) if isinstance(exc,ValueError) and not any(x in str(exc) for x in ['/Users/','/private/','/var/']) else 'Mac processing could not complete; review locally'
                 receipt={'event_id':event['id'],'status':'blocked','file_state':'blocked','message':safe[:300]}
             receipts.append(receipt)
+        stage='archive'
+        from office_history import apply_history
+        policy_path=root/'data/office_history_policy.json'
+        archived=apply_history(engine,json.loads(policy_path.read_text())) if policy_path.exists() else {'closed':0,'file_errors':0}
+        stage='commit'
         snapshot=json.loads(export_snapshot(root).read_text())
         exchange(config,{'action':'commit','snapshot':snapshot,'receipts':receipts})
-        result={'status':'ok','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'documents':len(snapshot['documents']),'applied':sum(r['status']=='applied' for r in receipts),'blocked':sum(r['status']=='blocked' for r in receipts)}
-        target=root/'Reports/office_sync_status.json';temp=target.with_suffix('.tmp');temp.write_text(json.dumps(result));os.chmod(temp,0o600);os.replace(temp,target)
+        result={'status':'ok','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'documents':len(snapshot['documents']),'applied':sum(r['status']=='applied' for r in receipts),'blocked':sum(r['status']=='blocked' for r in receipts),'archive_errors':archived['file_errors'],'last_attempt_at':started,'stage':'complete'}
+        stage='backup'
+        backup_policy=root/'data/office_backup_policy.json'
+        if backup_policy.exists():
+            from office_backup import daily_backup
+            try:
+                cloud=exchange(config,{'action':'backup'});cloud_path=root/'data/office_cloud_backup.json';cloud_temp=cloud_path.with_suffix('.tmp');cloud_temp.write_text(json.dumps(cloud));os.chmod(cloud_temp,0o600);os.replace(cloud_temp,cloud_path)
+                backup=daily_backup(root,json.loads(backup_policy.read_text()));result['backup_at']=backup['created_at'];result['backup_off_device']=backup['off_device']
+            except (OSError,ValueError):result['backup_error']=True
+        result=write_status(root,result);publish_health(config,result)
         return result
+    except Exception as exc:
+        result=write_status(root,{'status':'error','last_attempt_at':started,'stage':stage,'error_type':safe_error(exc),'message':'Synchronization could not finish. Retrying is safe; original files and payment records are preserved.'})
+        publish_health(config,result)
+        raise
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--root',type=pathlib.Path,default=pathlib.Path(__file__).resolve().parent);parser.add_argument('--config',type=pathlib.Path,default=pathlib.Path.home()/'Library/Application Support/Still Partners/office-device.json');args=parser.parse_args()

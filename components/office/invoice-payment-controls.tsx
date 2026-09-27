@@ -15,13 +15,13 @@ export function InvoicePaymentControls({document:d,digest,events,today,receipts,
  const [target,setTarget]=useState<string|null>(null),[correction,setCorrection]=useState('');
  const reviewId=useId();
  const request=useRef<{key:string;id:string;reviewId:string}|null>(null),sending=useRef(false);
- const remaining=Math.max(0,(d.amountCents??0)-state.paid),amount=amountEdit??(remaining/100).toFixed(2);
+ const remaining=state.historical?0:Math.max(0,(d.amountCents??0)-state.paid),amount=amountEdit??(remaining/100).toFixed(2);
  const cents=/^\d+(\.\d{1,2})?$/.test(amount)?Math.round(Number(amount)*100):0;
  const valid=cents>0&&cents<=remaining&&day.length===10&&day<=today;
  const mine=effectiveEvents.filter(e=>e.document_id===d.id),localReceipts=receipts.filter(r=>mine.some(e=>e.id===r.event_id));
  useEffect(()=>{setAmount(null);setReview(false);setComments('');},[state.paid,digest]);
  function markPaid(){
-  if(sending.current||!valid||readiness.status==='blocked')return;
+  if(state.historical||sending.current||!valid||readiness.status==='blocked')return;
   const details={documentId:d.id,digest,amount:cents,day,expectedPaid:state.paid,reference,reviewNote:comments};
   const key=JSON.stringify(details);
   if(request.current?.key!==key)request.current={key,id:crypto.randomUUID(),reviewId:crypto.randomUUID()};
@@ -35,6 +35,7 @@ export function InvoicePaymentControls({document:d,digest,events,today,receipts,
   const key=JSON.stringify(value);if(request.current?.key!==key)request.current={key,id:crypto.randomUUID(),reviewId:crypto.randomUUID()};
   sending.current=true;start(async()=>{try{const result=await recordOfficeInvoiceEvent({...value,id:request.current!.id});setNotice(result.message);if(result.ok){setTarget(null);router.refresh();}}catch{setNotice('Could not confirm correction. Retry the same details.');}finally{sending.current=false;}});
  }
+ if(state.historical)return <div className="office-paid-controls"><button className="office-paid-complete" disabled>{state.historical.kind==='settled'?'Paid ✓ · Historical':'Archived source'}</button><p className="ember-footnote">Owner confirmed accounts settled through {state.historical.cutoff}. No historical payment date or amount was invented.</p><details><summary>Archive details</summary><p>Basis: {state.historical.basis==='work_period'?'Work period ended':'Received before cutoff'} {state.historical.basis_date}</p><p>Confirmed: {state.historical.confirmed_at.slice(0,10)}</p><p>{state.historical.file_verified_at?'Original and archive copy verified.':'File verification pending.'}</p>{state.paid>0&&<p>Separately recorded payments: {aud(state.paid)}</p>}</details></div>;
  return <div className="office-paid-controls">
  <p><strong>{state.status==='Unknown'?'Payment not confirmed':state.status}</strong> · Recorded {aud(state.paid)}{d.amountCents!==null&&<> · Remaining {aud(remaining)}</>}</p>
  {state.status!=='Paid'&&readiness.status==='blocked'&&<div className="ember-notice"><strong>Source needs correction</strong><ul>{readiness.issues.map(x=><li key={x}>{x}</li>)}</ul></div>}

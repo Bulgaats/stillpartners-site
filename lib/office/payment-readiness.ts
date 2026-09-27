@@ -6,6 +6,7 @@ import {reconcileInvoice} from './reconciliation';
 export type PaymentReadiness={status:'ready'|'review'|'blocked';issues:string[]};
 export function paymentSourceIssues(d:InvoiceSnapshot['documents'][number]):string[]{
  const blocked:string[]=[];
+ if(d.historicalClosure&&d.historicalClosure.source_hash===d.sourceHash)blocked.push('Historical archive is closed by the owner. Reopen it explicitly before adding a payment.');
  if(d.recordType!=='invoice')blocked.push('This is not a contractor invoice.');
  if(d.duplicateOf)blocked.push('Use the original invoice; this document is a duplicate.');
  if(d.currency!=='AUD'||d.amountCents===null||d.amountCents<=0)blocked.push('A positive AUD invoice amount is required.');
