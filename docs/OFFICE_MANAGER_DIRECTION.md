@@ -128,3 +128,5 @@ Stage 1 implementation status (27 September 2026): company memory, work records,
 ## Owner priority update — 27 September 2026
 
 The phone is the primary daily control surface; the Mac is used occasionally. Owner-approved direction: cloud AI and live company email reads should work with the Mac off; hosted financial records are authoritative for phone actions; Mac reconnect later downloads missing Gmail sources and files originals/paid copies without replaying payments. Implement this cloud transition before general proactive detectors. CLOUD_EXECUTION.md distinguishes prepared code, activation gates and unfinished cloud ingestion/catch-up work.
+
+Current owner choice: hybrid operation without activating paid cloud AI. Prioritise phone record entry, direct Paid for clean invoices, exception-only review and per-payrun work summaries. Mac reasoning/import/filing remains the current execution path; independent no-AI cloud Gmail ingestion still requires a separate enabled mailbox and implementation.

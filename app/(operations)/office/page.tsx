@@ -11,16 +11,17 @@ import { canAccessOperations } from "@/lib/auth/roles";
 import { getPerthIsoDate,addIsoDays } from "@/lib/operations/dates";
 import { getOperationsWorkspaceData } from "@/lib/operations/data";
 import { officeData } from "@/lib/office/data";
+import {payrunPeriod} from "@/lib/office/payrun";
 import { validDate } from "@/lib/office/foundation";
 import { OfficeWorkspace } from "@/components/office/office-workspace";
 
 export const dynamic="force-dynamic";
-export default async function OfficePage({searchParams}:{searchParams?:Promise<{from?:string;to?:string;view?:string}>}) {
+export default async function OfficePage({searchParams}:{searchParams?:Promise<{from?:string;to?:string;view?:string;payday?:string}>}) {
   const session=await getSessionProfile();
   if(!session || !canAccessOperations(session.profile.role))redirect("/login");
-  const params=await searchParams;const today=getPerthIsoDate();
-  const a=params?.from && validDate(params.from)?params.from:addIsoDays(today,-27);
-  const b=params?.to && validDate(params.to)?params.to:today;
+  const params=await searchParams;const today=getPerthIsoDate();const cycle=params?.payday?payrunPeriod(params.payday):null;
+  const a=params?.from && validDate(params.from)?params.from:cycle?.from??addIsoDays(today,-27);
+  const b=params?.to && validDate(params.to)?params.to:cycle?.to??today;
   const data=await officeData(session.profile.role==="admin",a<b?a:b,a<b?b:a);
   const existing=await getOperationsWorkspaceData({session,rangeStart:data.from,rangeEnd:data.to,includeLegacyWork:false});
   const management={clients:existing.clients,projects:existing.projects,clientInvoices:existing.clientInvoices,isFinanceAdmin:existing.isFinanceAdmin};

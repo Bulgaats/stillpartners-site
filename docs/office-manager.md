@@ -66,3 +66,17 @@ Verified with phone and desktop synthetic browser flows: five tabs, source-to-de
 ## Cloud transition — 27 September 2026
 
 See CLOUD_EXECUTION.md. Read-only hosted AI/Gmail execution is implemented behind explicit environment activation and separate Google web OAuth consent. Local API credentials were not present during preparation, and live providers have not been validated. The default remains Mac execution. Cloud register ingestion, local catch-up for newly discovered cloud invoices, unattended monitoring and cloud sending remain next stages. Do not report them as completed.
+
+## Direct Paid and payment-day work summary — 27 September 2026
+
+Money → Contractor invoices defaults to Payment period. Payday follows the owner's fortnightly Friday cycle anchored on 25 September 2026. Two complete Monday–Sunday work weeks end five days before payday (7–20 September for 25 September). This is a planning filter, never evidence of payment. All dates / one-off work remains available, including unknown periods. Late invoices are grouped by work period rather than arrival date.
+
+Work summary shows each person’s recorded dates, client/site, actual hours and contractor-payable hours without money or rates. It includes recorded workers even when no matching invoice exists. It identifies unloaded periods and missing records; it does not fabricate hours, assign an ambiguous supplier or certify attendance completeness.
+
+For positive, nonduplicate AUD invoices with valid supplier details, existing source approval or a clean current calculation allows a direct Paid button. The visible amount and actual date are the owner’s payment confirmation; both are editable for partial/past payments. No separate Approve form or mandatory bank-reference checkbox is needed. Unreviewed source flags, missing records/rates, identity mismatches and calculation differences open one combined exception-review/payment step. Invalid ABNs, duplicates and noninvoice/zero documents remain blocked for source correction. A prior approval applies under the existing source-version rules; official ABN ownership is still a separate check.
+
+The server reloads source, payment history and work records. An atomic authenticated finance-only RPC records the required approval audit event and payment together, retaining Mac compatibility. Stable IDs, source digest, expected balance and existing amount/date checks guard retries, stale tabs and overpayments. Review precedes payment in Mac sync order. Payment state is online immediately; original/Paid file verification remains a later Mac receipt.
+
+Verified: 22 calculation/payment/payrun unit tests, rendered payment-control checks, rollback database checks for atomic failure, retries, source/balance changes, split payments and denied roles; production build. No real payment was made or marked by verification. Authenticated owner-screen visual validation is separate.
+
+Hybrid operation remains the current default: hosted record editing/payment recording/summary uses no AI API; Mac Codex handles Bobby and Gmail imports while awake. Cloud AI stays inactive. Independent hosted Gmail collection and catch-up for cloud-discovered invoices are not activated by this payment release.
