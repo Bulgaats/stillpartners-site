@@ -8,7 +8,7 @@ Open https://www.stillpartners.net/office with the finance admin account. On iPh
 
 - Today: choose the site, add contractors, enter actual hours. Finance can separately record contractor payable and client billable hours with an agreement note.
 - Company: contractor directory, client/site records, effective-dated agreed rates, work history, incoming invoice metadata and client invoice drafts.
-- Assistant: separate persisted conversations and a fixed composer; company-record retrieval, selected verified source text, invoice reconciliation and ABN lookup. It prepares client/site/invoice proposals and single or batch contractor registrations. A fresh-invoice request invokes the fixed Gmail importer. The model has bounded read-only company tools, not arbitrary shell, file, email-send or database access. Durable cross-chat decision memory and proactive case detection remain planned.
+- Assistant: separate persisted conversations and a fixed composer; company-record retrieval, selected verified source text, invoice reconciliation and ABN lookup. It prepares client/site/invoice proposals and single or batch contractor registrations. A fresh-invoice request invokes the fixed Gmail importer. The model has bounded read-only company tools, not arbitrary shell, file, email-send or database access. Durable cross-chat memory is available; the first four deterministic detectors are described below.
 - Check latest invoices: queued Gmail import on the Mac, all result pages, existing 14-day overlap and local originals. Self-addressed invoice mail is included. Review warnings are retained; this is not a guarantee that every unreadable attachment was extracted.
 - Invoice reconciliation: exact full-name and supplier-ABN match, valid work period, effective contractor rates, payable hours, explicit GST and overlapping-source checks. A calculation match does not verify completeness of time records or confirm payment.
 - Client drafts: recorded client billable hours, client-specific office rates, owner-selected dates/GST; no spreadsheet/legacy tonne rates. Review and approve freezes the source and locks work against duplicate invoicing. Repeated submissions are idempotent. Rates are entered excluding GST.
@@ -37,7 +37,7 @@ GST rounding reference: https://www.ato.gov.au/businesses-and-organisations/gst-
 
 After approving a client invoice, open **Email invoice · review & send**. Prepare a preview, inspect its saved recipient, subject, message and both exact PDFs, then use **Approve & send**. Changing a client billing email before sending starts blocks the queued message for a fresh review. Each outgoing message is approved individually. The assistant cannot approve or send an email by itself.
 
-The scoped Mac mail worker runs each minute while awake and online. Run `scripts/install_office_mail_schedule.py <invoice-assistant-folder>` to install. The owner then runs `ENABLE_GMAIL_SEND.command` in the assistant folder and grants Gmail read/send access to the correct work account. Existing login is preserved until verification succeeds; tokens stay in macOS Application Support, outside Git. Read-only Gmail imports preserve granted scopes.
+The scoped Mac mail worker runs each minute while awake and online. The resident coordinator schedules this worker; use `scripts/install_office_runtime.py <invoice-assistant-folder>` for the current scheduling setup. Legacy interval installers refuse to create competing timers. The owner then runs `ENABLE_GMAIL_SEND.command` in the assistant folder and grants Gmail read/send access to the correct work account. Existing login is preserved until verification succeeds; tokens stay in macOS Application Support, outside Git. Read-only Gmail imports preserve granted scopes.
 
 Generated client invoice PDFs are stored privately with the frozen preview. Original subcontractor files stay on Mac. Approved outgoing files and MIME messages are saved under `Client_Invoices/<client>/<invoice>/Prepared`, with confirmed deliveries copied to `Sent`. Phone approvals wait for the Mac if offline.
 
@@ -51,7 +51,7 @@ Stage 1 is implemented: Company → Company memory and Work inbox persist confir
 
 New assistant requests include a task-time snapshot of company memory and work items. Read-only retrieval tools can search and read them, and the assistant can prepare one memory/work proposal for owner confirmation. A new chat preserves access to these records. Superseded/future agreements must not be applied; agreed rates remain in Agreed rates. Saving a standing rule does not activate execution authority.
 
-Stable action IDs, transactional change events and optimistic versions prevent duplicate saves and stale overwrites. Completed assistant proposals remain proposals until applied_id is recorded. No email, bank transfer or invoice payment state is changed by saving these records. Hosted records remain accessible with the Mac off; model reasoning and local-source access still wait for the Mac. General issue detection, automatic follow-up and a standing-rule executor are not yet enabled.
+Stable action IDs, transactional change events and optimistic versions prevent duplicate saves and stale overwrites. Completed assistant proposals remain proposals until applied_id is recorded. No email, bank transfer or invoice payment state is changed by saving these records. Hosted records remain accessible with the Mac off; model reasoning and local-source access still wait for the Mac. The four detectors below are implemented. General correspondence follow-up and a standing-rule executor are not yet enabled.
 
 Verification: rollback database checks for replay, history, stale edits and closure evidence; anonymous/direct-write denial; six worker tests; phone/desktop synthetic UI checks; actual local Codex retrieval of memory and unfinished work from a new conversation; production build. No synthetic business records retained.
 
@@ -65,7 +65,7 @@ Verified with phone and desktop synthetic browser flows: five tabs, source-to-de
 
 ## Cloud transition — 27 September 2026
 
-See CLOUD_EXECUTION.md. Read-only hosted AI/Gmail execution is implemented behind explicit environment activation and separate Google web OAuth consent. Local API credentials were not present during preparation, and live providers have not been validated. The default remains Mac execution. Cloud register ingestion, local catch-up for newly discovered cloud invoices, unattended monitoring and cloud sending remain next stages. Do not report them as completed.
+See CLOUD_EXECUTION.md. Read-only hosted AI/Gmail execution is implemented behind explicit environment activation and separate Google web OAuth consent. Local API credentials were not present during preparation, and live providers have not been validated. The default remains Mac execution. Cloud register ingestion, local catch-up for newly discovered cloud invoices, general unattended cloud monitoring and cloud sending remain next stages. Do not report them as completed.
 
 ## Direct Paid and payment-day work summary — 27 September 2026
 
@@ -82,3 +82,22 @@ Verified: 22 calculation/payment/payrun unit tests, rendered payment-control che
 Hybrid operation remains the current default: hosted record editing/payment recording/summary uses no AI API; Mac Codex handles Bobby and Gmail imports while awake. Cloud AI stays inactive. Independent hosted Gmail collection and catch-up for cloud-discovered invoices are not activated by this payment release.
 
 Payment-list refinement (27 September 2026): To pay is the default; Paid invoices is a separate section. The action is Mark as paid; acknowledged full payments immediately leave To pay and display a green, disabled Paid ✓ control. Partial payments remain in To pay with their remaining balance. Pending response receipts are merged by event ID until fresh server/Mac data arrives, so a delayed refresh cannot reopen the full-payment action or count it twice. Optional Review/comments and source/role/date/balance checks are unchanged.
+
+
+## Resident runtime and first proactive checks — 27 September 2026
+
+The three short interval launch agents are replaced by one resident `net.stillpartners.office-runtime` coordinator. It starts the existing scoped assistant, approved-mail and sync workers 30/60/300 seconds after the preceding run finishes. An in-flight job is never overlapped or force-restarted; other jobs continue when one fails. Wall-clock catch-up runs once after sleep, without a backlog storm. Existing locks, task leases, mail journals and payment event IDs remain authoritative. `Reports/office_runtime_status.json` records the coordinator heartbeat and process outcomes; business outcomes remain in each worker's report.
+
+The Mac's GUI launch domain was deferring interval spawns while awake. Installation explicitly starts the resident job. A login launch agent and KeepAlive are configured, but OS-level deferral, logout, restart and lost connectivity can still interrupt work; check heartbeat/worker reports rather than promising uninterrupted execution. The installer preserves old scripts/plists and refuses to interrupt running jobs. Weekly Gmail import is unchanged. Do not reinstall legacy timers alongside the coordinator.
+
+Company → Work inbox now has Check now and Pause/Resume checks. While enabled, the database checks saved records after authenticated Mac health publication and when a finance admin opens/checks the Work inbox. It runs on the server using current saved metadata even when opened from a phone with the Mac off. There is no independent cron or live general-Gmail search.
+
+Current rules:
+- Source warnings, missing work period or unlinked supplier on active imported invoices. Historical source-matched closures and fully paid invoices are excluded.
+- Missing effective contractor/client rates on positive recorded work from the configured new-work date. Production starts 28 September 2026; historical attendance is not re-audited. Contractor base/client exceptions remain distinct from client billing rates.
+- Blocked Mac filing receipts, explicitly without repeating payment.
+- Unknown/blocked/failed approved client invoice mail delivery. Unknown delivery is never resent by this detector.
+
+Stable issue keys and evidence hashes prevent repeated polling from creating duplicate cases/history. Source changes update the same case. Automatic resolution closes only untouched cases; owner notes, next actions and edited follow-ups survive. An unchanged closed case stays closed; material new evidence reopens it. Case history distinguishes automatic observations. A cleared condition does not claim that Bobby made a payment, sent mail, verified attendance or completed another external action.
+
+These are the first four checks, not full automatic invoice/time matching, missing-attendance detection, all-company email ingestion, overdue client debt collection or document-expiry tracking. Those require complete source coverage and explicit expectations/standing rules. Today also flags stale Mac sync after 15 minutes; a fresh sync still does not prove fresh Gmail coverage.

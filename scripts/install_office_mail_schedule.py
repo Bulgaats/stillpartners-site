@@ -3,6 +3,7 @@ import datetime as dt,os,pathlib,plistlib,shutil,subprocess,sys
 LABEL='net.stillpartners.office-mail'
 def install(root):
  if sys.platform!='darwin':raise RuntimeError('macOS required')
+ if (pathlib.Path.home()/'Library/LaunchAgents/net.stillpartners.office-runtime.plist').exists():raise RuntimeError('Resident Office runtime is installed. Do not reinstall a competing interval timer; update the scoped worker and keep the existing runtime.')
  root=pathlib.Path(root).resolve();source=pathlib.Path(__file__).resolve().parent
  gmail=root/'gmail_sync.py';text=gmail.read_text();old="Credentials.from_authorized_user_file(str(TOKEN),SCOPES)";new="Credentials.from_authorized_user_file(str(TOKEN))"
  if old in text:

@@ -2,3 +2,10 @@ export type MacReceipt={event_id:string;status:'applied'|'blocked';file_state:st
 export type MacHealth={status:'ok'|'error';last_attempt_at:string;last_success_at:string|null;stage:string|null;error_type:string|null;blocked:number;archive_errors:number;backup_error?:boolean;backup_at?:string|null;backup_off_device?:boolean};
 export type MacDevice={id:string;name:string;last_seen:string|null;revoked:boolean;health?:MacHealth|null};
 export type MacSync={receipts:MacReceipt[];devices:MacDevice[]};
+
+export function macSyncFreshness(sync:MacSync,now:number){
+ const active=sync.devices.filter(d=>!d.revoked);
+ const successes=active.map(d=>Date.parse(d.health?.last_success_at??'')).filter(Number.isFinite);
+ const latest=successes.length?Math.max(...successes):null;
+ return {linked:active.length>0,lastSuccess:latest,stale:latest===null||now-latest>15*60*1000};
+}

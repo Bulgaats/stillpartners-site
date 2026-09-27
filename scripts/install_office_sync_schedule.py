@@ -3,6 +3,7 @@ import os,pathlib,plistlib,subprocess,sys
 LABEL='net.stillpartners.office-sync'
 def install(root):
  if sys.platform!='darwin':raise RuntimeError('macOS required')
+ if (pathlib.Path.home()/'Library/LaunchAgents/net.stillpartners.office-runtime.plist').exists():raise RuntimeError('Resident Office runtime is installed. Do not reinstall a competing interval timer; update the scoped worker and keep the existing runtime.')
  root=pathlib.Path(root).resolve();agents=pathlib.Path.home()/'Library/LaunchAgents';agents.mkdir(parents=True,exist_ok=True);logs=root/'Logs';logs.mkdir(exist_ok=True)
  path=agents/(LABEL+'.plist');domain='gui/'+str(os.getuid())
  job={'Label':LABEL,'ProgramArguments':[str(root/'.venv/bin/python'),str(root/'office_mac_sync.py')],'WorkingDirectory':str(root),'StartInterval':300,'RunAtLoad':True,'ProcessType':'Background','StandardOutPath':str(logs/'office-sync.log'),'StandardErrorPath':str(logs/'office-sync-error.log'),'EnvironmentVariables':{'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','PYTHONUNBUFFERED':'1','TZ':'Australia/Perth'}}

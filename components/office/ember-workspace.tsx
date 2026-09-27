@@ -77,7 +77,7 @@ export function EmberWorkspace({data,management,snapshot,invoiceEvents,macSync,t
  </>}
  {tab==="company"&&<>
  <div className="ember-chips" aria-label="Company sections">{(data.finance?[["contacts","Contractors"],["clients","Clients & access"],["work","Work inbox"],["memory","Company memory"],["reviews","Contact reviews"]]:[["sites","Clients & sites"]]).map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{label}</button>)}</div>
- {(section==="work"||section==="memory")&&data.finance&&<CompanyRecords key={section} kind={section==="work"?"work":"memory"} today={today}/>}
+ {(section==="work"||section==="memory")&&data.finance&&<CompanyRecords key={section} kind={section==="work"?"work":"memory"} today={today} navigate={navigate}/>}
  {section==="contacts"&&data.finance&&<Contacts data={data} pending={pending} run={run}/>}
  {section==="clients"&&data.finance&&<ClientsAndAccessPanel data={management} isPending={pending} runAction={runManagement}/>}
  {section==="reviews"&&data.finance&&<><h2>{count} contact sources to review</h2><ContactImportReview items={currentContactImports} people={data.contractors} pending={pending} run={run}/></>}

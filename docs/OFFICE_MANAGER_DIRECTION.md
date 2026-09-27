@@ -134,3 +134,10 @@ Current owner choice: hybrid operation without activating paid cloud AI. Priorit
 Owner interaction refinement (27 September 2026): use separate Review (view only) and Paid buttons. Pressing Paid is approval of that exact invoice and confirmation of the displayed actual transfer. Comments are optional, including for advisory reconciliation warnings. Do not require a Review click or typed resolution first, or describe the manual Paid decision as an automatic calculation match. Preserve source-integrity, balance, date, role and retry checks.
 
 Payment-list refinement (27 September 2026): To pay is the default; Paid invoices is a separate section. The action is Mark as paid; acknowledged full payments immediately leave To pay and display a green, disabled Paid ✓ control. Partial payments remain in To pay with their remaining balance. Pending response receipts are merged by event ID until fresh server/Mac data arrives, so a delayed refresh cannot reopen the full-payment action or count it twice. Optional Review/comments and source/role/date/balance checks are unchanged.
+
+
+## Delivery update — resident runtime and initial detection, 27 September 2026
+
+Stage 1 memory/work registry is implemented. Stage 2 now includes a resident Mac dispatcher with per-job heartbeat/outcomes and four deterministic saved-record detectors: active invoice source warnings, missing agreed rates on new work, blocked local filing and uncertain/failed approved invoice-email delivery. They share one deduplicated Work inbox and preserve owner decisions/version history. See office-manager.md for exact scope and pause controls.
+
+The new-work rate-check boundary is 28 September 2026. Historical settled accounts remain archived. Detection runs on Mac health publication and Work inbox checks; it is not a general always-on cloud email monitor. The proposed overdue/expected-record/expiry detectors, standing-rule executor and automatic end-to-end preparation loop above are still unfinished. No new email-send or payment authority is granted by this release.

@@ -5,8 +5,16 @@ import {companyRecords} from '@/lib/office/company-record-data';
 import {companyRecordProposal} from '@/lib/office/company-records';
 import {z} from 'zod';
 import {revalidatePath} from 'next/cache';
+import type {MonitorStatus} from '@/lib/office/company-records';
 async function access(){const session=await getSessionProfile();if(!session||session.profile.role!=='admin')throw new Error('Finance admin access required');return createServerSupabaseClient();}
 export async function listCompanyRecords(){await access();return companyRecords();}
+export async function checkCompanyWork(enabled?:boolean){
+ const db=await access();
+ if(enabled!==undefined)z.boolean().parse(enabled);
+ const {data,error}=await db.rpc('office_monitor_control',{p_enabled:enabled??null,p_scan:true});
+ if(error)throw new Error('Company checks could not finish. Existing work items are retained.');
+ return data as MonitorStatus;
+}
 export async function saveCompanyRecord(eventId:string,input:unknown){
  const db=await access();z.string().uuid().parse(eventId);const parsed=companyRecordProposal.safeParse(input);
  if(!parsed.success)return {ok:false,message:parsed.error.issues[0]?.message??'Check the record details.'};
