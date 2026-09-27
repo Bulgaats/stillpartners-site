@@ -4,13 +4,17 @@ import type {InvoiceSnapshot} from './invoice-snapshot';
 import {invoiceState,type InvoiceEvent} from './invoice-events';
 import {reconcileInvoice} from './reconciliation';
 export type PaymentReadiness={status:'ready'|'review'|'blocked';issues:string[]};
-export function paymentReadiness(d:InvoiceSnapshot['documents'][number],data:OfficeData,all:InvoiceSnapshot['documents'],digest:string,events:InvoiceEvent[]):PaymentReadiness{
+export function paymentSourceIssues(d:InvoiceSnapshot['documents'][number]):string[]{
  const blocked:string[]=[];
  if(d.recordType!=='invoice')blocked.push('This is not a contractor invoice.');
  if(d.duplicateOf)blocked.push('Use the original invoice; this document is a duplicate.');
  if(d.currency!=='AUD'||d.amountCents===null||d.amountCents<=0)blocked.push('A positive AUD invoice amount is required.');
  if(!validAbn(d.abn)||d.abn.replace(/\s/g,'')==='62687072420')blocked.push('Correct the supplier ABN before recording payment.');
  if(d.name.trim().length<2)blocked.push('A supplier name is required.');
+ return blocked;
+}
+export function paymentReadiness(d:InvoiceSnapshot['documents'][number],data:OfficeData,all:InvoiceSnapshot['documents'],digest:string,events:InvoiceEvent[]):PaymentReadiness{
+ const blocked=paymentSourceIssues(d);
  if(blocked.length)return {status:'blocked',issues:blocked};
  const state=invoiceState(d,digest,events);
  if(state.approved)return {status:'ready',issues:[]};

@@ -123,3 +123,6 @@
 .office-work-summary details>summary{line-height:1.65;}
 @media(max-width:390px){.office-payment-fields,.office-payrun-filters{grid-template-columns:1fr;}}
 @media print{.office-summary-scroll{max-height:none;overflow:visible;}.office-work-summary{break-inside:auto;}.office-summary-table thead th{position:static;}}
+
+.office-invoice-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
+.office-invoice-actions>button{min-height:48px;width:100%;}
