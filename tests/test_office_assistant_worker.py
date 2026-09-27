@@ -4,11 +4,17 @@ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 import office_assistant_worker as worker
 class WorkerBoundaries(unittest.TestCase):
  def test_model_cannot_add_executable_actions(self):
-  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','gstMode':'exclusive','section':'none'}
+  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','gstMode':'exclusive','section':'none','contractors':[]}
   self.assertEqual(worker.validate(payload),payload)
   for key,value in [('action','send_email'),('section','https://example.test')]:
    with self.subTest(key=key),self.assertRaises(ValueError):worker.validate({**payload,key:value})
   with self.assertRaises(ValueError):worker.validate({**payload,'command':'anything'})
+ def test_multiple_contractors_are_validated_together(self):
+  base={**{k:'' for k in worker.LIMITS},'action':'create_contractors','group':'regular','gstMode':'exclusive','section':'contacts'}
+  people=[{'name':'Example '+str(i),'email':'','phone':'','abn':'','group':'regular','sourceDocumentIds':[]} for i in range(4)]
+  self.assertEqual(len(worker.validate({**base,'contractors':people})['contractors']),4)
+  for invalid in [[],people*26,[{**people[0],'sourceDocumentIds':['x']*21}],[{**people[0],'command':'rm'}]]:
+   with self.assertRaises(ValueError):worker.validate({**base,'contractors':invalid})
  def test_check_retry_preserves_counts_without_reimport(self):
   with tempfile.TemporaryDirectory() as tmp:
    root=pathlib.Path(tmp);(root/'Reports').mkdir();task=str(uuid.uuid4());calls=[]

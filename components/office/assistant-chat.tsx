@@ -1,14 +1,97 @@
 'use client';
-import {useEffect,useState,useTransition,useRef} from 'react';
+import {useEffect,useLayoutEffect,useState,useTransition,useRef,useCallback} from 'react';
 import {useRouter} from 'next/navigation';
-import {submitAssistantTask,listAssistantTasks,applyAssistantTask} from '@/app/actions/assistant';
+import {ContractorBatch} from './contractor-batch';
+import {MessageSquare,Plus,PanelLeft,ArrowDown,Send,RefreshCw,X,Pencil} from 'lucide-react';
+import {submitAssistantTask,listAssistantTasks,listAssistantConversations,renameAssistantConversation,applyAssistantTask} from '@/app/actions/assistant';
 import {assistantResponse,type AssistantTask} from '@/lib/office/assistant';
+type Conversation={id:string;title:string;updated_at:string;status:string|null};
+type Draft={text:string;requestId:string};
 export function AssistantChat({navigate,clients}:{navigate:(section:string)=>void;clients:{id:string;name:string}[]}){
- const router=useRouter(),[tasks,setTasks]=useState<AssistantTask[]>([]),[prompt,setPrompt]=useState(''),[notice,setNotice]=useState(''),[pending,start]=useTransition();const id=useRef<string>('');
- async function refresh(){try{setTasks(await listAssistantTasks() as AssistantTask[]);}catch{setNotice('Conversation could not be loaded. Try Refresh.');}}
- useEffect(()=>{void refresh();const timer=setInterval(()=>void refresh(),10000);return()=>clearInterval(timer);},[]);
- function send(){if(!id.current)id.current=crypto.randomUUID();start(async()=>{try{const result=await submitAssistantTask(id.current,prompt);setNotice(result.message);if(result.ok){setPrompt('');id.current='';await refresh();}}catch{setNotice('Could not confirm your request. Retry with the same text.');}});}
- return <section className="ember-panel"><h2>Office Manager</h2><p className="muted">Ask me to find invoice details, compare billing tonnes and work-date rates, check an ABN, or prepare a client invoice draft, new client, site or contractor. Review the proposed details and apply the proposal to continue.</p><p className="ember-footnote">The assistant runs on your Mac. Requests wait while it is asleep or offline. Ask to check the latest invoices for a fresh Gmail import. Client invoice drafts are calculated from recorded hours and agreed rates. Open Client invoices to review and send an approved invoice email. Each email needs your explicit approval.</p><div className="ember-chips"><button onClick={()=>{setPrompt('Өнөөдрийн ажлын бүртгэлийг товч харуул.');id.current='';}}>Today’s records</button><button onClick={()=>{setPrompt('Шинэ клайнт бүртгэхэд ямар мэдээлэл хэрэгтэй вэ?');id.current='';}}>New client</button><button onClick={()=>{setPrompt('Контракторуудын бүртгэлийг харуул.');id.current='';}}>Contractors</button><button onClick={()=>void refresh()}>Refresh</button></div>
- <div aria-live="polite">{tasks.map(task=>{const parsed=assistantResponse.safeParse(task.response),r=parsed.success?parsed.data:null;return <article className="ember-person" key={task.id}><p className="eyebrow">YOU</p><p style={{whiteSpace:'pre-wrap'}}>{task.prompt}</p><p className="eyebrow">OFFICE MANAGER</p>{task.status==='queued'?<p className="muted">Waiting for your Mac…</p>:task.status==='running'?<p className="muted">Working on your request…</p>:r?<><p style={{whiteSpace:'pre-wrap'}}>{r.reply}</p>{r.evidence&&r.evidence.totalCalls>0&&<p className="ember-footnote">Evidence checks: {[...new Set(r.evidence.toolCalls.filter(c=>c.ok).map(c=>({search_company_records:'Company records searched',read_company_record:'Record details read',read_invoice_source:'Source text read',check_invoice:'Invoice checks run',lookup_supplier_abn:'ABN lookup run'}[c.tool]??'Company evidence checked')))].join(' · ')||'No successful retrieval'}. See the reply for results and any incomplete checks.</p>}{r.action!=='none'&&<div className="ember-panel"><p><strong>{r.action.replaceAll('_',' ')}</strong></p><p>{r.name}</p><p>{r.email} {r.phone}</p>{r.abn&&<p>ABN {r.abn}</p>}{(r.action==='create_site'||r.action==='prepare_client_invoice')&&<p>Client: {clients.find(c=>c.id===r.clientId)?.name??'Client unavailable — review before saving'}</p>}{r.address&&<p>{r.address}</p>}{r.action==='create_client'&&<p>Payment terms: 14 days · Active</p>}{r.action==='create_contractor'&&<p>{r.group==='regular'?'Regular contractor':'Occasional contractor'} · Active</p>}{r.action==='prepare_client_invoice'&&<p>Work period: {r.periodStart} to {r.periodEnd}<br/>Issue: {r.issueDate} · Due: {r.dueDate}<br/>GST: {r.gstMode==='none'?'Not charged':'10% added to agreed rates'}</p>}{task.applied_id?<p>{r.action==='prepare_client_invoice'?'Draft prepared':'Created'} ✓</p>:<button disabled={pending} onClick={()=>start(async()=>{try{const result=await applyAssistantTask(task.id);setNotice(result.message);if(result.ok){await refresh();router.refresh();}}catch{setNotice('Could not confirm the save. Refresh before retrying.');}})}>{r.action==='prepare_client_invoice'?'Prepare draft':'Create record'}</button>}</div>}{r.section!=='none'&&<button className="ember-link" onClick={()=>navigate(r.section)}>Open related section →</button>}</>:<p className="error">Assistant could not complete this request. Check the Mac connection and try again.</p>}</article>;})}</div>
- <form onSubmit={e=>{e.preventDefault();send();}}><label htmlFor="office-request">Your request</label><textarea id="office-request" rows={4} maxLength={4000} placeholder="Tell your office manager what you need…" value={prompt} disabled={pending} onChange={e=>{setPrompt(e.target.value);id.current='';}}/><button className="ember-primary" disabled={pending||!prompt.trim()} type="submit">{pending?'Sending…':'Send request'}</button></form>{notice&&<p className="ember-notice" role="status">{notice}</p>}</section>;
+ const router=useRouter(),[tasks,setTasks]=useState<AssistantTask[]>([]),[prompt,setPrompt]=useState(''),[notice,setNotice]=useState(''),[pending,start]=useTransition();
+ const [conversations,setConversations]=useState<Conversation[]>([]),[selected,setSelected]=useState<string|null>(null),[ready,setReady]=useState(false),[loading,setLoading]=useState(false),[drawer,setDrawer]=useState(false),[more,setMore]=useState(false),[moreChats,setMoreChats]=useState(false),[legacy,setLegacy]=useState(0),[atBottom,setAtBottom]=useState(true);
+ const panel=useRef<HTMLElement>(null),scroller=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),id=useRef(''),selectedRef=useRef<string|null>(null),nearEnd=useRef(true),drafts=useRef<Record<string,Draft>>({}),listLimit=useRef(30),prepend=useRef<{height:number;top:number}|null>(null),initialised=useRef(false);
+ const active=tasks.some(t=>t.status==='queued'||t.status==='running');
+ const title=selected==='legacy'?'Other requests':conversations.find(c=>c.id===selected)?.title??'New chat';
+ const refresh=useCallback(async()=>{
+  const key=selectedRef.current;
+  try{
+   const chats=await listAssistantConversations(listLimit.current);setConversations(chats.items);setMoreChats(chats.hasMore);setLegacy(chats.legacyCount);
+   if(key){const result=await listAssistantTasks(key==='legacy'?null:key);if(selectedRef.current===key){setTasks(previous=>{const merged=new Map(previous.map(t=>[t.id,t]));result.items.forEach(t=>merged.set(t.id,t));return [...merged.values()].sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));});}}
+  }catch{setNotice('Could not refresh. Your draft is kept. Try Refresh.');}
+ },[]);
+ async function openChat(key:string){
+  if(selectedRef.current)drafts.current[selectedRef.current]={text:prompt,requestId:id.current};
+  selectedRef.current=key;setSelected(key);setDrawer(false);setNotice('');setTasks([]);setLoading(true);setMore(false);nearEnd.current=true;setAtBottom(true);
+  setPrompt(drafts.current[key]?.text??'');id.current=drafts.current[key]?.requestId??'';
+  try{const result=await listAssistantTasks(key==='legacy'?null:key);if(selectedRef.current===key){setTasks(result.items);setMore(result.hasMore);}}catch{if(selectedRef.current===key)setNotice('Could not load this chat. Try Refresh.');}
+  finally{if(selectedRef.current===key)setLoading(false);}
+ }
+ function newChat(){
+  if(selectedRef.current)drafts.current[selectedRef.current]={text:prompt,requestId:id.current};
+  const key=crypto.randomUUID();selectedRef.current=key;setSelected(key);setTasks([]);setPrompt('');id.current='';setNotice('');setMore(false);setLoading(false);setDrawer(false);nearEnd.current=true;setAtBottom(true);
+  input.current?.focus();
+ }
+ useEffect(()=>{
+  let live=true;
+  void (async()=>{try{const result=await listAssistantConversations(listLimit.current);if(!live||initialised.current)return;initialised.current=true;setConversations(result.items);setMoreChats(result.hasMore);setLegacy(result.legacyCount);
+   const key=result.items[0]?.id??crypto.randomUUID();selectedRef.current=key;setSelected(key);
+   if(result.items.length){const page=await listAssistantTasks(key);if(live&&selectedRef.current===key){setTasks(page.items);setMore(page.hasMore);}}
+  }catch{if(live)setNotice('Could not load chats. Try Refresh.');}finally{if(live)setReady(true);}})();
+  const timer=setInterval(()=>void refresh(),10000);return()=>{live=false;clearInterval(timer);};
+ },[refresh]);
+ // VisualViewport keeps the composer above the phone keyboard, including standalone PWA mode.
+ useEffect(()=>{
+  const main=panel.current?.closest<HTMLElement>('.ember');const viewport=window.visualViewport;
+  const fit=()=>{main?.style.setProperty('--chat-height',`${viewport?.height??window.innerHeight}px`);main?.style.setProperty('--chat-top',`${viewport?.offsetTop??0}px`);main?.classList.toggle('ember-keyboard-open',!!viewport&&window.innerHeight-viewport.height>150);};
+  fit();viewport?.addEventListener('resize',fit);viewport?.addEventListener('scroll',fit);window.addEventListener('resize',fit);
+  return()=>{viewport?.removeEventListener('resize',fit);viewport?.removeEventListener('scroll',fit);window.removeEventListener('resize',fit);main?.classList.remove('ember-keyboard-open');};
+ },[]);
+ useLayoutEffect(()=>{
+  const el=scroller.current;if(!el)return;
+  if(prepend.current){el.scrollTop=prepend.current.top+el.scrollHeight-prepend.current.height;prepend.current=null;}
+  else if(nearEnd.current)el.scrollTop=el.scrollHeight;
+ },[tasks,loading]);
+ async function older(){
+  const first=tasks[0],key=selectedRef.current;if(!first||!key)return;setLoading(true);
+  try{const result=await listAssistantTasks(key==='legacy'?null:key,{createdAt:first.created_at,id:first.id});if(selectedRef.current===key){const el=scroller.current;if(el)prepend.current={height:el.scrollHeight,top:el.scrollTop};setTasks(old=>[...result.items.filter(t=>!old.some(o=>o.id===t.id)),...old]);setMore(result.hasMore);}}catch{setNotice('Could not load earlier messages. Please retry.');}finally{if(selectedRef.current===key)setLoading(false);}
+ }
+ function send(){
+  const key=selectedRef.current;if(!key||pending||active||!prompt.trim())return;
+  if(key==='legacy'){setNotice('Start a new chat to send a request. Earlier requests are kept here.');return;}
+  if(!id.current)id.current=crypto.randomUUID();const request=id.current,text=prompt;
+  start(async()=>{try{const result=await submitAssistantTask(request,text,key);setNotice(result.message);if(result.ok){setPrompt('');id.current='';delete drafts.current[key];nearEnd.current=true;setAtBottom(true);await refresh();}}catch{setNotice('Could not confirm your request. Retry with the same text.');}});
+ }
+ async function rename(){
+  if(!selected||selected==='legacy')return;const value=window.prompt('Chat title',title);if(value===null)return;
+  start(async()=>{try{const result=await renameAssistantConversation(selected,value);setNotice(result.message);if(result.ok)await refresh();}catch{setNotice('Could not rename this chat.');}});
+ }
+ return <section ref={panel} className="office-chat" aria-label="Office Manager">
+ <div className={`office-chat-sidebar ${drawer?'is-open':''}`}>
+  <div className="office-chat-sidebar-top"><strong>Conversations</strong><button className="office-chat-mobile" aria-label="Close conversations" onClick={()=>setDrawer(false)}><X size={20}/></button></div>
+  <button className="office-chat-new" disabled={pending||!ready} onClick={newChat}><Plus size={18}/> New chat</button>
+  <div className="office-chat-history">{conversations.map(c=><button key={c.id} disabled={pending} aria-current={selected===c.id?'true':undefined} onClick={()=>void openChat(c.id)}><MessageSquare size={16}/><span><strong>{c.title}</strong><small>{c.status==='running'?'Working…':c.status==='queued'?'Waiting for Mac…':new Date(c.updated_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',timeZone:'Australia/Perth'})}</small></span></button>)}
+   {legacy>0&&<button disabled={pending} onClick={()=>void openChat('legacy')} aria-current={selected==='legacy'?'true':undefined}><MessageSquare size={16}/><span>Other requests<small>Invoice checks & earlier app versions</small></span></button>}
+   {moreChats&&listLimit.current<500&&<button onClick={()=>{listLimit.current=Math.min(500,listLimit.current+30);void refresh();}}>Load more chats</button>}
+   {!conversations.length&&ready&&<p className="muted">Your chats will appear here.</p>}
+  </div><p className="ember-footnote">A separate chat for each topic. Company records remain available in every chat.</p>
+ </div>
+ {drawer&&<button className="office-chat-backdrop" aria-label="Close conversations" onClick={()=>setDrawer(false)}/>}
+ <div className="office-chat-main">
+  <header className="office-chat-toolbar"><button className="office-chat-mobile" aria-label="Open conversations" onClick={()=>setDrawer(true)}><PanelLeft size={21}/></button><div><h2>Office Manager</h2><p title={title}>{title}</p></div><button aria-label="Rename chat" disabled={pending||!conversations.some(c=>c.id===selected)} onClick={()=>void rename()}><Pencil size={18}/></button><button aria-label="Refresh conversation" onClick={()=>void refresh()}><RefreshCw size={18}/></button><button aria-label="New chat" disabled={pending||!ready} onClick={newChat}><Plus size={22}/></button></header>
+  <div className="office-chat-scroll" ref={scroller} role="region" aria-label="Conversation messages" tabIndex={0} onScroll={e=>{const el=e.currentTarget;nearEnd.current=el.scrollHeight-el.scrollTop-el.clientHeight<90;setAtBottom(nearEnd.current);}}>
+   {more&&<button className="office-chat-older" disabled={loading} onClick={()=>void older()}>Load earlier messages</button>}
+   {(!ready||loading)&&<p role="status" className="muted">Loading conversation…</p>}
+   {ready&&!loading&&!tasks.length&&<div className="office-chat-welcome"><div className="orb large"/><h3>What needs doing?</h3><p>Find an invoice, check a contractor, or prepare your next client invoice.</p><div className="ember-chips">{[['Today’s records','Өнөөдрийн ажлын бүртгэлийг товч харуул.'],['Check invoices','Хамгийн сүүлд ирсэн инвойсуудыг шалга.'],['Contractors','Контракторуудын бүртгэлийг харуул.']].map(([label,text])=><button key={label} onClick={()=>{setPrompt(text);id.current='';input.current?.focus();}}>{label}</button>)}</div></div>}
+{tasks.map(task=>{const parsed=assistantResponse.safeParse(task.response),r=parsed.success?parsed.data:null;return <article className="ember-person office-chat-message" key={task.id}><p className="eyebrow">YOU</p><p style={{whiteSpace:'pre-wrap'}}>{task.prompt}</p><p className="eyebrow">OFFICE MANAGER</p>{task.status==='queued'?<p className="muted">Waiting for your Mac…</p>:task.status==='running'?<p className="muted">Working on your request…</p>:r?<><p style={{whiteSpace:'pre-wrap'}}>{r.reply}</p>{r.evidence&&r.evidence.totalCalls>0&&<p className="ember-footnote">Evidence checks: {[...new Set(r.evidence.toolCalls.filter(c=>c.ok).map(c=>({search_company_records:'Company records searched',read_company_record:'Record details read',read_invoice_source:'Source text read',check_invoice:'Invoice checks run',lookup_supplier_abn:'ABN lookup run'}[c.tool]??'Company evidence checked')))].join(' · ')||'No successful retrieval'}. See the reply for results and any incomplete checks.</p>}{r.action==='create_contractors'&&<ContractorBatch task={task} response={r} pending={pending} run={action=>start(async()=>{try{const result=await action();setNotice(result.message);await refresh();if(result.ok)router.refresh();}catch{setNotice('Could not confirm the batch. Refresh before retrying.');}})}/>}
+{r.action!=='none'&&r.action!=='create_contractors'&&<div className="ember-panel"><p><strong>{r.action.replaceAll('_',' ')}</strong></p><p>{r.name}</p><p>{r.email} {r.phone}</p>{r.abn&&<p>ABN {r.abn}</p>}{(r.action==='create_site'||r.action==='prepare_client_invoice')&&<p>Client: {clients.find(c=>c.id===r.clientId)?.name??'Client unavailable — review before saving'}</p>}{r.address&&<p>{r.address}</p>}{r.action==='create_client'&&<p>Payment terms: 14 days · Active</p>}{r.action==='create_contractor'&&<p>{r.group==='regular'?'Regular contractor':'Occasional contractor'} · Active</p>}{r.action==='prepare_client_invoice'&&<p>Work period: {r.periodStart} to {r.periodEnd}<br/>Issue: {r.issueDate} · Due: {r.dueDate}<br/>GST: {r.gstMode==='none'?'Not charged':'10% added to agreed rates'}</p>}{task.applied_id?<p>{r.action==='prepare_client_invoice'?'Draft prepared':'Created'} ✓</p>:<button disabled={pending} onClick={()=>start(async()=>{try{const result=await applyAssistantTask(task.id);setNotice(result.message);if(result.ok){await refresh();router.refresh();}}catch{setNotice('Could not confirm the save. Refresh before retrying.');}})}>{r.action==='prepare_client_invoice'?'Prepare draft':'Create record'}</button>}</div>}{r.section!=='none'&&<button className="ember-link" onClick={()=>navigate(r.section)}>Open related section →</button>}</>:<p className="error">Assistant could not complete this request. Check the Mac connection and try again.</p>}</article>;})}
+  </div>
+  {!atBottom&&<button className="office-chat-latest" onClick={()=>{const el=scroller.current;if(el)el.scrollTo({top:el.scrollHeight,behavior:'smooth'});nearEnd.current=true;setAtBottom(true);}}><ArrowDown size={16}/> Latest</button>}
+  <div className="office-chat-compose">
+   {notice&&<p className="office-chat-status" role="status">{notice}</p>}
+   {active&&<p className="office-chat-status" role="status">{tasks.some(t=>t.status==='running')?'Working on this request… You can start a new chat for another task.':'Waiting for your Mac. This request stays queued while it is asleep or offline.'}</p>}
+   <form onSubmit={e=>{e.preventDefault();send();}}><label className="sr-only" htmlFor="office-request">Your request</label><textarea ref={input} id="office-request" rows={2} maxLength={4000} placeholder={selected==='legacy'?'Start a new chat to send a request…':'Message your office manager…'} value={prompt} disabled={pending||!ready||selected==='legacy'} onChange={e=>{setPrompt(e.target.value);id.current='';}} onKeyDown={e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)&&!e.nativeEvent.isComposing){e.preventDefault();send();}}}/><button className="office-chat-send" aria-label="Send request" title="Send request (⌘/Ctrl + Enter)" disabled={pending||active||!ready||!prompt.trim()||selected==='legacy'} type="submit"><Send size={20}/></button></form>
+   <details className="office-chat-info"><summary>Mac assistant · About this chat</summary><p>Requests run on your Mac. The assistant uses this chat’s six latest completed exchanges for follow-up context and can search company records. Proposals and outgoing invoice emails still require your approval.</p></details>
+  </div>
+ </div></section>;
 }
