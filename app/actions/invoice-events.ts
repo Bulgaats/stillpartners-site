@@ -4,9 +4,7 @@ import {validDate} from '@/lib/office/foundation';
 import {getPerthIsoDate} from '@/lib/operations/dates';
 import {invoiceSnapshotSchema} from '@/lib/office/invoice-snapshot';
 import {invoiceState,type InvoiceEvent} from '@/lib/office/invoice-events';
-import {invoicePeriod} from '@/lib/office/reconciliation';
-import {paymentReadiness} from '@/lib/office/payment-readiness';
-import {officeData} from '@/lib/office/data';
+import {paymentSourceIssues} from '@/lib/office/payment-readiness';
 import {getSessionProfile} from '@/lib/auth/session';
 import {createServerSupabaseClient} from '@/lib/supabase/server';
 import {revalidatePath} from 'next/cache';
@@ -24,7 +22,7 @@ const paidInput=z.object({
  id:z.string().uuid(),reviewId:z.string().uuid(),documentId:z.string().min(1).max(2000),
  digest:z.string().regex(/^[a-f0-9]{64}$/),amount:z.number().int().positive().max(999999999999),
  day:z.string().refine(validDate),expectedPaid:z.number().int().min(0),
- reference:z.string().trim().max(500),reviewNote:z.string().trim().max(1000)
+ reference:z.string().trim().max(500).default(''),reviewNote:z.string().trim().max(1000).default('')
 });
 export async function markOfficeInvoicePaid(value:unknown){
  const session=await getSessionProfile();
@@ -34,7 +32,7 @@ export async function markOfficeInvoicePaid(value:unknown){
  const p=parsed.data;
  if(p.day>getPerthIsoDate())return {ok:false,message:'Use the actual transfer date, not a future payday.'};
  const db=await createServerSupabaseClient();
- const reason=`Owner marked Paid: AUD ${(p.amount/100).toFixed(2)} on ${p.day}.`+(p.reference?' Reference: '+p.reference:'');
+ const reason=`Owner marked Paid: AUD ${(p.amount/100).toFixed(2)} on ${p.day}.`+(p.reference?' Reference: '+p.reference:'')+(p.reviewNote?' Comment: '+p.reviewNote:'');
  // Reconcile an uncertain response before running freshness checks.
  const {data:prior,error:priorError}=await db.from('office_invoice_events').select('*').eq('id',p.id).maybeSingle();
  if(priorError)return {ok:false,message:'Payment history unavailable. Retry with the same details.'};
@@ -57,13 +55,12 @@ export async function markOfficeInvoicePaid(value:unknown){
  }
  const state=invoiceState(d,p.digest,events);
  if(state.paid!==p.expectedPaid)return {ok:false,message:'Payment balance changed. Refresh before recording another payment.'};
- const period=invoicePeriod(d.workPeriod);
- const data=await officeData(true,period?.from??p.day,period?.to??p.day);
- const ready=paymentReadiness(d,data,snapshot.documents,p.digest,events);
- if(ready.status==='blocked')return {ok:false,message:ready.issues.join(' ')};
- if(ready.status==='review'&&p.reviewNote.length<3)return {ok:false,message:'Review needed: '+ready.issues.join(' ')};
- const reviewReason=ready.status==='review'?'Owner reviewed exceptions and confirmed payment. '+p.reviewNote:
-  'Owner confirmed this invoice by marking Paid. Recorded calculation matched or invoice details had already been approved. This is not independent proof of time-record completeness or official ABN ownership.';
+ const sourceIssues=paymentSourceIssues(d);
+ if(sourceIssues.length)return {ok:false,message:sourceIssues.join(' ')};
+ // Paid is the owner's approval and transfer confirmation. Viewing Review and adding
+ // comments are optional; do not claim that checks matched or were opened.
+ const reviewReason='Owner approved this invoice by pressing Paid and confirmed the recorded transfer.'+
+  (p.reviewNote?' Comment: '+p.reviewNote:'');
  const {error:saveError}=await db.rpc('office_mark_invoice_paid',{
   p_id:p.id,p_review_id:p.reviewId,p_document_id:d.id,p_digest:p.digest,p_amount:p.amount,p_day:p.day,
   p_reason:reason,p_review_reason:reviewReason,p_expected_paid:p.expectedPaid
