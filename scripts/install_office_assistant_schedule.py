@@ -3,6 +3,7 @@ import os,pathlib,plistlib,shutil,subprocess,sys
 LABEL='net.stillpartners.office-assistant'
 def install(root):
  if sys.platform!='darwin':raise RuntimeError('macOS required')
+ if (pathlib.Path.home()/'Library/LaunchAgents/net.stillpartners.office-runtime.plist').exists():raise RuntimeError('Resident Office runtime is installed. Do not reinstall a competing interval timer; update the scoped worker and keep the existing runtime.')
  root=pathlib.Path(root).resolve();source=pathlib.Path(__file__).resolve().parent/'office_assistant_worker.py'
  shutil.copy2(source,root/'office_assistant_worker.py')
  agents=pathlib.Path.home()/'Library/LaunchAgents';agents.mkdir(parents=True,exist_ok=True);logs=root/'Logs';logs.mkdir(exist_ok=True)

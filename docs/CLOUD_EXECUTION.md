@@ -19,7 +19,7 @@ New chat requests can use a hosted read-only AI runtime after explicit server ac
 
 ## Not yet delivered
 
-Cloud register ingestion and Mac catch-up downloads of newly cloud-discovered invoices; cloud outgoing delivery; automatic issue detection; unattended cron dispatch; official ABN-holder lookup in the cloud toolset. These remain next stages, not activated capabilities. The Money / Latest invoices importer still queues a Mac job.
+Cloud register ingestion and Mac catch-up downloads of newly cloud-discovered invoices; cloud outgoing delivery; general email/expiry issue detection; unattended cron dispatch; official ABN-holder lookup in the cloud toolset. These remain next stages, not activated capabilities. The Money / Latest invoices importer still queues a Mac job.
 
 A submitted chat dispatches through a 300-second server route using Next after. Existing browser polling retries the dispatcher; its atomic lease prevents duplicate model jobs. If the app closes before dispatch is accepted, reopen the app to resume queued work. No always-on scheduler is installed. A process killed after a model request may require a second billed read attempt after its lease expires; no external write is performed by the runtime. Do not promise exactly-once API billing.
 
@@ -64,3 +64,5 @@ Live API and Google consent cannot be verified without the owner/provider setup.
 - https://supabase.com/docs/guides/database/postgres/row-level-security
 
 Security advisor baseline: older auth helper / mutable search_path / password-protection findings remain outside this change. The new mailbox table deliberately has no browser RLS policy and no browser grants; service-role access is the only path. This is deny-by-default, not public token access. Advisor explanation: https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy
+
+Saved-record Work inbox detection is separately implemented without cloud AI activation. Its four exact rules, triggering conditions and limitations are documented in office-manager.md. It does not make this hosted Gmail/AI runtime active.

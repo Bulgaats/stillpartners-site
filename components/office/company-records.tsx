@@ -1,13 +1,15 @@
 'use client';
 import {useEffect,useState,useTransition,useRef} from 'react';
-import {listCompanyRecords,saveCompanyRecord,companyRecordHistory} from '@/app/actions/company-records';
-import {recordDraft,type CompanyRecord,type CompanyRecordProposal} from '@/lib/office/company-records';
+import {listCompanyRecords,saveCompanyRecord,companyRecordHistory,checkCompanyWork} from '@/app/actions/company-records';
+import {recordDraft,type CompanyRecord,type CompanyRecordProposal,type MonitorStatus} from '@/lib/office/company-records';
 const label=(s:string)=>s.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
-export function CompanyRecords({kind,today}:{kind:'memory'|'work';today:string}){
+export function CompanyRecords({kind,today,navigate}:{kind:'memory'|'work';today:string;navigate?:(s:string)=>void}){
  const [rows,setRows]=useState<CompanyRecord[]>([]),[draft,setDraft]=useState<CompanyRecordProposal|null>(null),[message,setMessage]=useState(''),[filter,setFilter]=useState('active'),[search,setSearch]=useState(''),[loading,setLoading]=useState(true),[pending,start]=useTransition();
  const event=useRef('');
+ const [monitor,setMonitor]=useState<MonitorStatus|null>(null),[checking,setChecking]=useState(false);
  async function refresh(){try{setRows(await listCompanyRecords());}catch{setMessage('Could not load company records. Try Refresh.');}finally{setLoading(false);}}
- useEffect(()=>{void refresh();},[]);
+ async function check(enabled?:boolean){setChecking(true);try{setMonitor(await checkCompanyWork(enabled));await refresh();}catch{setMessage('Automatic checks could not finish. Your saved work remains available.');await refresh();}finally{setChecking(false);}}
+ useEffect(()=>{if(kind==='work')void check();else void refresh();},[kind]);
  function edit(r?:CompanyRecord){setDraft(recordDraft(kind,r));event.current='';setMessage('');}
  function change(p:Partial<CompanyRecordProposal>){setDraft(d=>d?{...d,...p}:d);event.current='';}
  const visible=rows.filter(r=>r.kind===kind&&(filter==='all'||!['completed','cancelled','superseded'].includes(r.status))&&[r.title,r.body,r.next_action].join(' ').toLowerCase().includes(search.toLowerCase())).sort((a,b)=>kind==='work'?(a.due_date??'9999').localeCompare(b.due_date??'9999')||b.updated_at.localeCompare(a.updated_at):b.updated_at.localeCompare(a.updated_at));
@@ -15,7 +17,8 @@ export function CompanyRecords({kind,today}:{kind:'memory'|'work';today:string})
  function save(){if(!draft)return;if(!event.current)event.current=crypto.randomUUID();const payload=draft,id=event.current;start(async()=>{try{const result=await saveCompanyRecord(id,payload);setMessage(result.message);if(result.ok){setDraft(null);event.current='';await refresh();}}catch{setMessage('Could not confirm the save. Your draft is kept; retry without editing to avoid duplicate submission.');}});}
  return <section className="ember-panel">
  <div className="ember-section-heading"><div><p className="eyebrow">{kind==='work'?'COMPANY WORK':'SHARED ACROSS CHATS'}</p><h2>{kind==='work'?'Work inbox':'Company memory'}</h2></div><button className="office-record-add" disabled={pending} onClick={()=>edit()}>+ {kind==='work'?'New work item':'Add memory'}</button></div>
- <p className="muted">{kind==='work'?'Keep unfinished work, waiting replies and next steps in one place. Automatic issue detection is not enabled yet.':'Confirmed decisions, agreements and preferences stay available in new chats. Recording a rule here does not activate an automatic action.'}</p>
+ <p className="muted">{kind==='work'?'Bobby checks saved invoice warnings, missing agreed rates for new work, Mac filing and invoice-email delivery. Repeated checks update the same work item.':'Confirmed decisions, agreements and preferences stay available in new chats. Recording a rule here does not activate an automatic action.'}</p>
+ {kind==='work'&&<div className="office-monitor-status"><p><strong>{monitor?(monitor.enabled?'Automatic checks on':'Automatic checks paused'):'Loading check status…'}</strong>{monitor?.last_checked_at&&<> · Last checked {new Date(monitor.last_checked_at).toLocaleString('en-AU',{timeZone:'Australia/Perth'})}</>}</p>{monitor?.last_error&&<p role="status" className="ember-notice">The last background check could not finish. Saved work items are retained.</p>}<div className="ember-chips"><button disabled={checking} onClick={()=>void check()}>{checking?'Checking…':'Check now'}</button>{monitor&&<button disabled={checking} onClick={()=>void check(!monitor.enabled)}>{monitor.enabled?'Pause checks':'Resume checks'}</button>}</div><p className="ember-footnote">Uses saved company records; this is not a live Gmail search or a full time/rate reconciliation. Checks run with Mac sync and when this inbox opens. Pausing these checks does not pause Bobby chat, sync or already-approved email delivery.</p></div>}
  {kind==='work'&&<div className="office-work-counts"><span>{open.length} open</span><span>{open.filter(r=>r.due_date&&r.due_date<today).length} past review date</span><span>{open.filter(r=>r.status.startsWith('waiting')).length} waiting</span></div>}
  <div className="ember-chips"><button aria-pressed={filter==='active'} onClick={()=>setFilter('active')}>Active</button><button aria-pressed={filter==='all'} onClick={()=>setFilter('all')}>Including history</button><button onClick={()=>void refresh()}>Refresh</button></div>
  <input aria-label="Search company records" placeholder={kind==='work'?'Search work items…':'Search decisions and agreements…'} value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -36,6 +39,7 @@ export function CompanyRecords({kind,today}:{kind:'memory'|'work';today:string})
   <p style={{whiteSpace:'pre-wrap'}}>{r.body}</p>
   {kind==='work'?<><p><strong>Next:</strong> {r.next_action||'—'}</p><small>{label(r.priority)} priority{r.due_date?` · Review / due ${r.due_date}`:''}{r.due_date&&r.due_date<today&&!['completed','cancelled'].includes(r.status)?' · Review date passed':''}</small>{r.outcome&&<p><strong>Outcome:</strong> {r.outcome}</p>}</>:<small>{label(r.category)}{r.effective_date?` · Effective ${r.effective_date}`:''}{r.effective_date&&r.effective_date>today?' · Future agreement':''}</small>}
   {r.source_ref&&<p className="ember-footnote">Source: {r.source_ref}</p>}
+  {r.detection&&<><p className="ember-footnote">Bobby detected · {label(r.detection.rule)} · {r.detection.active?'Condition still present':'Condition cleared'} · {new Date(r.detection.observedAt).toLocaleString('en-AU',{timeZone:'Australia/Perth'})}</p>{r.body!==r.detection.summary&&<details><summary>Latest detected evidence</summary><p style={{whiteSpace:'pre-wrap'}}>{r.detection.summary}</p></details>}{navigate&&<button className="ember-text-button" onClick={()=>navigate(r.detection!.rule==='work_rates'?'rates':r.detection!.rule==='mail_delivery'?'invoices':'contractor-invoices')}>Open related section →</button>}</>}
   <button className="ember-text-button" disabled={pending} onClick={()=>edit(r)}>Review / edit</button><RecordHistory id={r.id} version={r.version}/>
  </article>)}
  </section>;
