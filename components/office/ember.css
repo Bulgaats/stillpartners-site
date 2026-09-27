@@ -107,3 +107,19 @@
 .office-record-history small{display:block;margin-top:5px}
 
 .office-main-nav{display:flex;justify-content:space-around}.office-main-nav button{flex:1;min-width:0}.office-main-nav .office-assistant-tab svg{color:var(--accent)}.office-home-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 30px}.office-home-actions button{text-align:left;border:1px solid var(--line);background:var(--panel);padding:18px;border-radius:16px;display:flex;flex-direction:column;gap:10px;min-width:0}.office-home-actions svg{color:var(--accent)}.office-home-actions strong{font-size:14px}.office-home-actions small{font-size:12px;line-height:1.5}.office-count{display:inline-block;border-radius:20px;background:#493021;color:#ffbc92;padding:2px 7px;font-size:12px}@media(max-width:600px){.office-main-nav button{font-size:10px;padding:9px 3px}.office-home-actions button{padding:14px}.office-home-actions strong{font-size:13px}}
+
+/* Payment-day controls keep the transfer amount/date visible before a single Paid action. */
+.office-payment-fields,.office-payrun-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0;}
+.office-payment-fields label,.office-payrun-filters label{min-width:0;display:grid;gap:6px;}
+.office-payment-fields input,.office-payrun-filters input,.office-payrun-filters select{box-sizing:border-box;min-width:0;width:100%;}
+.office-paid-form>.ember-primary{width:100%;min-height:48px;margin-top:12px;}
+.office-paid-form textarea{width:100%;min-height:84px;box-sizing:border-box;}
+.office-summary-scroll{max-height:420px;overflow:auto;overscroll-behavior:contain;}
+.office-summary-table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;}
+.office-summary-table th,.office-summary-table td{text-align:left;padding:10px 8px;border-bottom:1px solid #303741;vertical-align:top;}
+.office-summary-table thead th{position:sticky;top:0;background:#222830;z-index:1;}
+.office-summary-table small{display:block;color:#a9b1bc;max-width:200px;}
+.office-work-summary>summary{cursor:pointer;}
+.office-work-summary details>summary{line-height:1.65;}
+@media(max-width:390px){.office-payment-fields,.office-payrun-filters{grid-template-columns:1fr;}}
+@media print{.office-summary-scroll{max-height:none;overflow:visible;}.office-work-summary{break-inside:auto;}.office-summary-table thead th{position:static;}}

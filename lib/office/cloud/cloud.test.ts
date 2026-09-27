@@ -8,7 +8,7 @@ const answer={reply:'Found the records.',action:'none',name:'',email:'',phone:''
 afterEach(()=>vi.unstubAllEnvs());
 describe('Cloud boundaries',()=>{
  it('requires explicit activation, a key/model and a finite configured limit',()=>{
-  const env={SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',OPENAI_API_KEY:'test',OFFICE_CLOUD_MODEL:'gpt-6-astra',OFFICE_CLOUD_DAILY_REQUESTS:'40'};
+  const env={NODE_ENV:'test' as const,SUPABASE_SERVICE_ROLE_KEY:'synthetic-service',OPENAI_API_KEY:'test',OFFICE_CLOUD_MODEL:'gpt-6-astra',OFFICE_CLOUD_DAILY_REQUESTS:'40'};
   expect(cloudConfig(env).enabled).toBe(false);
   expect(cloudConfig({...env,OFFICE_CLOUD_ENABLED:'true'}).enabled).toBe(true);
   expect(cloudConfig({...env,OFFICE_CLOUD_ENABLED:'true',OFFICE_CLOUD_DAILY_REQUESTS:'NaN'}).enabled).toBe(false);
