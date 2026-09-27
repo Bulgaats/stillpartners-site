@@ -33,12 +33,14 @@ export async function markOfficeInvoicePaid(value:unknown){
  if(p.day>getPerthIsoDate())return {ok:false,message:'Use the actual transfer date, not a future payday.'};
  const db=await createServerSupabaseClient();
  const reason=`Owner marked Paid: AUD ${(p.amount/100).toFixed(2)} on ${p.day}.`+(p.reference?' Reference: '+p.reference:'')+(p.reviewNote?' Comment: '+p.reviewNote:'');
+ // Confirmed response receipt only; an empty creation timestamp stays unknown until refresh.
+ const payment:InvoiceEvent={id:p.id,document_id:p.documentId,kind:'payment',source_digest:p.digest,amount_cents:p.amount,payment_date:p.day,reason,target_id:null,created_at:''};
  // Reconcile an uncertain response before running freshness checks.
  const {data:prior,error:priorError}=await db.from('office_invoice_events').select('*').eq('id',p.id).maybeSingle();
  if(priorError)return {ok:false,message:'Payment history unavailable. Retry with the same details.'};
  if(prior){
   if(prior.created_by===session.userId&&prior.kind==='payment'&&prior.document_id===p.documentId&&prior.source_digest===p.digest&&prior.amount_cents===p.amount&&prior.payment_date===p.day&&prior.reason===reason)
-   return {ok:true,message:'This payment was already recorded. No duplicate was added.'};
+   return {ok:true,message:'This payment was already recorded. No duplicate was added.',payment:{...payment,created_at:prior.created_at??''}};
   return {ok:false,message:'This action ID belongs to different payment details. Refresh first.'};
  }
  const {data:saved,error}=await db.from('office_invoice_snapshots').select('payload').order('exported_at',{ascending:false}).limit(1).maybeSingle();
@@ -66,5 +68,5 @@ export async function markOfficeInvoicePaid(value:unknown){
   p_reason:reason,p_review_reason:reviewReason,p_expected_paid:p.expectedPaid
  });
  if(saveError)return {ok:false,message:saveError.code==='P0001'?saveError.message:'Could not confirm. Retry with the same details; do not create a second payment.'};
- revalidatePath('/office');return {ok:true,message:'Payment recorded. Mac filing will follow when connected.'};
+ revalidatePath('/office');return {ok:true,message:'Payment recorded. Mac filing will follow when connected.',payment};
 }

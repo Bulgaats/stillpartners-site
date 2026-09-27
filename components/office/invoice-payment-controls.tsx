@@ -3,28 +3,30 @@ import type {MacReceipt} from '@/lib/office/mac-sync';
 import {useEffect,useId,useRef,useState,useTransition,type ReactNode} from 'react';
 import {useRouter} from 'next/navigation';
 import {markOfficeInvoicePaid,recordOfficeInvoiceEvent} from '@/app/actions/invoice-events';
-import {invoiceState,type InvoiceEvent} from '@/lib/office/invoice-events';
+import {invoiceState,mergeConfirmedPayments,type InvoiceEvent} from '@/lib/office/invoice-events';
 import type {InvoiceSnapshot} from '@/lib/office/invoice-snapshot';
 import type {PaymentReadiness} from '@/lib/office/payment-readiness';
 const aud=(n:number)=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(n/100);
-export function InvoicePaymentControls({document:d,digest,events,today,receipts,readiness,reviewContent}:{document:InvoiceSnapshot['documents'][number];digest:string;events:InvoiceEvent[];today:string;receipts:MacReceipt[];readiness:PaymentReadiness;reviewContent?:ReactNode}){
- const state=invoiceState(d,digest,events),router=useRouter(),[pending,start]=useTransition();
- const [amountEdit,setAmount]=useState<string|null>(null),[day,setDay]=useState(today),[reference,setReference]=useState(''),[review,setReview]=useState(false),[comments,setComments]=useState(''),[notice,setNotice]=useState(''),[saved,setSaved]=useState(false);
+export function InvoicePaymentControls({document:d,digest,events,today,receipts,readiness,reviewContent,onPaymentRecorded}:{document:InvoiceSnapshot['documents'][number];digest:string;events:InvoiceEvent[];today:string;receipts:MacReceipt[];readiness:PaymentReadiness;reviewContent?:ReactNode;onPaymentRecorded?:(payment:InvoiceEvent)=>void}){
+ const [confirmed,setConfirmed]=useState<InvoiceEvent[]>([]);
+ const effectiveEvents=mergeConfirmedPayments(events,confirmed);
+ const state=invoiceState(d,digest,effectiveEvents),router=useRouter(),[pending,start]=useTransition();
+ const [amountEdit,setAmount]=useState<string|null>(null),[day,setDay]=useState(today),[reference,setReference]=useState(''),[review,setReview]=useState(false),[comments,setComments]=useState(''),[notice,setNotice]=useState('');
  const [target,setTarget]=useState<string|null>(null),[correction,setCorrection]=useState('');
  const reviewId=useId();
  const request=useRef<{key:string;id:string;reviewId:string}|null>(null),sending=useRef(false);
  const remaining=Math.max(0,(d.amountCents??0)-state.paid),amount=amountEdit??(remaining/100).toFixed(2);
  const cents=/^\d+(\.\d{1,2})?$/.test(amount)?Math.round(Number(amount)*100):0;
  const valid=cents>0&&cents<=remaining&&day.length===10&&day<=today;
- const mine=events.filter(e=>e.document_id===d.id),localReceipts=receipts.filter(r=>mine.some(e=>e.id===r.event_id));
- useEffect(()=>{setSaved(false);setAmount(null);setReview(false);setComments('');},[state.paid,digest]);
+ const mine=effectiveEvents.filter(e=>e.document_id===d.id),localReceipts=receipts.filter(r=>mine.some(e=>e.id===r.event_id));
+ useEffect(()=>{setAmount(null);setReview(false);setComments('');},[state.paid,digest]);
  function markPaid(){
-  if(sending.current||!valid||saved||readiness.status==='blocked')return;
+  if(sending.current||!valid||readiness.status==='blocked')return;
   const details={documentId:d.id,digest,amount:cents,day,expectedPaid:state.paid,reference,reviewNote:comments};
   const key=JSON.stringify(details);
   if(request.current?.key!==key)request.current={key,id:crypto.randomUUID(),reviewId:crypto.randomUUID()};
   const value={...details,id:request.current.id,reviewId:request.current.reviewId};
-  sending.current=true;start(async()=>{try{const result=await markOfficeInvoicePaid(value);setNotice(result.message);if(result.ok){setSaved(true);setReview(false);router.refresh();}}
+  sending.current=true;start(async()=>{try{const result=await markOfficeInvoicePaid(value);setNotice(result.message);if(result.ok){const payment=result.payment;if(payment){setConfirmed(rows=>mergeConfirmedPayments(rows,[payment]));onPaymentRecorded?.(payment);}setReview(false);router.refresh();}}
    catch{setNotice('Confirmation was interrupted. Retry with the same details to check this payment safely.');}finally{sending.current=false;}});
  }
  function cancelPayment(){
@@ -37,14 +39,14 @@ export function InvoicePaymentControls({document:d,digest,events,today,receipts,
  <p><strong>{state.status==='Unknown'?'Payment not confirmed':state.status}</strong> · Recorded {aud(state.paid)}{d.amountCents!==null&&<> · Remaining {aud(remaining)}</>}</p>
  {state.status!=='Paid'&&readiness.status==='blocked'&&<div className="ember-notice"><strong>Source needs correction</strong><ul>{readiness.issues.map(x=><li key={x}>{x}</li>)}</ul></div>}
  {state.status!=='Paid'&&readiness.status!=='blocked'&&<div className="office-paid-form">
- <div className="office-payment-fields"><label>Amount paid (AUD)<input aria-label="Amount paid (AUD)" inputMode="decimal" value={amount} disabled={pending||saved} onChange={e=>setAmount(e.target.value)}/></label>
- <label>Actual payment date<input aria-label="Actual payment date" type="date" max={today} value={day} disabled={pending||saved} onChange={e=>setDay(e.target.value)}/></label></div>
- <details><summary>Add comments</summary><label>Comment (optional)<textarea aria-label="Comment (optional)" maxLength={1000} value={comments} disabled={pending||saved} onChange={e=>setComments(e.target.value)}/></label><label>Bank reference (optional)<input aria-label="Bank reference" value={reference} maxLength={500} disabled={pending||saved} onChange={e=>setReference(e.target.value)}/></label></details>
- <p className="ember-footnote">Paid approves this invoice and confirms the transfer shown above.</p>
+ <div className="office-payment-fields"><label>Amount paid (AUD)<input aria-label="Amount paid (AUD)" inputMode="decimal" value={amount} disabled={pending} onChange={e=>setAmount(e.target.value)}/></label>
+ <label>Actual payment date<input aria-label="Actual payment date" type="date" max={today} value={day} disabled={pending} onChange={e=>setDay(e.target.value)}/></label></div>
+ <details><summary>Add comments</summary><label>Comment (optional)<textarea aria-label="Comment (optional)" maxLength={1000} value={comments} disabled={pending} onChange={e=>setComments(e.target.value)}/></label><label>Bank reference (optional)<input aria-label="Bank reference" value={reference} maxLength={500} disabled={pending} onChange={e=>setReference(e.target.value)}/></label></details>
+ <p className="ember-footnote">Mark as paid confirms the transfer shown above and approves this invoice.</p>
  <div className="office-invoice-actions"><button type="button" aria-expanded={review} aria-controls={reviewId} onClick={()=>setReview(v=>!v)}>Review</button>
- <button className="ember-primary" disabled={pending||saved||!valid} onClick={markPaid}>{pending?'Saving…':saved?'Recorded ✓':'Paid'}</button></div>
+ <button className="ember-primary" disabled={pending||!valid} onClick={markPaid}>{pending?'Saving…':'Mark as paid'}</button></div>
  </div>}
- {(state.status==='Paid'||readiness.status==='blocked')&&<button type="button" aria-expanded={review} aria-controls={reviewId} onClick={()=>setReview(v=>!v)}>Review</button>}
+ {(state.status==='Paid'||readiness.status==='blocked')&&<div className="office-invoice-actions"><button type="button" aria-expanded={review} aria-controls={reviewId} onClick={()=>setReview(v=>!v)}>Review</button>{state.status==='Paid'&&<button type="button" className="office-paid-complete" disabled>Paid ✓</button>}</div>}
  {review&&<section id={reviewId} className="ember-panel"><h4>Invoice review</h4>{readiness.issues.length>0&&<ul>{readiness.issues.map(x=><li key={x}>{x}</li>)}</ul>}{reviewContent}{d.source&&<a className="ember-link" href={d.source} target="_blank" rel="noreferrer">Open source email ↗</a>}</section>}
  {state.pending&&<p className="ember-footnote">Payment saved in Office · Mac filing pending.</p>}
  {localReceipts.filter(r=>r.status==='blocked').map(r=><p className="error" key={r.event_id}>Mac filing needs review: {r.message}</p>)}

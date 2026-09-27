@@ -24,7 +24,7 @@ beforeEach(()=>{
 describe('Owner Paid approval with optional comments',()=>{
  it('records a flagged invoice without opening Review or writing a comment',async()=>{
   const result=await markOfficeInvoicePaid(request);
-  expect(result.ok).toBe(true);expect(f.rpc).toHaveBeenCalledTimes(1);
+  expect(result.ok).toBe(true);expect(result.payment).toMatchObject({id:request.id,document_id:'fixture',amount_cents:12000,payment_date:'2026-09-27'});expect(f.rpc).toHaveBeenCalledTimes(1);
   const args=f.rpc.mock.calls[0][1];
   expect(args.p_reason).toContain('120.00 on 2026-09-27');
   expect(args.p_review_reason).toContain('by pressing Paid');
@@ -51,6 +51,6 @@ describe('Owner Paid approval with optional comments',()=>{
  });
  it('reconciles a replay without adding a second payment',async()=>{
   f.prior.current={created_by:'owner',kind:'payment',document_id:'fixture',source_digest:digest,amount_cents:12000,payment_date:'2026-09-27',reason:'Owner marked Paid: AUD 120.00 on 2026-09-27.'};
-  expect((await markOfficeInvoicePaid(request)).ok).toBe(true);expect(f.rpc).not.toHaveBeenCalled();
+  const replay=await markOfficeInvoicePaid(request);expect(replay.ok).toBe(true);expect(replay.payment?.id).toBe(request.id);expect(f.rpc).not.toHaveBeenCalled();
  });
 });

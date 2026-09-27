@@ -126,3 +126,14 @@
 
 .office-invoice-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
 .office-invoice-actions>button{min-height:48px;width:100%;}
+
+/* Payment actions and completed invoices are intentionally distinct. */
+.office-payment-sections{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:20px 0 12px;}
+.ember .office-payment-sections button{min-height:48px;border:1px solid var(--line);border-radius:12px;padding:12px 8px;background:var(--input);color:var(--muted);font-size:14px;}
+.ember .office-payment-sections button[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:#33251c;}
+.office-payment-sections span{display:inline-block;margin-left:6px;font-size:12px;}
+.ember .office-invoice-actions .office-paid-complete:disabled{background:#183e2b;color:#b0f0c9;border:1px solid #428862;border-radius:12px;font-weight:700;opacity:1;cursor:default;padding:14px 20px;}
+.office-payment-toast{position:fixed;bottom:calc(86px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:45;width:min(90vw,560px);display:flex;align-items:center;gap:12px;border:1px solid #428862;border-radius:14px;background:#183e2b;color:#d4f5e1;padding:14px 16px;box-shadow:0 8px 28px #0007;}
+.office-payment-toast p{margin:0;font-size:13px;flex:1;}
+.office-payment-toast button{min-height:44px;color:#d4f5e1;font-size:13px;text-decoration:underline;flex-shrink:0;}
+.office-payment-toast button[aria-label]{min-width:32px;text-decoration:none;font-size:22px;}
