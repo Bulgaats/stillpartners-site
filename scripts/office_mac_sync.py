@@ -110,15 +110,21 @@ def sync_locked(root,config,engine,export_snapshot):
         archived=apply_history(engine,json.loads(policy_path.read_text())) if policy_path.exists() else {'closed':0,'file_errors':0}
         stage='commit'
         snapshot=json.loads(export_snapshot(root).read_text())
-        exchange(config,{'action':'commit','snapshot':snapshot,'receipts':receipts})
-        result={'status':'ok','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'documents':len(snapshot['documents']),'applied':sum(r['status']=='applied' for r in receipts),'blocked':sum(r['status']=='blocked' for r in receipts),'archive_errors':archived['file_errors'],'last_attempt_at':started,'stage':'complete'}
+        # The server digest also resolves a previous commit whose response timed out.
+        # Always send pending receipts, including blocked/replayed payment actions.
+        upload=bool(receipts) or response.get('sourceDigest')!=snapshot['sourceDigest']
+        if upload:exchange(config,{'action':'commit','snapshot':snapshot,'receipts':receipts})
+        result={'status':'ok','finished_at':dt.datetime.now(dt.timezone.utc).isoformat(),'documents':len(snapshot['documents']),'applied':sum(r['status']=='applied' for r in receipts),'blocked':sum(r['status']=='blocked' for r in receipts),'archive_errors':archived['file_errors'],'snapshot_uploaded':upload,'last_attempt_at':started,'stage':'complete'}
         stage='backup'
         backup_policy=root/'data/office_backup_policy.json'
         if backup_policy.exists():
-            from office_backup import daily_backup
+            from office_backup import current_daily_backup,daily_backup
             try:
-                cloud=exchange(config,{'action':'backup'});cloud_path=root/'data/office_cloud_backup.json';cloud_temp=cloud_path.with_suffix('.tmp');cloud_temp.write_text(json.dumps(cloud));os.chmod(cloud_temp,0o600);os.replace(cloud_temp,cloud_path)
-                backup=daily_backup(root,json.loads(backup_policy.read_text()));result['backup_at']=backup['created_at'];result['backup_off_device']=backup['off_device']
+                backup=current_daily_backup(root)
+                if backup is None:
+                    cloud=exchange(config,{'action':'backup'});cloud_path=root/'data/office_cloud_backup.json';cloud_temp=cloud_path.with_suffix('.tmp');cloud_temp.write_text(json.dumps(cloud));os.chmod(cloud_temp,0o600);os.replace(cloud_temp,cloud_path)
+                    backup=daily_backup(root,json.loads(backup_policy.read_text()))
+                result['backup_at']=backup['created_at'];result['backup_off_device']=backup['off_device']
             except (OSError,ValueError):result['backup_error']=True
         result=write_status(root,result);publish_health(config,result)
         return result

@@ -60,10 +60,20 @@ def create_backup(root,destination):
     return {**result,'file':str(path),'sha256':sha(path.read_bytes()),'created_at':dt.datetime.now(dt.timezone.utc).isoformat(),'off_device':destination.stat().st_dev!=root.stat().st_dev}
 
 
-def daily_backup(root,policy):
+def current_daily_backup(root):
+    """Reuse today's existing bundle before fetching another cloud metadata copy."""
     target=root/'Reports/office_backup_status.json'
     try:prior=json.loads(target.read_text())
     except (ValueError,OSError):prior={}
     today=dt.datetime.now(dt.timezone.utc).date().isoformat()
-    if str(prior.get('created_at','')).startswith(today) and Path(prior.get('file','')).is_file():return prior
+    if (isinstance(prior,dict) and str(prior.get('created_at','')).startswith(today)
+            and isinstance(prior.get('file'),str) and isinstance(prior.get('off_device'),bool)
+            and Path(prior['file']).is_file()):return prior
+    return None
+
+
+def daily_backup(root,policy):
+    prior=current_daily_backup(root)
+    if prior is not None:return prior
+    target=root/'Reports/office_backup_status.json'
     result=create_backup(root,policy['destination']);temp=target.with_suffix('.tmp');temp.write_text(json.dumps(result));os.chmod(temp,0o600);os.replace(temp,target);return result
