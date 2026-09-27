@@ -21,6 +21,10 @@ def build_snapshot(raw):
         issues=[text(x) for x in d.get('flags',[])]
         if not d.get('supplier_id'):issues.append('Supplier identity not confirmed')
         documents.append(dict(id=text(d['id']),sourceHash=text(d.get('sha256')),supplierId=text(d.get('supplier_id')),name=text(d.get('name')),abn=text(d.get('abn')),email=text(d.get('email')),phone=text(d.get('phone')),invoiceNumber=text(d.get('invoice_number')),issueDate=text(d.get('issue_date')),workPeriod=text(d.get('work_period')),received=text(d.get('received')),amountCents=amount,gst=text(d.get('gst')) if d.get('gst') is not None else '',currency=text(d.get('currency')),tonnage=text(d.get('tonnage')),recordType=text(d.get('record_type')),approved=d.get('approved') is True,duplicateOf=text(d.get('duplicate_of')),flags=issues,source=source,filename=Path(text(d.get('filename'))).name,paidCents=paid,paymentStatus='Paid' if paid and amount and paid>=amount else 'Part-paid' if paid else 'Unknown',payments=[dict(id=text(p.get('id')),date=text(p.get('date')),amountCents=cents(p.get('amount_cents'))) for p in allocated]))
+    for source, exported in zip(state['documents'], documents):
+        from office_history import valid_closure
+        h=valid_closure(source)
+        if h: exported['historicalClosure']={k:h.get(k) for k in ['kind','cutoff','confirmed_at','basis','basis_date','source_hash','file_verified_at']}
     if len({d['id'] for d in documents})!=len(documents):raise ValueError('Duplicate source document IDs')
     return dict(version=1,account=state['account'],sourceDigest=hashlib.sha256(b'office-snapshot-v1.1\0'+raw).hexdigest(),exportedAt=dt.datetime.now(dt.timezone.utc).isoformat(),paymentsComplete=state.get('payments_complete') is True,documents=documents)
 

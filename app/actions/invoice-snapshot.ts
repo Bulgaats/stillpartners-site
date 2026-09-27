@@ -5,7 +5,7 @@ import {invoiceSnapshotSchema} from '@/lib/office/invoice-snapshot';
 import {revalidatePath} from 'next/cache';
 export async function importOfficeInvoiceSnapshot(content:string){
  const session=await getSessionProfile();if(!session||session.profile.role!=='admin')return {ok:false,message:'Finance admin access required.'};
- if(content.length>900_000)return {ok:false,message:'Snapshot exceeds the import limit.'};
+ if(Buffer.byteLength(content,'utf8')>3_000_000)return {ok:false,message:'Snapshot exceeds the import limit.'};
  let raw:unknown;try{raw=JSON.parse(content);}catch{return {ok:false,message:'Select the exported Office_snapshot.json file.'};}
  const parsed=invoiceSnapshotSchema.safeParse(raw);if(!parsed.success)return {ok:false,message:'Snapshot format is invalid. Re-export from the Mac assistant.'};
  const p=parsed.data;const db=await createServerSupabaseClient();

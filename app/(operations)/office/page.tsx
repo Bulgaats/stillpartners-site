@@ -23,6 +23,7 @@ export default async function OfficePage({searchParams}:{searchParams?:Promise<{
   const a=params?.from && validDate(params.from)?params.from:cycle?.from??addIsoDays(today,-27);
   const b=params?.to && validDate(params.to)?params.to:cycle?.to??today;
   const data=await officeData(session.profile.role==="admin",a<b?a:b,a<b?b:a);
+  data.viewerId=session.userId;
   const existing=await getOperationsWorkspaceData({session,rangeStart:data.from,rangeEnd:data.to,includeLegacyWork:false});
   const management={clients:existing.clients,projects:existing.projects,clientInvoices:existing.clientInvoices,isFinanceAdmin:existing.isFinanceAdmin};
   let snapshot:InvoiceSnapshot|null=null;

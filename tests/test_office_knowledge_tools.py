@@ -14,6 +14,12 @@ class KnowledgeTests(unittest.TestCase):
  def test_invoice_metadata_is_retrievable_not_just_a_count(self):
   k=self.knowledge([document('a')]);r=k.call('read_company_record',{'collection':'invoices','id':'a'})
   self.assertEqual(r['record']['name'],'Example Person');self.assertEqual(r['record']['email'],'example@example.test');self.assertEqual(r['record']['tonnage'],'1')
+ def test_historical_sources_are_retrievable_but_not_reconciled_again(self):
+  d=document('a',historical_closure={'kind':'settled','source_hash':'a'*64,'cutoff':'2026-09-20'})
+  k=self.knowledge([d])
+  self.assertEqual(k.records('invoices')[0]['historicalClosure']['kind'],'settled')
+  with patch('office_knowledge_tools.subprocess.run') as calc,patch('office_knowledge_tools.registry_lookup') as registry:
+   result=k.check('a');self.assertEqual(result['overall'],'historical_closed');self.assertTrue(result['historicalSettlementConfirmed']);self.assertFalse(result['paymentConfirmed']);calc.assert_not_called();registry.assert_not_called()
  def test_duplicates_reused_numbers_and_identity_conflicts_remain_visible(self):
   a=document('a');b={**a,'id':'b','duplicate_of':'a'}
   c={**a,'id':'c','sha256':'c'*64};d={**a,'id':'d','name':'Another Person'}

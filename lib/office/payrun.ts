@@ -5,6 +5,7 @@ import type {InvoiceSnapshot} from './invoice-snapshot';
 const anchor='2026-09-25';
 const millis=(s:string)=>Date.parse(s+'T00:00:00Z');
 export function latestPayday(today:string){return addIsoDays(anchor,Math.floor((millis(today)-millis(anchor))/86400000/14)*14);}
+export function upcomingPayday(today:string){return addIsoDays(anchor,Math.ceil((millis(today)-millis(anchor))/86400000/14)*14);}
 export function payrunPeriod(payday:string){
  if(!validDate(payday))return null;
  // Two complete Monday–Sunday work weeks, paid on the following Friday.

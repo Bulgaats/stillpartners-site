@@ -18,7 +18,7 @@ const doc={id:'example',sourceHash:'b'.repeat(64),supplierId:'example',name:'Exa
 const snapshot={version:1,account:'work@stillpartners.net',sourceDigest:digest,exportedAt:'2026-09-27T00:00:00Z',paymentsComplete:false,documents:[doc,{...doc,id:'paid-example',invoiceNumber:'PAID-EXAMPLE'}]} as InvoiceSnapshot;
 const payment:InvoiceEvent={id:'payment-example',document_id:'paid-example',kind:'payment',source_digest:digest,amount_cents:12000,payment_date:'2026-09-27',reason:'Confirmed transfer',target_id:null,created_at:''};
 const data={finance:true,from:'2026-09-07',to:'2026-09-20',contractors:[],clients:[],projects:[],entries:[],rates:[]} as OfficeData;
-const props={snapshot,events:[payment],today:'2026-09-27',sync:{devices:[],receipts:[]} as unknown as MacSync,data};
+const props={snapshot,events:[payment],today:'2026-09-25',sync:{devices:[],receipts:[]} as unknown as MacSync,data};
 beforeEach(()=>{f.query='';});
 describe('To pay and Paid invoices rendered register',()=>{
  it('defaults to To pay, removes full paid invoices, and keeps the next invoice payable',()=>{
