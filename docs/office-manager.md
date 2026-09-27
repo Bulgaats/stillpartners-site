@@ -62,3 +62,7 @@ Owner-approved layout: Today is the default landing screen. Finance users have T
 Daily-entry state remains mounted across tab changes, preserving unsaved hours. Existing invoice/history entry links still select their corresponding screen. No payment, approval, database, source-file or email policy changes are included. Documents/global search/contextual AI are not added by this navigation release.
 
 Verified with phone and desktop synthetic browser flows: five tabs, source-to-destination links, contact reviews, client/contractor invoice separation and unsaved work retention. Production build required before release.
+
+## Cloud transition — 27 September 2026
+
+See CLOUD_EXECUTION.md. Read-only hosted AI/Gmail execution is implemented behind explicit environment activation and separate Google web OAuth consent. Local API credentials were not present during preparation, and live providers have not been validated. The default remains Mac execution. Cloud register ingestion, local catch-up for newly discovered cloud invoices, unattended monitoring and cloud sending remain next stages. Do not report them as completed.

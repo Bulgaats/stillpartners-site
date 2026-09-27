@@ -1,0 +1,5 @@
+import {createCipheriv,createDecipheriv,randomBytes,timingSafeEqual} from 'node:crypto';
+function key(){const value=process.env.OFFICE_TOKEN_KEY??'';if(!/^[a-f0-9]{64}$/i.test(value))throw new Error('Gmail encryption is not configured');return Buffer.from(value,'hex');}
+export function seal(value:unknown,owner:string){const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key(),iv);cipher.setAAD(Buffer.from(owner));const bytes=Buffer.concat([cipher.update(JSON.stringify(value),'utf8'),cipher.final()]);return [iv,cipher.getAuthTag(),bytes].map(v=>v.toString('base64url')).join('.');}
+export function unseal(value:string,owner:string){const [iv,tag,data]=value.split('.').map(v=>Buffer.from(v,'base64url'));const cipher=createDecipheriv('aes-256-gcm',key(),iv);cipher.setAAD(Buffer.from(owner));cipher.setAuthTag(tag);return JSON.parse(Buffer.concat([cipher.update(data),cipher.final()]).toString('utf8'));}
+export function sameSecret(a:string,b:string){const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length&&timingSafeEqual(x,y);}

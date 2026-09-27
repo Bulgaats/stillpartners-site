@@ -5,6 +5,7 @@ import {companyRecords} from '@/lib/office/company-record-data';
 import {officeData} from '@/lib/office/data';
 import {getPerthIsoDate,addIsoDays} from '@/lib/operations/dates';
 import {z} from 'zod';
+import {cloudConfig} from '@/lib/office/cloud/config';
 import {revalidatePath} from 'next/cache';
 async function access(){const session=await getSessionProfile();if(!session||session.profile.role!=='admin')throw new Error('Finance admin access required');return {session,db:await createServerSupabaseClient()};}
 const uuid=z.string().uuid();
@@ -32,10 +33,10 @@ export async function submitAssistantTask(id:string,prompt:string,conversationId
  const docs=Array.isArray(snapshot?.payload?.documents)?snapshot.payload.documents:[];
  const records=await companyRecords();
  const context={companyMemory:records.filter(r=>r.kind==='memory'),workItems:records.filter(r=>r.kind==='work'),capturedAt:new Date().toISOString(),today,currency:'AUD',contractors:data.contractors,clients:data.clients,sites:data.projects,workRecords:data.entries,agreedRates:data.rates.filter(r=>!r.voidedAt),workRange:{from:data.from,to:data.to},pendingContactReviews:data.contactImports?.filter(i=>i.status==='pending').length??0,contactReviews:(data.contactImports??[]).map(i=>({id:i.id,status:i.status,workerId:i.workerId,name:i.source.name,abn:i.source.abn,emails:i.source.emails,phones:i.source.phones,issues:i.source.issues,documentCount:i.source.documentCount})),invoiceSnapshot:{exportedAt:snapshot?.exported_at??null,documentCount:docs.length,coverage:'Full imported invoice metadata and verified local source text are available through the Mac company-record tools. Use them before asking the owner for data. This snapshot is not a live inbox check.'},conversation:(history??[]).reverse()};
- const {error}=await db.from('office_assistant_tasks').insert({id,user_id:session.userId,conversation_id:conversationId??null,prompt:prompt.trim(),context});
+ const {error}=await db.from('office_assistant_tasks').insert({id,user_id:session.userId,conversation_id:conversationId??null,prompt:prompt.trim(),context,executor:cloudConfig().enabled?'cloud':'mac'});
  if(error?.code==='23505')return {ok:true,message:'Request already queued.'};
  if(error)return {ok:false,message:'Could not queue your request.'};
- return {ok:true,message:'Request queued for your Mac assistant.'};
+ return {ok:true,message:cloudConfig().enabled?'Request queued for Bobby in the cloud.':'Request queued for your Mac assistant.'};
 }
 export async function listAssistantConversations(limit=30){
  const {session,db}=await access();
@@ -49,7 +50,7 @@ export async function listAssistantConversations(limit=30){
 export async function listAssistantTasks(conversationId:string|null, before?:{createdAt:string;id:string}){
  const {session,db}=await access();
  if(conversationId!==null)uuid.parse(conversationId);
- let query=db.from('office_assistant_tasks').select('id,prompt,status,response,created_at,applied_id,conversation_id,applications:office_assistant_applications(proposal_index,worker_id,status,message)').eq('user_id',session.userId);
+ let query=db.from('office_assistant_tasks').select('id,prompt,status,response,created_at,applied_id,conversation_id,executor,cloud_error,applications:office_assistant_applications(proposal_index,worker_id,status,message)').eq('user_id',session.userId);
  query=conversationId?query.eq('conversation_id',conversationId):query.is('conversation_id',null);
  if(before){const at=z.string().datetime({offset:true}).parse(before.createdAt),id=uuid.parse(before.id);query=query.or(`created_at.lt.${at},and(created_at.eq.${at},id.lt.${id})`);}
  const {data,error}=await query.order('created_at',{ascending:false}).order('id',{ascending:false}).limit(31);

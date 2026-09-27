@@ -124,3 +124,7 @@ Measure from actual events, not estimated marketing claims:
 A task is complete only when its intended business result is verified and recorded. Report completed, awaiting approval, waiting externally, blocked and next due separately.
 
 Stage 1 implementation status (27 September 2026): company memory, work records, version history and cross-chat retrieval are implemented. See office-manager.md for capability and verification details. Stages 2–5 remain planned.
+
+## Owner priority update — 27 September 2026
+
+The phone is the primary daily control surface; the Mac is used occasionally. Owner-approved direction: cloud AI and live company email reads should work with the Mac off; hosted financial records are authoritative for phone actions; Mac reconnect later downloads missing Gmail sources and files originals/paid copies without replaying payments. Implement this cloud transition before general proactive detectors. CLOUD_EXECUTION.md distinguishes prepared code, activation gates and unfinished cloud ingestion/catch-up work.
