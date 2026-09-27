@@ -91,3 +91,17 @@
 .office-batch-person p{font-size:13px;line-height:1.6}
 .office-batch-person small{font-size:11px;display:block;overflow-wrap:anywhere}
 .office-batch-person>button{min-height:42px;padding:9px 14px;border:1px solid #785339;border-radius:9px;margin-top:12px;color:#ffb682}
+
+.office-record-add{border:1px solid #66503f;border-radius:10px;color:var(--accent);padding:10px 14px;min-height:44px;font-size:13px}
+.office-record-form{margin:20px 0;padding:18px;border:1px solid #73503b;border-radius:14px}
+.office-record-form label{display:grid;gap:6px;font-size:12px;margin:14px 0}
+.office-record-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.office-work-counts{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;color:#f1c397}
+.office-record-card{padding:20px 0;border-top:1px solid var(--line);margin-top:18px;overflow-wrap:anywhere}
+.office-record-card h3{font-size:16px;font-weight:650}
+.office-record-card p{font-size:14px}
+.office-record-badge{font-size:11px;padding:6px 9px;border:1px solid var(--line);border-radius:15px;white-space:nowrap}
+.office-record-history{font-size:12px;margin-top:14px;color:var(--muted)}
+.office-record-history summary{cursor:pointer}
+.office-record-history>div{padding:12px;border-left:2px solid #614432;margin:12px 0}
+.office-record-history small{display:block;margin-top:5px}

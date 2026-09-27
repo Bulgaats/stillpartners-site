@@ -4,7 +4,7 @@ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 import office_assistant_worker as worker
 class WorkerBoundaries(unittest.TestCase):
  def test_model_cannot_add_executable_actions(self):
-  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','gstMode':'exclusive','section':'none','contractors':[]}
+  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','gstMode':'exclusive','section':'none','contractors':[],'companyRecord':None}
   self.assertEqual(worker.validate(payload),payload)
   for key,value in [('action','send_email'),('section','https://example.test')]:
    with self.subTest(key=key),self.assertRaises(ValueError):worker.validate({**payload,key:value})
@@ -30,4 +30,18 @@ class WorkerBoundaries(unittest.TestCase):
    fake_mac=types.SimpleNamespace(sync=lambda *args:{'status':'already_running'})
    with patch.dict(sys.modules,{'gmail_sync':fake_gmail,'office_mac_sync':fake_mac}):result=worker.check_invoices(root,root/'config',str(uuid.uuid4()))
    self.assertIn('update is pending',result['reply']);self.assertNotIn('register refreshed',result['reply'])
+
+ def test_company_record_requires_evidence_and_real_dates(self):
+  base={**{k:'' for k in worker.LIMITS},'action':'save_company_record','group':'regular','gstMode':'exclusive','section':'work','contractors':[]}
+  record={'id':'','expectedVersion':0,'kind':'work','title':'Await supplier reply','body':'','status':'waiting_external','category':'','priority':'normal','dueDate':'2026-09-28','effectiveDate':'','nextAction':'Check matching thread','outcome':'','sourceRef':'Synthetic thread'}
+  self.assertEqual(worker.validate({**base,'companyRecord':record})['companyRecord'],record)
+  for patch_ in [{'dueDate':'2026-02-30'},{'nextAction':''},{'status':'completed'},{'expectedVersion':-1},{'command':'anything'}]:
+   with self.subTest(patch_=patch_),self.assertRaises(ValueError):worker.validate({**base,'companyRecord':{**record,**patch_}})
+ def test_memory_retrieval_is_not_bound_to_chat(self):
+  import office_knowledge_tools as kt
+  k=kt.Knowledge.__new__(kt.Knowledge)
+  k.context={'companyMemory':[{'id':'memory1','title':'Approved preference','status':'confirmed','effective_date':'2026-09-27'}],'workItems':[{'id':'work1','title':'Waiting reply','due_date':'2026-09-28'}]}
+  self.assertEqual(k.records('companyMemory')[0]['id'],'memory1')
+  self.assertEqual(k.records('workItems')[0]['id'],'work1')
+
 if __name__=='__main__':unittest.main()

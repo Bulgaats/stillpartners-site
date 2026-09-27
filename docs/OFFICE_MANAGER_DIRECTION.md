@@ -122,3 +122,5 @@ Measure from actual events, not estimated marketing claims:
 - Owner time saved only when measured or explicitly estimated with its basis.
 
 A task is complete only when its intended business result is verified and recorded. Report completed, awaiting approval, waiting externally, blocked and next due separately.
+
+Stage 1 implementation status (27 September 2026): company memory, work records, version history and cross-chat retrieval are implemented. See office-manager.md for capability and verification details. Stages 2–5 remain planned.

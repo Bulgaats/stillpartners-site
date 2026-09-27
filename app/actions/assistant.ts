@@ -1,6 +1,7 @@
 'use server';
 import {getSessionProfile} from '@/lib/auth/session';
 import {createServerSupabaseClient} from '@/lib/supabase/server';
+import {companyRecords} from '@/lib/office/company-record-data';
 import {officeData} from '@/lib/office/data';
 import {getPerthIsoDate,addIsoDays} from '@/lib/operations/dates';
 import {z} from 'zod';
@@ -29,7 +30,8 @@ export async function submitAssistantTask(id:string,prompt:string,conversationId
  if(historyError)return {ok:false,message:'Could not load this chat’s context. Please retry.'};
  const {data:snapshot}=await db.from('office_invoice_snapshots').select('exported_at,payload').order('exported_at',{ascending:false}).limit(1).maybeSingle();
  const docs=Array.isArray(snapshot?.payload?.documents)?snapshot.payload.documents:[];
- const context={capturedAt:new Date().toISOString(),today,currency:'AUD',contractors:data.contractors,clients:data.clients,sites:data.projects,workRecords:data.entries,agreedRates:data.rates.filter(r=>!r.voidedAt),workRange:{from:data.from,to:data.to},pendingContactReviews:data.contactImports?.filter(i=>i.status==='pending').length??0,contactReviews:(data.contactImports??[]).map(i=>({id:i.id,status:i.status,workerId:i.workerId,name:i.source.name,abn:i.source.abn,emails:i.source.emails,phones:i.source.phones,issues:i.source.issues,documentCount:i.source.documentCount})),invoiceSnapshot:{exportedAt:snapshot?.exported_at??null,documentCount:docs.length,coverage:'Full imported invoice metadata and verified local source text are available through the Mac company-record tools. Use them before asking the owner for data. This snapshot is not a live inbox check.'},conversation:(history??[]).reverse()};
+ const records=await companyRecords();
+ const context={companyMemory:records.filter(r=>r.kind==='memory'),workItems:records.filter(r=>r.kind==='work'),capturedAt:new Date().toISOString(),today,currency:'AUD',contractors:data.contractors,clients:data.clients,sites:data.projects,workRecords:data.entries,agreedRates:data.rates.filter(r=>!r.voidedAt),workRange:{from:data.from,to:data.to},pendingContactReviews:data.contactImports?.filter(i=>i.status==='pending').length??0,contactReviews:(data.contactImports??[]).map(i=>({id:i.id,status:i.status,workerId:i.workerId,name:i.source.name,abn:i.source.abn,emails:i.source.emails,phones:i.source.phones,issues:i.source.issues,documentCount:i.source.documentCount})),invoiceSnapshot:{exportedAt:snapshot?.exported_at??null,documentCount:docs.length,coverage:'Full imported invoice metadata and verified local source text are available through the Mac company-record tools. Use them before asking the owner for data. This snapshot is not a live inbox check.'},conversation:(history??[]).reverse()};
  const {error}=await db.from('office_assistant_tasks').insert({id,user_id:session.userId,conversation_id:conversationId??null,prompt:prompt.trim(),context});
  if(error?.code==='23505')return {ok:true,message:'Request already queued.'};
  if(error)return {ok:false,message:'Could not queue your request.'};
