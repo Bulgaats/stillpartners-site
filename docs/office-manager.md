@@ -101,3 +101,13 @@ Current rules:
 Stable issue keys and evidence hashes prevent repeated polling from creating duplicate cases/history. Source changes update the same case. Automatic resolution closes only untouched cases; owner notes, next actions and edited follow-ups survive. An unchanged closed case stays closed; material new evidence reopens it. Case history distinguishes automatic observations. A cleared condition does not claim that Bobby made a payment, sent mail, verified attendance or completed another external action.
 
 These are the first four checks, not full automatic invoice/time matching, missing-attendance detection, all-company email ingestion, overdue client debt collection or document-expiry tracking. Those require complete source coverage and explicit expectations/standing rules. Today also flags stale Mac sync after 15 minutes; a fresh sync still does not prove fresh Gmail coverage.
+
+## Clear inbox actions and touch feedback — 28 September 2026
+
+Work inbox and assistant messages have separate tinted cards with a coloured status edge and visible status text. Review / edit brings the editor into view and focuses it. Existing active work items offer **Approve & close** and **Dismiss** directly on the card and in the editor without a typed comment. These actions record the owner's inbox decision, preserve source references and history, and use the existing finance-only, version-checked, idempotent save. They do not verify an external business outcome or change invoice/payment/source records. Optional outcome notes are retained. Dismissed records can be reopened through Including history → Review / edit.
+
+Invoice payment sections show the current selection. Selecting a section, including the already-active To pay section, focuses and scrolls to its list heading and explains how to open supplier invoices. To pay/Paid counts keep the same period scope when Historical archive is selected. The selected list continues to respect search and document filters.
+
+Contractor creation and company-record proposals use prominent buttons and Saving feedback. Inbox mutations surface a persistent result or error message; failed requests keep their record and retry identity. Refresh and history controls display their progress. No database migration is required.
+
+Validation: 17 targeted work-review/payment/rendering tests and production build. Browser interaction/visual QA was blocked by the local-preview browser permission, so authenticated iPhone visual verification remains outstanding.

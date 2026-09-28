@@ -13,7 +13,7 @@ export function ContractorBatch({task,response,pending,run}:{task:AssistantTask;
    <strong>{p.name}</strong><p>{p.email||'Email not available'}<br/>{p.phone||'Phone not available'}<br/>ABN {p.abn||'not available'}</p>
    <small>{p.group==='regular'?'Regular contractor':'Occasional contractor'} · {p.sourceDocumentIds.length?`Invoice sources: ${p.sourceDocumentIds.join(', ')}`:'Owner-provided details'}</small>
    {result&&<p className={result.status==='review'?'error':'muted'} role="status">{result.status==='created'?'Created ✓':result.status==='existing'?'Already registered ✓':'Needs review'} — {result.message}</p>}
-   {!done&&<button disabled={pending} onClick={()=>run(()=>applyAssistantContractors(task.id,[i]))}>{result?.status==='review'?'Retry this record':'Create record'}</button>}
+   {!done&&<button className="ember-primary" aria-busy={pending} disabled={pending} onClick={()=>run(()=>applyAssistantContractors(task.id,[i]))}>{pending?'Saving…':result?.status==='review'?'Retry this record':'Create record'}</button>}
   </article>;})}
  </section>;
 }
