@@ -6,8 +6,8 @@ import {prepareClientDraft,listClientDrafts,approveClientDraft,cancelClientDraft
 import type {ClientDraft} from '@/lib/office/client-drafts';
 import {addIsoDays} from '@/lib/operations/dates';
 const money=(n:number)=>new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD'}).format(n/100);
-export function ClientDrafts({clients,today,from,to}:{clients:{id:string;name:string;active:boolean}[];today:string;from:string;to:string}){
- const [drafts,setDrafts]=useState<ClientDraft[]>([]),[client,setClient]=useState(''),[startDay,setStart]=useState(from),[endDay,setEnd]=useState(to),[issue,setIssue]=useState(today),[due,setDue]=useState(addIsoDays(today,14)),[gst,setGst]=useState<'exclusive'|'none'>('exclusive'),[message,setMessage]=useState(''),[pending,transition]=useTransition();const id=useRef('');
+export function ClientDrafts({clients,today,from,to,preset}:{preset?:{clientId:string;from:string;to:string}|null;clients:{id:string;name:string;active:boolean}[];today:string;from:string;to:string}){
+ const [drafts,setDrafts]=useState<ClientDraft[]>([]),[client,setClient]=useState(preset?.clientId??''),[startDay,setStart]=useState(preset?.from??from),[endDay,setEnd]=useState(preset?.to??to),[issue,setIssue]=useState(today),[due,setDue]=useState(addIsoDays(today,14)),[gst,setGst]=useState<'exclusive'|'none'>('exclusive'),[message,setMessage]=useState(''),[pending,transition]=useTransition();const id=useRef('');
  async function refresh(){try{setDrafts(await listClientDrafts());}catch{setMessage('Could not load invoice drafts. Refresh before continuing.');}}
  useEffect(()=>{void refresh();},[]);
  const edit=(change:()=>void)=>{id.current='';change();};

@@ -1,6 +1,6 @@
 import type { ContactImport } from './contact-import';
 export type Contractor = {
-  id: string; fullName: string; phone: string; email: string; abn: string;
+  id: string; fullName: string; shortName?:string; aliases?:string[]; nameVersion?:number; phone: string; email: string; abn: string;
   group: "regular" | "occasional"; active: boolean;
 };
 export type OfficeRate = {
@@ -25,7 +25,7 @@ export function contactText(person: Contractor) {
 }
 export function directory(people: Contractor[], query = "") {
   const term=query.trim().toLocaleLowerCase();
-  return people.filter(p=>`${p.fullName} ${p.phone} ${p.email} ${p.abn}`.toLocaleLowerCase().includes(term))
+  return people.filter(p=>`${p.fullName} ${p.shortName??""} ${(p.aliases??[]).join(" ")} ${p.phone} ${p.email} ${p.abn}`.toLocaleLowerCase().includes(term))
     .sort((a,b)=>Number(b.active)-Number(a.active) || Number(a.group==="occasional")-Number(b.group==="occasional") || a.fullName.localeCompare(b.fullName,"en-AU"));
 }
 export function effectiveRate(rates: OfficeRate[], workerId: string, clientId: string, kind: OfficeRate["kind"], day: string) {

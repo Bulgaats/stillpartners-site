@@ -4,7 +4,7 @@ sys.path.insert(0,str(pathlib.Path(__file__).resolve().parents[1]/'scripts'))
 import office_assistant_worker as worker
 class WorkerBoundaries(unittest.TestCase):
  def test_model_cannot_add_executable_actions(self):
-  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','gstMode':'exclusive','section':'none','contractors':[],'companyRecord':None}
+  payload={**{k:'' for k in worker.LIMITS},'action':'none','group':'regular','gstMode':'exclusive','section':'none','contractors':[],'companyRecord':None,'contractorNames':[]}
   self.assertEqual(worker.validate(payload),payload)
   for key,value in [('action','send_email'),('section','https://example.test')]:
    with self.subTest(key=key),self.assertRaises(ValueError):worker.validate({**payload,key:value})
@@ -30,6 +30,13 @@ class WorkerBoundaries(unittest.TestCase):
    fake_mac=types.SimpleNamespace(sync=lambda *args:{'status':'already_running'})
    with patch.dict(sys.modules,{'gmail_sync':fake_gmail,'office_mac_sync':fake_mac}):result=worker.check_invoices(root,root/'config',str(uuid.uuid4()))
    self.assertIn('update is pending',result['reply']);self.assertNotIn('register refreshed',result['reply'])
+
+ def test_short_names_are_bounded_batch_proposals(self):
+  base={**{k:'' for k in worker.LIMITS},'action':'save_contractor_names','group':'regular','gstMode':'exclusive','section':'contacts','contractors':[]}
+  person={'workerId':str(uuid.uuid4()),'fullName':'Synthetic Legal Person','shortName':'Example','aliases':['Example One'],'expectedVersion':0}
+  self.assertEqual(len(worker.validate({**base,'contractorNames':[person]})['contractorNames']),1)
+  for change in [{'workerId':'not-an-id'},{'shortName':''},{'expectedVersion':-1},{'aliases':['a']*21}]:
+   with self.assertRaises(ValueError):worker.validate({**base,'contractorNames':[{**person,**change}]})
 
  def test_company_record_requires_evidence_and_real_dates(self):
   base={**{k:'' for k in worker.LIMITS},'action':'save_company_record','group':'regular','gstMode':'exclusive','section':'work','contractors':[]}
