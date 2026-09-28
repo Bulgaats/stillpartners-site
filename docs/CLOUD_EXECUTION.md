@@ -1,6 +1,6 @@
 # Bobby cloud execution — activation handoff
 
-Status: implementation prepared on 27 September 2026. Activation and live provider validation are separate gates. Do not call this a fully cloud office manager.
+Status: hosted read-only AI implementation prepared on 27 September 2026; manual Work Gmail delivered on 28 September 2026. Provider configuration, owner consent and live validation remain separate gates. The current owner choice is manual hosted Gmail with paid cloud AI inactive. Do not call this a fully cloud office manager.
 
 ## Owner intent and boundaries
 
@@ -23,7 +23,36 @@ Cloud register ingestion and Mac catch-up downloads of newly cloud-discovered in
 
 A submitted chat dispatches through a 300-second server route using Next after. Existing browser polling retries the dispatcher; its atomic lease prevents duplicate model jobs. If the app closes before dispatch is accepted, reopen the app to resume queued work. No always-on scheduler is installed. A process killed after a model request may require a second billed read attempt after its lease expires; no external write is performed by the runtime. Do not promise exactly-once API billing.
 
-## Required server setup (Vercel production environment only)
+## Current setup: manual Work Gmail without a paid AI API
+
+This is the current authorised connection task. `/office/mail` provides direct search, message reading and original attachment downloads while the Mac is off after setup. It does not make Mac Bobby chat, invoice import, source filing or outgoing email run in the cloud. Existing hosting and account limits still apply; no paid plan or API is activated by this setup.
+
+1. Sign in to the existing Vercel project and Google Cloud project using their normal authentication. Check existing production configuration by key names/presence only; never print secret values. If interactive sign-in is unavailable, save the stopping point instead of reusing browser cookies or Mac credentials.
+2. In the existing Google project with Gmail API enabled, create a separate OAuth **Web application** client. Use the organisation's Internal audience where appropriate. Register this exact authorised redirect URI:
+
+   `https://www.stillpartners.net/api/office/gmail/callback`
+
+   The existing Desktop client and its Mac refresh token stay local. A web client cannot be constructed by renaming Desktop credentials.
+3. Configure the following **production-only, server-side** values in Vercel. Keep the secret values out of chat, git, screenshots and `NEXT_PUBLIC` variables.
+
+   | Variable | Preparation |
+   |---|---|
+   | `OFFICE_GOOGLE_CLIENT_ID` | The new Web application's client ID |
+   | `OFFICE_GOOGLE_CLIENT_SECRET` | The new Web application's secret; store as a Secret |
+   | `OFFICE_TOKEN_KEY` | Fresh random 32 bytes encoded as 64 hex characters; store as a Secret. Preserve an existing key when reconnecting rather than silently rotating it. |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Verify the existing server-only database credential is configured; do not overwrite it or expose it to the browser. |
+
+   Keep `OFFICE_CLOUD_ENABLED=false`. Do not create an OpenAI API key, add billing or enable the model for this connection. `gmailConfig()` checks the three Gmail settings; callback storage separately requires the service-role credential.
+4. Redeploy production so the configuration takes effect. Open `/office/connections` as the finance admin, choose **Connect work Gmail (read only)** and complete Google's consent for the expected work mailbox. The application requests only `https://www.googleapis.com/auth/gmail.readonly`; it rejects a different mailbox or broader granted scopes. The owner completes sign-in and consent through the supported authentication flow; do not request passwords, OTPs or tokens in chat.
+5. Confirm a mailbox record was saved, then use `/office/mail` to search a bounded recent range, read one message and open one supported attachment. Report the source date and any remaining pages. Repeat with the Mac unavailable to establish that this read path is independent. A configured button or successful OAuth redirect alone is not a completed live acceptance test.
+
+The refresh token is encrypted and owner-bound before database storage. The encryption key stays in server configuration, separate from the ciphertext. Disconnecting hosted Gmail does not alter the Mac connection. Mail search/download requires no model call; general AI replies continue on the Mac under the current arrangement.
+
+### Resume evidence, 28 September 2026
+
+The Vercel environment-settings page required sign-in in the available browser. Google Cloud's OAuth client page returned `Site Unavailable`; its configuration was not inspected. No server variables or OAuth clients were changed, no new token was issued, and no hosted mailbox was connected. The owner deferred any required participation until morning. Continue from authentication/configuration, not by reinstalling the Office app or copying the Mac's Gmail token. The private Mac report `Reports/office_work_gmail_connection_status.json` holds the detailed resumable checkpoint.
+
+## Optional later setup: paid cloud AI (not authorised for activation now)
 
 Never paste secrets into a chat, repository, NEXT_PUBLIC variable, screenshot or PR.
 - OPENAI_API_KEY: dedicated restricted project API key with Responses access, configured billing and owner-reviewed spend controls.
@@ -32,15 +61,8 @@ Never paste secrets into a chat, repository, NEXT_PUBLIC variable, screenshot or
 - OFFICE_CLOUD_DAILY_REQUESTS: owner-chosen integer 1–500. This is an attempt cap, not a guaranteed AUD budget. Each request can make up to eight model calls.
 - OFFICE_CLOUD_ENABLED: keep false until the live acceptance checks are ready.
 - SUPABASE_SERVICE_ROLE_KEY: existing server-only database credential is required.
-- OFFICE_GOOGLE_CLIENT_ID and OFFICE_GOOGLE_CLIENT_SECRET: a NEW Google OAuth Web application client, not the Mac Desktop client.
-- OFFICE_TOKEN_KEY: fresh random 32 bytes encoded as 64 hex characters. Retain securely; changing it requires reconnecting cloud Gmail. Never store it beside the ciphertext in the database.
 
-Google client authorised redirect URI:
-https://www.stillpartners.net/api/office/gmail/callback
-
-Use the existing Google Cloud project with Gmail API enabled. Workspace Internal audience where appropriate. Request gmail.readonly only. Open production /office/connections and choose Connect work Gmail while signed in to the correct Office admin and work mailbox. The page explains that email/attachment content will be processed by the cloud AI. No existing subcontractor PDFs are uploaded from the Mac by setup.
-
-Then activate the model and redeploy, first testing a harmless saved-record question and a bounded live Gmail check. OpenAI store:false is used; this is not a promise of zero provider retention. Follow the actual provider data policy.
+The separately connected hosted mailbox can supply requested email evidence to a cloud model only if this optional AI runtime is later activated. Existing source PDFs are not bulk-uploaded from the Mac by setup. Obtain separate owner approval for the provider, spend controls and activation; then test a harmless saved-record question and bounded Gmail read. OpenAI store:false is used; this is not a promise of zero provider retention. Follow the actual provider data policy.
 
 ## Runtime bounds and honest coverage
 
@@ -52,7 +74,7 @@ Company work evidence covers the task's last 90 days; older invoice checks retur
 
 Synthetic unit tests exercise configuration, owner-bound encryption/tampering, pagination, self-addressed messages, attachment coverage, tool allowlist, Responses tool replay and incomplete-result rejection. Rollback SQL checks verify owner routing, no duplicate lease, stale completion rejection, recovery limits, daily cap and denied browser token/claim access. No synthetic invoices/payments or outgoing emails are retained.
 
-Live API and Google consent cannot be verified without the owner/provider setup. Before declaring active, test with Mac off: request -> live model result -> Gmail source/attachment read -> honest source time and remaining import state. Verify auth denial and reconnect behavior. Existing Mac importer remains operational in the meantime.
+Live Google consent cannot be verified without owner/provider setup. For the current manual connection, verify search -> message -> original attachment from `/office/mail` with the Mac off, including source time and search coverage. Verify auth denial and reconnect behavior. Test request -> live model result only if paid cloud AI is separately authorised and activated later. Existing Mac importer remains operational in the meantime.
 
 ## References
 
