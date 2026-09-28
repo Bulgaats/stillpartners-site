@@ -15,7 +15,7 @@ function contactText(person) {
 }
 function directory(people, query = "") {
     const term = query.trim().toLocaleLowerCase();
-    return people.filter(p => `${p.fullName} ${p.phone} ${p.email} ${p.abn}`.toLocaleLowerCase().includes(term))
+    return people.filter(p => `${p.fullName} ${p.shortName ?? ""} ${(p.aliases ?? []).join(" ")} ${p.phone} ${p.email} ${p.abn}`.toLocaleLowerCase().includes(term))
         .sort((a, b) => Number(b.active) - Number(a.active) || Number(a.group === "occasional") - Number(b.group === "occasional") || a.fullName.localeCompare(b.fullName, "en-AU"));
 }
 function effectiveRate(rates, workerId, clientId, kind, day) {

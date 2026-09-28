@@ -178,3 +178,7 @@
 .office-supplier-group{border-left:3px solid #658bad;background:#1c242e;}
 .office-supplier-group[open]{border-color:#657e99;}
 @media(prefers-reduced-motion:reduce){.ember button{transition:none;}}
+
+.office-document-fields{border:0;padding:0;display:grid;gap:16px}.office-document-fields label{display:grid;gap:8px}.office-document-fields input[type=checkbox]{width:auto;justify-self:start}.office-brief details{margin:20px 0}.office-brief .office-home-actions{margin:16px 0}
+
+.office-name-options { max-height: 18rem; overflow-y: auto; margin-block: 1rem; }

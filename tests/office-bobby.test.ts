@@ -1,0 +1,23 @@
+import {describe,it,expect} from 'vitest';
+import {documentExpiry,documentInput,type OfficeDocument} from '../lib/office/documents';
+import {resolveContractorName} from '../lib/office/contractor-names';
+import {officeBrief} from '../lib/office/brief';
+import type {OfficeData} from '../lib/office/foundation';
+import type {InvoiceSnapshot} from '../lib/office/invoice-snapshot';
+const person={id:'w',fullName:'Example Legal Person',shortName:'Example',aliases:['Example One'],abn:'51824753556',phone:'',email:'',active:true,group:'regular' as const};
+const data:OfficeData={finance:true,from:'2026-09-28',to:'2026-10-04',contractors:[person],clients:[{id:'c',name:'Example Client',active:true}],projects:[{id:'s',clientId:'c',name:'Example Site',active:true}],entries:[{id:'e',workerId:'w',jobId:'s',workDate:'2026-09-28',actualHours:8,contractorHours:8,clientHours:10,agreementNote:'Agreed different hours',locked:false,updatedAt:''}],rates:[{id:'r',workerId:'w',clientId:null,kind:'contractor',hourlyRateCents:6000,effectiveFrom:'2026-09-28',agreementNote:'Agreed',voidedAt:null},{id:'c-rate',workerId:'w',clientId:'c',kind:'client',hourlyRateCents:7000,effectiveFrom:'2026-09-28',agreementNote:'Agreed',voidedAt:null}]};
+const doc={id:'d',sourceHash:'a'.repeat(64),name:person.fullName,abn:person.abn,workPeriod:'2026-09-28',invoiceNumber:'EX-1',recordType:'invoice',amountCents:48000,gst:'0',currency:'AUD',tonnage:'0.8',flags:[],duplicateOf:'',approved:false,paidCents:0,payments:[]} as unknown as InvoiceSnapshot['documents'][number];
+const snapshot={sourceDigest:'b'.repeat(64),exportedAt:'2026-09-28T14:00:00Z',documents:[doc]} as InvoiceSnapshot;
+describe('Bobby office brief',()=>{
+ it('compares payable hours while client billing uses its separate hours/rate',()=>{const r=officeBrief(data,snapshot,[],[],[],[],'2026-09-28');expect(r.invoices[0].label).toBe('Matched');expect(r.billing[0].feeCents).toBe(70000);expect(r.invoices[0].expectedTotalCents).toBe(48000);});
+ it('does not reopen historical or fully-paid invoices',()=>{const s={...snapshot,documents:[{...doc,historicalClosure:{source_hash:doc.sourceHash,kind:'settled'}},{...doc,id:'paid',paidCents:48000}]} as InvoiceSnapshot;expect(officeBrief(data,s,[],[],[],[],'2026-09-28').invoices).toHaveLength(0);});
+ it('labels absent attendance as missing, not zero',()=>expect(officeBrief({...data,entries:[]},snapshot,[],[],[],[],'2026-09-28').invoices[0].label).toBe('Missing records'));
+ it('honours cloud payments before local filing',()=>expect(officeBrief(data,snapshot,[{id:'p',document_id:'d',kind:'payment',source_digest:snapshot.sourceDigest,amount_cents:48000,payment_date:'2026-09-28',reason:'Owner confirmation',target_id:null,created_at:''}],[],[],[],'2026-09-28').invoices).toHaveLength(0));
+ it('blocks client preparation without an assigned summary name',()=>expect(officeBrief({...data,contractors:[{...person,shortName:''}]},snapshot,[],[],[],[],'2026-09-28').billing[0].issues).toContain('Short name needed for the client summary'));
+ it('does not propose billing locked work or pre-cutover work',()=>expect(officeBrief({...data,entries:data.entries.map(e=>({...e,locked:true}))},null,[],[],[],[],'2026-09-28').billing).toEqual([]));
+});
+describe('Source-linked documents and identity aliases',()=>{
+ it('requires expiry confirmation before counting down',()=>{const d={expires_on:'2026-09-30',expiry_confirmed:false,status:'active'} as OfficeDocument;expect(documentExpiry(d,'2026-09-28').status).toBe('unverified');expect(documentExpiry({...d,expiry_confirmed:true},'2026-09-28').days).toBe(2);expect(documentExpiry({...d,expiry_confirmed:true,status:'archived'},'2026-09-28').status).toBe('none');});
+ it('resolves aliases case-insensitively without fuzzy guessing',()=>{expect(resolveContractorName([person],'  example   ONE ')[0].id).toBe('w');expect(resolveContractorName([person],'Exampl')).toEqual([]);expect(resolveContractorName([person,{...person,id:'other'}],'Example')).toHaveLength(2);});
+ it('rejects unsafe document links, impossible dates and missing identity',()=>{const x={id:'00000000-0000-4000-8000-000000000001',expectedVersion:0,title:'Insurance',entityType:'company',entityId:'',category:'insurance',sourceUrl:'https://mail.google.com/mail/#all/abc',sourceNote:'',notes:'',expiresOn:'',expiryConfirmed:false,status:'active'};expect(documentInput.safeParse(x).success).toBe(true);for(const change of [{sourceUrl:'javascript:alert(1)'},{sourceUrl:'https://user:pass@example.invalid'},{expiresOn:'2026-02-30'},{entityType:'contractor'},{expiryConfirmed:true}])expect(documentInput.safeParse({...x,...change}).success).toBe(false);});
+});

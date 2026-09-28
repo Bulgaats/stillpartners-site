@@ -19,6 +19,8 @@ import {ClientDrafts} from "./client-drafts";
 import {CompanyRecords} from './company-records';
 import {OperationalReadiness} from './operational-readiness';
 import {activeContactImports} from '@/lib/office/readiness';
+import {OfficeBrief} from './office-brief';
+import {DocumentCatalog} from './document-catalog';
 import {AssistantChat} from "./assistant-chat";
 
 import {readWorkDrafts,writeWorkDrafts,type WorkDraft as Draft} from '@/lib/office/work-drafts';
@@ -27,6 +29,7 @@ const colors=["#b4a0e8","#83b9e1","#92cdb8","#e8b783"];
 const clientColor=(id:string)=>colors[Array.from(id).reduce((n,c)=>n+c.charCodeAt(0),0)%colors.length];
 export function EmberWorkspace({data,management,snapshot,invoiceEvents,macSync,today,initialTab="daily"}:{data:OfficeData;snapshot:InvoiceSnapshot|null;invoiceEvents:InvoiceEvent[];macSync:MacSync;management:CompanyManagementData;today:string;initialTab?:"daily"|"history"|"invoices"}) {
  const router=useRouter();
+ const [billingPreset,setBillingPreset]=useState<{clientId:string;from:string;to:string}|null>(null);
  const [tab,setTab]=useState(initialTab==="invoices"&&data.finance?"money":initialTab==="history"?"sites":"today");
  const [section,setSection]=useState(initialTab==="invoices"?"contractor-invoices":initialTab==="history"?"history":"daily");
  const [requestedSite,setRequestedSite]=useState<{id:string;nonce:number}|null>(null);
@@ -51,7 +54,7 @@ export function EmberWorkspace({data,management,snapshot,invoiceEvents,macSync,t
  {notice&&<p role="status" className={notice.ok?"ember-notice":"ember-notice error"}>{notice.message}</p>}
  {tab==="today"&&<>
  <section className="ember-agent"><div className="orb"/><div><p className="eyebrow">TODAY AT A GLANCE</p><p>{data.entries.filter(e=>e.workDate===today).length} work records today · {activeSites.length} active sites</p><button onClick={()=>navigate("daily")}>Record site work <ArrowUpRight size={15}/></button></div></section>
- {data.finance&&<><OperationalReadiness sync={macSync} data={data} snapshot={snapshot} day={today} navigate={navigate}/><h2>Needs your review</h2><div className="office-home-actions">
+ {data.finance&&<><OfficeBrief data={data} snapshot={snapshot} events={invoiceEvents} today={today} navigate={navigate} prepare={(clientId,from,to)=>{setBillingPreset({clientId,from,to});navigate("invoices");}}/><OperationalReadiness sync={macSync} data={data} snapshot={snapshot} day={today} navigate={navigate}/><p><a className="ember-link" href="/office/mail">Work Gmail · search messages & files →</a></p><h2>Needs your review</h2><div className="office-home-actions">
  <button onClick={()=>navigate("reviews")}><CheckCheck size={20}/><strong>Contact reviews <span className="office-count">{count}</span></strong><small>Review imported identities</small></button>
  <button onClick={()=>navigate("contractor-invoices")}><Wallet size={20}/><strong>Contractor payments</strong><small>Review invoices and record payments</small></button>
  <button onClick={()=>navigate("invoices")}><FileText size={20}/><strong>Client invoices</strong><small>Review drafts and outgoing messages</small></button>
@@ -72,11 +75,12 @@ export function EmberWorkspace({data,management,snapshot,invoiceEvents,macSync,t
  {tab==="money"&&data.finance&&<>
  <div className="ember-chips" aria-label="Money sections">{[["contractor-invoices","Contractor payments"],["invoices","Client invoices"],["rates","Agreed rates"]].map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{label}</button>)}</div>
  {section==="contractor-invoices"&&<InvoiceRegister data={data} snapshot={snapshot} events={invoiceEvents} today={today} sync={macSync}/>}
- {section==="invoices"&&<><ClientDrafts clients={data.clients} today={today} from={data.from} to={data.to}/><details><summary>Historical client records</summary><p className="ember-footnote">Earlier records are retained for reference. Drafts remain labelled as drafts; no payment date has been inferred.</p><ClientInvoiceHistory data={management}/></details></>}
+ {section==="invoices"&&<><ClientDrafts preset={billingPreset} clients={data.clients} today={today} from={data.from} to={data.to}/><details><summary>Historical client records</summary><p className="ember-footnote">Earlier records are retained for reference. Drafts remain labelled as drafts; no payment date has been inferred.</p><ClientInvoiceHistory data={management}/></details></>}
  {section==="rates"&&<Rates data={data} today={today} pending={pending} run={run}/>}
  </>}
  {tab==="company"&&<>
- <div className="ember-chips" aria-label="Company sections">{(data.finance?[["contacts","Contractors"],["clients","Clients & access"],["work","Work inbox"],["memory","Company memory"],["reviews","Contact reviews"]]:[["sites","Clients & sites"]]).map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{label}</button>)}</div>
+ <div className="ember-chips" aria-label="Company sections">{(data.finance?[["contacts","Contractors"],["clients","Clients & access"],["documents","Documents"],["work","Work inbox"],["memory","Company memory"],["reviews","Contact reviews"]]:[["sites","Clients & sites"]]).map(([id,label])=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{label}</button>)}</div>
+ {section==="documents"&&data.finance&&<DocumentCatalog data={data} today={today}/>}
  {(section==="work"||section==="memory")&&data.finance&&<CompanyRecords key={section} kind={section==="work"?"work":"memory"} today={today} navigate={navigate}/>}
  {section==="contacts"&&data.finance&&<Contacts data={data} pending={pending} run={run}/>}
  {section==="clients"&&data.finance&&<ClientsAndAccessPanel data={management} isPending={pending} runAction={runManagement}/>}

@@ -3,7 +3,7 @@ import datetime as dt,fcntl,hashlib,json,pathlib,shutil,sys
 
 def install(root,repo):
  root=pathlib.Path(root);repo=pathlib.Path(repo)
- names=['office_mac_sync.py','office_snapshot.py','office_history.py','office_backup.py','office_knowledge_tools.py']
+ names=['office_mac_sync.py','office_snapshot.py','office_history.py','office_backup.py','office_knowledge_tools.py','office_mail_tools.py']
  with (root/'data/office-sync.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
   backup=root/'data/code_backups'/('readiness-'+dt.datetime.now().strftime('%Y%m%dT%H%M%S'));backup.mkdir(parents=True)

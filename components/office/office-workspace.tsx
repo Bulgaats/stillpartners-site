@@ -12,12 +12,13 @@ type Run=(action:()=>Promise<OfficeResult>)=>void;
 
 export { EmberWorkspace as OfficeWorkspace } from "./ember-workspace";
 
+import {ContractorNames} from './contractor-names';
 export function Contacts({data,pending,run}:{data:OfficeData;pending:boolean;run:Run}) {
   const empty:Contractor={id:"",fullName:"",phone:"",email:"",abn:"",group:"regular",active:true};
   const [person,setPerson]=useState<Contractor>(empty);const [search,setSearch]=useState("");const [copied,setCopied]=useState("");const [fallback,setFallback]=useState("");
   const list=useMemo(()=>directory(data.contractors,search),[data.contractors,search]);
   async function copy(p:Contractor) {try{await navigator.clipboard.writeText(contactText(p));setCopied(p.id);setFallback("");}catch{setFallback(contactText(p));}}
-  return <div className="grid items-start gap-5 xl:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.3fr)]">
+  return <><ContractorNames people={data.contractors}/><div className="grid items-start gap-5 xl:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.3fr)]">
     <section className="dashboard-card"><h2 className="dashboard-card-title">{person.id?"Edit contractor":"Add contractor"}</h2><form className="mt-4 grid gap-4" onSubmit={event=>{event.preventDefault();run(async()=>{const r=await saveOfficeContractor({...person,id:person.id||null});if(r.ok)setPerson(empty);return r;});}}>
       <Field label="Full Name"><input required value={person.fullName} onChange={e=>setPerson({...person,fullName:e.target.value})}/></Field>
       <Field label="Phone"><input type="tel" value={person.phone} onChange={e=>setPerson({...person,phone:e.target.value})}/></Field>
@@ -31,7 +32,7 @@ export function Contacts({data,pending,run}:{data:OfficeData;pending:boolean;run
       {fallback?<Field label="Select and copy contact details"><textarea readOnly rows={4} value={fallback} onFocus={e=>e.currentTarget.select()}/></Field>:null}
       {(["regular","occasional","archived"] as const).map(group=>{const people=list.filter(p=>group==="archived"?!p.active:p.active&&p.group===group);return <div className="mt-6" key={group}><h3 className="mb-3 text-xs font-black uppercase tracking-wider text-slate-500">{group==="regular"?"Regular Contractors":group==="occasional"?"Occasional Contractors":"Archived Contacts"} · {people.length}</h3>{people.map(p=><article className="mb-3 rounded-xl border border-slate-200 p-4" key={p.id}><h4 className="text-lg font-bold text-blue-950">{p.fullName}</h4><dl className="mt-3 grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[80px_1fr]"><dt className="text-slate-500">Phone</dt><dd>{p.phone||"Not provided"}</dd><dt className="text-slate-500">Email</dt><dd className="break-all">{p.email||"Not provided"}</dd><dt className="text-slate-500">ABN</dt><dd>{p.abn||"Needs confirmation"}</dd></dl><div className="mt-4 flex flex-wrap gap-2"><button className={secondary} type="button" onClick={()=>copy(p)}>{copied===p.id?"Copied ✓":"Copy Contact Details"}</button><button className={secondary} type="button" onClick={()=>setPerson({...p})}>Edit</button></div></article>)}</div>;})}
     </section>
-  </div>;
+  </div></>;
 }
 
 export function History({data}:{data:OfficeData}) {
