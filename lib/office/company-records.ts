@@ -17,4 +17,10 @@ export const companyRecordProposal=z.object({
 export type CompanyRecordProposal=z.infer<typeof companyRecordProposal>;
 export type CompanyRecord={id:string;kind:'memory'|'work';title:string;body:string;status:CompanyRecordProposal['status'];category:CompanyRecordProposal['category'];priority:CompanyRecordProposal['priority'];due_date:string|null;effective_date:string|null;next_action:string;outcome:string;source_ref:string;version:number;created_at:string;updated_at:string;detection?:{rule:string;active:boolean;observedAt:string;summary:string;evidence:Record<string,unknown>}|null};
 export type MonitorStatus={enabled:boolean;work_from:string;last_checked_at:string|null;last_error:string|null;last_result:{activeConditions?:number;snapshotAvailable?:boolean;created?:number;updated?:number;cleared?:number}};
+// The button records an owner's inbox decision, not evidence of an external action.
+export function reviewedWorkDraft(draft:CompanyRecordProposal,status:'completed'|'cancelled'):CompanyRecordProposal {
+ if(draft.kind!=='work'||!draft.id)throw new Error('Review an existing work item first.');
+ const decision=status==='completed'?'Owner approved this work item as reviewed and closed it.':'Owner dismissed this work item as not needed.';
+ return {...draft,status,outcome:draft.outcome.trim()||decision};
+}
 export function recordDraft(kind:'memory'|'work',r?:CompanyRecord):CompanyRecordProposal{return r?{id:r.id,expectedVersion:r.version,kind:r.kind,title:r.title,body:r.body,status:r.status,category:r.category,priority:r.priority,dueDate:r.due_date??'',effectiveDate:r.effective_date??'',nextAction:r.next_action,outcome:r.outcome,sourceRef:r.source_ref}:{id:'',expectedVersion:0,kind,title:'',body:'',status:kind==='memory'?'confirmed':'open',category:kind==='memory'?'decision':'',priority:'normal',dueDate:'',effectiveDate:'',nextAction:'',outcome:'',sourceRef:''};}

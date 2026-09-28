@@ -23,7 +23,7 @@ beforeEach(()=>{f.query='';});
 describe('To pay and Paid invoices rendered register',()=>{
  it('defaults to To pay, removes full paid invoices, and keeps the next invoice payable',()=>{
   const html=renderToStaticMarkup(createElement(InvoiceRegister,props));
-  expect(html).toContain('aria-pressed="true">To pay <span>1</span>');
+  expect(html).toContain('aria-pressed="true"><span aria-hidden="true">✓ </span>To pay <span>1</span>');
   expect(html).toContain('Paid invoices <span>1</span>');
   expect(html).toContain('OPEN-EXAMPLE');expect(html).not.toContain('PAID-EXAMPLE');
   expect(html).toContain('>Mark as paid</button>');
@@ -31,7 +31,7 @@ describe('To pay and Paid invoices rendered register',()=>{
  it('shows only completed invoices with a green disabled Paid control in Paid invoices',()=>{
   f.query='payments=paid';
   const html=renderToStaticMarkup(createElement(InvoiceRegister,props));
-  expect(html).toContain('aria-pressed="true">Paid invoices');
+  expect(html).toContain('aria-pressed="true"><span aria-hidden="true">✓ </span>Paid invoices');
   expect(html).toContain('PAID-EXAMPLE');expect(html).not.toContain('OPEN-EXAMPLE');
   expect(html).toContain('class="office-paid-complete" disabled="">Paid ✓</button>');
   expect(html).not.toContain('>Mark as paid</button>');
