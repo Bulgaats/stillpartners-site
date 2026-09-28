@@ -8,7 +8,7 @@ class MailEvidence(unittest.TestCase):
  def test_body_and_manifest_are_not_attachment_reads(self):
   m=view(message());self.assertIn('Evidence',m['text']);self.assertNotIn('fake instruction',m['text']);self.assertEqual(m['attachments'][0]['read'],False);self.assertIn('SENT',m['labels'])
  def test_message_path_injection_denied(self):
-  for id in ['../profile','abcd/attachments','token.json','']: 
+  for id in ['../profile','abcd/attachments','token.json','']:
    with self.assertRaises(ValueError):identity(id)
  def test_reads_selected_part_without_writes_or_arbitrary_filename(self):
   reader=MailReader('/not-used',Mock());reader.get=Mock(return_value=message());result=reader.attachment('abcd','1');self.assertTrue(result['readable']);self.assertIn('8,60',result['text']);reader.api.assert_not_called()
