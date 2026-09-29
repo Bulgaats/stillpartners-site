@@ -33,3 +33,10 @@ export async function companyRecordHistory(id:string){
  const {data,error}=await db.from('office_company_record_events').select('id,before_data,after_data,created_at').eq('record_id',id).order('created_at',{ascending:false}).limit(50);
  if(error)throw new Error('Could not load history');return data??[];
 }
+
+export async function mailAttentionSummary(){
+ const db=await access();
+ const {data,error,count}=await db.from('office_company_records').select('id,title,priority,updated_at',{count:'exact'}).eq('kind','work').eq('detection->>rule','incoming_mail').not('status','in','(completed,cancelled)').order('updated_at',{ascending:false}).limit(3);
+ if(error)throw new Error('Mail work status unavailable');
+ return {count:count??0,items:data??[]};
+}

@@ -20,4 +20,10 @@ class MailEvidence(unittest.TestCase):
   m=message();m['payload']['parts'][0]={'mimeType':'text/plain','body':{'data':encoded('x'*17000)}};self.assertEqual(view(m)['nextOffset'],16000);self.assertEqual(len(view(m,16000)['text']),1000)
  def test_search_exposes_next_page_and_no_claim_of_reading(self):
   api=Mock();api.users().messages().list().execute.return_value={'messages':[{'id':'abcd'}],'nextPageToken':'page2'};r=MailReader('/not-used',api).search('has:attachment');self.assertEqual(r['nextPageToken'],'page2');self.assertIn('IDs only',r['coverage']);api.users().messages().list.assert_called_with(userId='me',q='has:attachment',maxResults=50,pageToken=None,includeSpamTrash=True)
+class ThreadEvidence(unittest.TestCase):
+ def test_thread_pagination_keeps_sent_and_body_coverage(self):
+  api=Mock();messages=[{**message(),'id':str(i),'internalDate':str(1000*i),'labelIds':['SENT'] if i%2 else ['INBOX']} for i in range(5)]
+  api.users().threads().get().execute.return_value={'messages':list(reversed(messages))}
+  reader=MailReader('/not-used',api);first=reader.thread('abcd');last=reader.thread('abcd',3)
+  self.assertEqual(first['nextOffset'],3);self.assertEqual([m['id'] for m in first['messages']],['0','1','2']);self.assertIn('SENT',first['messages'][1]['labels']);self.assertIsNone(last['nextOffset'])
 if __name__=='__main__':unittest.main()

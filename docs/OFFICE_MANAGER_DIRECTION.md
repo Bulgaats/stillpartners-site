@@ -217,3 +217,45 @@ invoice reconciliation, document catalogue, work registry and approval services
 behind Bobby's shared execution interface. General Mac-off reasoning needs a
 separately authorised execution arrangement; do not activate spending to hide
 this dependency.
+
+## Standing duty clarified by owner — 29 September 2026
+
+New company mail is Bobby's standing work, not a task requiring an owner prompt
+for each poll. An owner request to check mail is an additional immediate check.
+Monitor every newly received message (including self-addressed generator mail),
+read the thread and relevant attachments, identify and prioritise real work,
+prepare available evidence/drafts, then bring decisions and exact final approvals
+to the owner. Do not generate a new alert on every repeat poll. Retain unresolved
+work and catch up after the Mac reconnects. A mail search/AI failure must remain
+visible and queued, never be described as a complete check.
+
+The owner further confirmed that this proactive responsibility covers daily work
+records, contractor invoice reconciliation, client invoice preparation, receipt
+confirmation, payable invoices, insurance renewal and other company work. Do not
+wait for a separate instruction for each obvious, already authorised preparation.
+Ask for missing actual work/site facts, business decisions or final permission;
+do not invent attendance, agreed rates, due dates, bank receipts or payment dates.
+A client invoice becoming due is a reason to prepare a receipt-confirmation task,
+not proof that it is unpaid. Sending, bank transfers and binding commitments keep
+their existing exact-action approval boundaries.
+
+Implementation status must remain explicit: the new-mail release uses the
+existing Mac Codex login and the shared Work inbox/evidence tools. It does not
+activate paid cloud AI. In-app notices are separate from phone push delivery;
+never claim a locked-phone notification until device permission, subscription
+and delivery are verified. Automatic client billing cycles and expected daily
+attendance still need their agreed schedules/coverage and executors implemented.
+
+### Owner acceptance and corrections — 29 September 2026
+
+The owner can accept a known discrepancy, including a small hours difference,
+and close a specified set of earlier review requests together. Preserve that
+manual acceptance and its scope so unchanged evidence does not reopen the issue.
+A calculation mismatch remains factual evidence; the decision is `owner accepted`,
+not a fabricated automatic match. Accepting a review is separate from confirming
+an actual bank payment. When asked, Bobby must show each selected contractor's
+work by date, weekday, site and hours, then apply an unambiguous owner correction
+with an audit trail of old/new values. Ambiguous person/date/site needs resolution;
+retrievable details should not be asked for again. The shared work tools already
+retrieve the records; conversational batch closure, exception acceptance and
+audited time corrections still require their action executors to be connected.

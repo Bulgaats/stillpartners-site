@@ -125,3 +125,41 @@ This release uses existing Mac Codex execution and hosted deterministic controls
 - The encrypted authenticated Mac backup allowlist includes document and nickname records/history. It does not add an off-device backup.
 
 Validation: full JavaScript unit suite and targeted Python evidence/worker suites, production build, rendered synthetic invoice and multi-page summary, and transaction-rollback database checks covering finance access, stale versions, idempotency, expiry deduplication/renewal, alias collisions, frozen names and no financial mutations. Authenticated phone-screen and hosted OAuth provider checks require a connected owner session; do not claim those were performed from static tests.
+
+## New-mail duty and continuous invoice review — 29 September 2026
+
+- `office_mail_monitor.py` is a fourth job in the existing Mac resident runtime.
+  It discovers new company-mail IDs every five minutes with Gmail history,
+  retrieves every history/list page and retains a durable queue. An expired
+  history cursor falls back to a dated search with overlap. The initial boundary
+  is activation time, so this does not reopen all historical settled invoices.
+- Incoming and self-addressed mail are handled; drafts and exclusively outgoing
+  messages are skipped as new incoming work. Thread reading includes Sent.
+- One bounded Bobby preparation per job uses the same Codex login, company
+  retrieval, Gmail attachment and deterministic invoice-check tools as chat.
+  Background reasoning shares the owner-chat lock. Failed messages keep their
+  queue position/evidence and get bounded backoff while other mail can continue.
+- Prepared results are cached before publication. The scoped device publisher
+  creates/updates one Work inbox case per thread, deduplicates message IDs,
+  rejects revoked/mismatched devices and respects Pause checks. Later evidence
+  preserves owner edits; older observations cannot overwrite newer case evidence.
+  Informational mail is recorded without generating a work alert. No work item
+  is closed merely because a later email was classified as information.
+- The app shows a persistent prepared-mail banner and a live-check timestamp,
+  pending count and Mac/error state in Work inbox. The banner refreshes once a
+  minute while the app is visible. This is **in-app notification only**; locked-
+  phone push permission/subscription/delivery has not been implemented here.
+- `refresh_invoice_register` now returns newly processed source IDs, refreshes
+  the same model's register and company context, and lets Bobby continue reading
+  and checking instead of ending with import counts. Work-date agreed rates,
+  distinct actual/payable/billable hours, source flags and payment evidence remain
+  separate. A reversed payment in an older snapshot is explicitly unresolved.
+- A successful preparation is neither a sent email nor a Gmail draft. General
+  sending still needs its exact-message approval/executor. No paid cloud AI,
+  bank transfer, automatic Paid status or new hosting plan is activated.
+- Verification: 47 selected Python checks (including the installed Mac Python),
+  seven reconciliation tests, TypeScript and production build passed. Six SQL
+  tests ran in a rolled-back transaction: device authentication, replay, priority,
+  owner-edit preservation, older-message ordering, pause, information-only
+  handling and no financial-event changes. Private mail ledger tables deliberately
+  deny direct client access. Existing unrelated database-advisor warnings remain.

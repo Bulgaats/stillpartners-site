@@ -21,6 +21,7 @@ import {OperationalReadiness} from './operational-readiness';
 import {activeContactImports} from '@/lib/office/readiness';
 import {OfficeBrief} from './office-brief';
 import {DocumentCatalog} from './document-catalog';
+import {MailAttention} from './mail-watch';
 import {AssistantChat} from "./assistant-chat";
 
 import {readWorkDrafts,writeWorkDrafts,type WorkDraft as Draft} from '@/lib/office/work-drafts';
@@ -51,6 +52,7 @@ export function EmberWorkspace({data,management,snapshot,invoiceEvents,macSync,t
  return <main className={`ember ${tab==="assistant"&&data.finance?"ember-chat-mode":""}`}><div className="ember-shell">
  <header className="ember-top"><a href="/office" className="ember-brand"><Image src="/assets/logo/logo-icon-light.svg" alt="Still Partners" width="38" height="38"/><span>STILL PARTNERS<small>YOUR COMPANY OFFICE</small></span></a><form action={logout}><button type="submit" className="ember-text-button">Sign out</button></form></header>
  <div className="ember-content"><div className="ember-heading"><p className="eyebrow">STILL PARTNERS / OFFICE</p><h1>{headings[tab]}</h1><p className="muted">{new Intl.DateTimeFormat("en-AU",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"Australia/Perth"}).format(new Date(today+"T12:00:00+08:00"))}</p></div>
+ {data.finance&&<MailAttention open={()=>navigate("work")}/>}
  {notice&&<p role="status" className={notice.ok?"ember-notice":"ember-notice error"}>{notice.message}</p>}
  {tab==="today"&&<>
  <section className="ember-agent"><div className="orb"/><div><p className="eyebrow">TODAY AT A GLANCE</p><p>{data.entries.filter(e=>e.workDate===today).length} work records today · {activeSites.length} active sites</p><button onClick={()=>navigate("daily")}>Record site work <ArrowUpRight size={15}/></button></div></section>
