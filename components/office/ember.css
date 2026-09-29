@@ -182,3 +182,20 @@
 .office-document-fields{border:0;padding:0;display:grid;gap:16px}.office-document-fields label{display:grid;gap:8px}.office-document-fields input[type=checkbox]{width:auto;justify-self:start}.office-brief details{margin:20px 0}.office-brief .office-home-actions{margin:16px 0}
 
 .office-name-options { max-height: 18rem; overflow-y: auto; margin-block: 1rem; }
+
+/* Shared Bobby direct results stay inside the existing phone conversation. */
+.office-direct-tools {border-top:1px solid var(--ember-line,#323a45);padding:8px 0;max-height:44vh;overflow:auto}
+.office-direct-tools summary {cursor:pointer;color:#ff944c;font-size:.85rem}
+.office-direct-tools form {display:grid;gap:10px;padding:12px 0}
+.office-direct-tools label,.office-document-upload label {display:grid;gap:4px;font-size:.85rem}
+.office-direct-dates {display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.office-direct-row {border:1px solid #38414b;border-radius:14px;padding:14px;margin:12px 0;background:#202730;overflow-wrap:anywhere}
+.office-direct-row p {margin:8px 0;font-size:.9rem}
+.office-mail-body {white-space:pre-wrap;overflow-wrap:anywhere;font-size:.93rem;background:#202730;padding:14px;border-radius:12px;max-height:65vh;overflow:auto}
+.office-match {color:#83d6a9}
+.office-document-upload {display:grid;gap:8px;padding:12px 0;border-top:1px solid #38414b}
+.office-document-upload small {color:#aeb7c1}
+.office-document-upload input {max-width:100%;font-size:.8rem}
+.office-file-preview {position:fixed;inset:4vh 4vw;z-index:120;background:#171d23;border:1px solid #505b68;border-radius:16px;padding:16px;display:flex;flex-direction:column;box-shadow:0 0 0 100vmax #000a}
+.office-file-preview iframe {flex:1;width:100%;background:white;min-height:0;border:0}
+.office-file-preview strong {overflow-wrap:anywhere}

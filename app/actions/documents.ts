@@ -5,8 +5,11 @@ import {documentInput} from '@/lib/office/documents';
 import {documentRecords} from '@/lib/office/document-data';
 import {revalidatePath} from 'next/cache';
 import {z} from 'zod';
+import {officeData} from '@/lib/office/data';
+import {getPerthIsoDate} from '@/lib/operations/dates';
 async function access(){const s=await getSessionProfile();if(!s||s.profile.role!=='admin')throw new Error('Finance admin access required');return createServerSupabaseClient();}
 export async function listOfficeDocuments(){await access();return documentRecords();}
+export async function documentOwners(){await access();const day=getPerthIsoDate(),data=await officeData(true,day,day);return {contractors:data.contractors.map(p=>({id:p.id,name:p.shortName?`${p.shortName} · ${p.fullName}`:p.fullName})),clients:data.clients.map(c=>({id:c.id,name:c.name}))};}
 export async function saveOfficeDocument(eventId:string,input:unknown){
  const db=await access();z.string().uuid().parse(eventId);const v=documentInput.safeParse(input);
  if(!v.success)return {ok:false,message:v.error.issues[0].message};

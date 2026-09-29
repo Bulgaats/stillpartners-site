@@ -8,22 +8,28 @@ import {getPerthIsoDate,addIsoDays} from '@/lib/operations/dates';
 import {z} from 'zod';
 import {cloudConfig} from '@/lib/office/cloud/config';
 import {revalidatePath} from 'next/cache';
+import {directRequest,directFromPrompt,type DirectRequest} from '@/lib/office/direct';
 async function access(){const session=await getSessionProfile();if(!session||session.profile.role!=='admin')throw new Error('Finance admin access required');return {session,db:await createServerSupabaseClient()};}
 const uuid=z.string().uuid();
-export async function submitAssistantTask(id:string,prompt:string,conversationId?:string){
+export async function submitAssistantTask(id:string,prompt:string,conversationId?:string,directInput?:DirectRequest){
  const {session,db}=await access();
  if(!uuid.safeParse(id).success||(conversationId&&!uuid.safeParse(conversationId).success)||prompt.trim().length<1||prompt.length>4000)return {ok:false,message:'Enter a request up to 4000 characters.'};
  const {data:existing,error:existingError}=await db.from('office_assistant_tasks').select('id').eq('id',id).eq('user_id',session.userId).maybeSingle();
  if(existingError)return {ok:false,message:'Could not check this request. Please retry.'};
  if(existing)return {ok:true,message:'Request already queued.'};
+ const direct=directInput?directRequest.parse(directInput):directFromPrompt(prompt);
  const {data:active,error:countError}=await db.from('office_assistant_tasks').select('id,conversation_id').eq('user_id',session.userId).in('status',['queued','running']);
  if(countError)return {ok:false,message:'Could not check pending requests. Please retry.'};
- if(conversationId&&(active??[]).some(t=>t.conversation_id===conversationId))return {ok:false,message:'Let the current reply finish, or start a new chat for a separate task.'};
+ if(!direct&&conversationId&&(active??[]).some(t=>t.conversation_id===conversationId))return {ok:false,message:'Let the current reply finish, or start a new chat for a separate task.'};
  if(conversationId){
   const {error}=await db.from('office_assistant_conversations').upsert({id:conversationId,user_id:session.userId,title:prompt.trim().replace(/\s+/g,' ').slice(0,120)},{onConflict:'id',ignoreDuplicates:true});
   if(error)return {ok:false,message:'Could not open this conversation. Please retry.'};
   const {data:conversation}=await db.from('office_assistant_conversations').select('id').eq('id',conversationId).eq('user_id',session.userId).maybeSingle();
   if(!conversation)return {ok:false,message:'Conversation unavailable. Start a new chat.'};
+ }
+ if(direct){
+  const {error}=await db.from('office_assistant_tasks').insert({id,user_id:session.userId,conversation_id:conversationId??null,prompt:prompt.trim(),context:{directRequest:direct},executor:'direct'});
+  return error&&error.code!=='23505'?{ok:false,message:'Could not save this request. Retry is safe.'}:{ok:true,message:'Reading company sources directly. Your Mac can stay off.'};
  }
  const today=getPerthIsoDate(),data=await officeData(true,addIsoDays(today,-89),today);
  let historyQuery=db.from('office_assistant_tasks').select('prompt,response,applied_id,applications:office_assistant_applications(proposal_index,worker_id,status,message)').eq('user_id',session.userId).eq('status','done');

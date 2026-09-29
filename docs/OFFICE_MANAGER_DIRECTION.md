@@ -259,3 +259,24 @@ with an audit trail of old/new values. Ambiguous person/date/site needs resoluti
 retrievable details should not be asked for again. The shared work tools already
 retrieve the records; conversational batch closure, exception acceptance and
 audited time corrections still require their action executors to be connected.
+
+## Urgent work while the Mac is off — owner approval, 29 September 2026
+
+Use every existing authorised hosted read and deterministic calculation for
+urgent phone work before waiting for Mac reasoning. Reuse company domain
+services: clear source retrieval and numeric/date comparisons do not require a
+model. Keep Bobby's conversation as the result surface and durable task record.
+Complex free-text reasoning continues on the Mac; paid cloud AI remains inactive.
+
+The owner now authorises a private hosted store for company and contractor
+documents needed away from the Mac. This supersedes the earlier local-only
+restriction for selected company documents. Preserve originals, source links,
+file hashes and version history. Keep Gmail originals directly accessible; do
+not indiscriminately upload the Mac or personal files. Storage limits must be
+visible and no paid plan or spending activation is authorised.
+
+Delivered scope and remaining gaps are recorded in office-manager.md. Showing a
+file is separate from extracting or verifying its content. Deterministic invoice
+comparison uses known imported source fields and current saved work/rates, not
+guessed numbers from an unread incoming PDF. All approval/payment evidence rules
+remain unchanged.
