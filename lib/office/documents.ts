@@ -13,7 +13,7 @@ export const documentInput=z.object({
  if(v.expiryConfirmed&&!v.expiresOn)c.addIssue({code:'custom',message:'Enter the date before confirming expiry.'});
 });
 export type DocumentInput=z.infer<typeof documentInput>;
-export type OfficeDocument={id:string;version:number;title:string;entity_type:DocumentInput['entityType'];entity_id:string|null;category:DocumentInput['category'];source_url:string;source_note:string;notes:string;expires_on:string|null;expiry_confirmed:boolean;status:'active'|'archived';updated_at:string};
+export type OfficeDocument={id:string;version:number;title:string;entity_type:DocumentInput['entityType'];entity_id:string|null;category:DocumentInput['category'];source_url:string;source_note:string;notes:string;expires_on:string|null;expiry_confirmed:boolean;status:'active'|'archived';updated_at:string;files?:{id:string;filename:string;mime:string;bytes:number;created_at:string}[]};
 export function safeDocumentUrl(value:string){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:null;}catch{return null;}}
 export function documentExpiry(d:OfficeDocument,today:string){
  if(d.status==='archived'||!d.expires_on)return {status:'none' as const,days:null};

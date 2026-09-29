@@ -42,6 +42,7 @@ def from_export(export,previous,now=None):
    'agreementNote':r.get('agreement_note') or '', 'voidedAt':r.get('voided_at')} for r in tables['office_rates']],
   companyMemory=[r for r in records if r['kind']=='memory'],workItems=[r for r in records if r['kind']=='work'],
   documents=tables['office_documents'],paymentEvents=tables['office_invoice_events'])
+ context['documents']=[{**d,'files':[{k:f[k] for k in ('id','filename','mime','bytes','sha256')} for f in tables.get('office_document_files',[]) if f['document_id']==d['id'] and f['status']=='ready']} for d in tables['office_documents']]
  context['workRecords']=[]
  for e in tables['work_entries']:
   if not start<=e['work_date']<=end:continue

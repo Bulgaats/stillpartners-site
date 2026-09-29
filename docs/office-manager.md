@@ -4,6 +4,65 @@ Product direction and delivery priorities: [Office Manager direction](OFFICE_MAN
 
 Open https://www.stillpartners.net/office with the finance admin account. On iPhone use Safari, Share, Add to Home Screen. Operations admins retain the site/day work tools; financial records and Assistant are finance-admin only.
 
+## Urgent phone work without the Mac — 29 September 2026
+
+Assistant → **Office tools · works with Mac off** invokes the shared hosted
+read services and saves results in the same conversation. It remains usable
+while an AI request waits for the Mac. No paid AI model is called. Supported
+exact commands such as `сүүлийн имэйлүүдийг үзүүл`, `/mail has:attachment`,
+`/invoices Example`, `/contacts Example`, `/documents insurance` and `/work`
+use the same service. General/ambiguous or multi-action prompts still queue for
+the model; this is not an arbitrary-language cloud agent.
+
+- Work email: live Gmail search, pages, message text, attachments and PDF preview
+  in Bobby. Incoming, Sent and self-addressed results are included. Explicit
+  date ranges use Perth midnights; larger/unsupported files link to the original.
+- Saved invoices: name/short-name/ABN/invoice-number lookup, work-period filters,
+  quantities, GST and current recorded-payment state. Latest is received-date
+  order in the displayed snapshot, not a claimed live import.
+- Compare with records: loads the exact invoice work period from current hosted
+  records, including dates older than 90 days. Uses the existing reconciliation
+  engine, separate payable hours and rates effective on each work date. Unknown
+  GST, missing records, identity/source conflicts and revisions remain review
+  issues. No approval or Paid event is generated.
+- Work summary: dated site, actual/payable/client-billable hours. Directory
+  supports saved short names, aliases and Copy contact. Company records searches
+  confirmed memory and tracked matters.
+- Documents: company/contractor/client catalogue, Gmail attachment references
+  and private uploaded copies. Gmail → Save to Documents records the exact
+  attachment source and selected owner/category; no file is duplicated unless
+  separately uploaded. Existing folder-only references still require the Mac.
+
+Company → Documents → Add document saves its reference; **Add private file**
+attaches a PDF, PNG/JPEG/WebP or .txt copy to that record. Versions are immutable,
+hash-verified, authenticated finance-admin only and not publicly hosted. Current
+guard is 3 MiB per upload and 100 MiB cumulative reservations in this store;
+these guards do not promise an unlimited/free provider quota. Larger sources
+can remain in Gmail. No paid plan, new AI API or indiscriminate migration is
+activated. At release the catalogue/store is empty until actual sources are
+added; do not claim existing Mac documents were already migrated.
+
+Bobby's Mac evidence tools receive the same catalogue/file manifests and can
+read a selected private file using the existing revocable device credential.
+The file reader cannot select arbitrary URLs/paths, write records or send mail.
+Original email, image or document instructions never grant authority.
+
+Direct jobs have a separate executor and atomic leases; neither Mac nor cloud
+AI claims them. Lost replies retry reads safely, preserve the saved request,
+and reject stale completion. File upload reservations deduplicate exact copies
+and recover a lost upload acknowledgement without overwriting a source.
+
+Remaining: autonomous Mac-off AI understanding, background cloud Gmail ingestion
+and new arbitrary-PDF extraction, general approved email sending and phone push.
+Mac source extraction/import/filing and background mail reasoning keep their
+existing runtime. Direct phone actions do not silently change that schedule.
+
+Verification: targeted hosted-service/calculation tests, file-reader tests,
+rollback SQL tests for roles/leases/replay/files, and production build. Owner
+browser sign-in testing remains separately unverified; do not bypass the blocked
+browser login route. Original business records and payments are not changed by
+the tests.
+
 ## Current workflows
 
 - Today: choose the site, add contractors, enter actual hours. Finance can separately record contractor payable and client billable hours with an agreement note.
