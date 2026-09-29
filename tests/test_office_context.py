@@ -11,6 +11,19 @@ class ContextRefresh(unittest.TestCase):
   result=from_export(source,{'conversation':['retained'],'unrelated':'retained'},dt.datetime.fromisoformat(source['exported_at']))
   self.assertEqual(result['workRecords'][0]['actualHours'],8);self.assertEqual(result['workRecords'][0]['contractorHours'],10);self.assertEqual(result['workRecords'][0]['clientHours'],12)
   self.assertNotIn('bank_account',str(result));self.assertEqual(result['contractors'][0]['shortName'],'Short');self.assertEqual(result['conversation'],['retained'])
+ def test_plans_remain_expectations_with_exact_site_and_blank_hours(self):
+  source=self.source();t=source['tables']
+  t['workers']=[{'id':'w','full_name':'Synthetic Example'}]
+  t['jobs']=[{'id':'j','client_id':'c','site_name':'Synthetic site','location':'Example address'}]
+  t['office_site_plans']=[{'id':'p','job_id':'j','work_date':'2026-09-29','reminder_time':'17:00:00','note':''}]
+  t['office_site_plan_people']=[{'plan_id':'p','worker_id':'w','active':True}]
+  t['work_entries']=[{'id':'other','worker_id':'w','job_id':'elsewhere','work_date':'2026-09-29','hours':8}]
+  result=from_export(source,{},dt.datetime.fromisoformat(source['exported_at']))
+  self.assertIsNone(result['plannedWork'][0]['people'][0]['hours'])
+  t['work_entries'].append({'id':'exact','worker_id':'w','job_id':'j','work_date':'2026-09-29','hours':0})
+  result=from_export(source,{},dt.datetime.fromisoformat(source['exported_at']))
+  self.assertEqual(result['plannedWork'][0]['people'][0]['hours'],0)
+  self.assertEqual(result['plannedWork'][0]['people'][0]['entryId'],'exact')
  def test_incomplete_or_stale_export_is_not_current(self):
   source=self.source();source['tables'].pop('office_rates')
   with self.assertRaises(ValueError):from_export(source,{},dt.datetime.fromisoformat(source['exported_at']))

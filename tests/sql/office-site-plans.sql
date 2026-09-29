@@ -1,0 +1,73 @@
+-- Synthetic fixtures only. Always run inside a rollback transaction.
+create temporary table plan_test_checks (name text primary key);
+create temporary table plan_test_users(role text,id uuid);
+grant select on plan_test_users to authenticated;
+do $$
+declare admin uuid=gen_random_uuid();ops uuid=gen_random_uuid();worker_user uuid=gen_random_uuid();c uuid=gen_random_uuid();j uuid=gen_random_uuid();j2 uuid=gen_random_uuid();w uuid=gen_random_uuid();w2 uuid=gen_random_uuid();p jsonb;r jsonb;key uuid=gen_random_uuid();entry uuid;caseid uuid;n int;today date=(now() at time zone 'Australia/Perth')::date;
+begin
+ insert into plan_test_users values('admin',admin),('operations_admin',ops),('worker',worker_user);
+ insert into auth.users(id,email) values(admin,'plan-admin@example.invalid'),(ops,'plan-ops@example.invalid'),(worker_user,'plan-worker@example.invalid');
+ insert into public.profiles(id,role,full_name,is_active) values(admin,'admin','Synthetic plan admin',true),(ops,'operations_admin','Synthetic plan operator',true),(worker_user,'worker','Synthetic plan worker',true) on conflict(id) do update set role=excluded.role,is_active=true;
+ insert into public.clients(id,name) values(c,'Synthetic plan client');
+ insert into public.jobs(id,site_name,location,client_id,status,project_status) values(j,'Synthetic plan site','Synthetic address',c,'active','active'),(j2,'Synthetic second site','Second address',c,'active','active');
+ insert into public.workers(id,full_name) values(w,'Synthetic plan person'),(w2,'Synthetic second person');
+ perform set_config('request.jwt.claim.sub',admin::text,true);
+ update office_private.monitor_state set enabled=true where singleton;
+ p=jsonb_build_object('jobId',j,'workDate',today+1,'workerIds',jsonb_build_array(w,w2),'reminderTime','17:00','expectedVersion',0,'note','');
+ r=public.office_save_site_plan(key,p);
+ if (r->>'due')::boolean or (select count(*) from public.work_entries where worker_id in(w,w2))<>0 then raise exception 'Future plan invented work or premature reminder';end if;
+ perform public.office_save_site_plan(key,p);
+ if (select count(*) from public.office_site_plan_events where id=key)<>1 then raise exception 'Replay duplicated event';end if;
+ begin perform public.office_save_site_plan(key,p||'{"note":"changed"}');raise exception 'FAIL event conflict';exception when raise_exception then if sqlerrm='FAIL event conflict' then raise;end if;end;
+ begin perform public.office_save_site_plan(gen_random_uuid(),p);raise exception 'FAIL stale version';exception when raise_exception then if sqlerrm='FAIL stale version' then raise;end if;end;
+ insert into plan_test_checks values('Future expectation separate; retry and stale edits');
+ begin perform public.office_save_site_plan(gen_random_uuid(),p||jsonb_build_object('jobId',j2));raise exception 'FAIL double site';exception when raise_exception then if sqlerrm='FAIL double site' then raise;end if;end;
+ insert into plan_test_checks values('One planned site per contractor per date');
+ -- A past-cutoff current-day plan produces one grouped work item.
+ p=p||jsonb_build_object('workDate',today,'reminderTime','00:00');
+ r=public.office_save_site_plan(gen_random_uuid(),p);caseid=(select record_id from office_private.detected_work where issue_key='planned-work:'||(r->>'id'));
+ if caseid is null or (r->>'missing')::int<>2 then raise exception 'Missing grouped reminder';end if;
+ select count(*) into n from public.office_company_record_events where record_id=caseid;
+ perform office_private.scan_site_plans();perform office_private.scan_site_plans();
+ if (select count(*) from public.office_company_record_events where record_id=caseid)<>n then raise exception 'Repeated scan duplicated history';end if;
+ insert into plan_test_checks values('After-cutoff grouped reminder; repeat checks deduplicate');
+ -- Work elsewhere does not satisfy this exact planned site.
+ insert into public.work_entries(worker_id,job_id,work_date,hours,entered_by,entry_role) values(w,j2,today,2,admin,'admin');
+ if (office_private.plan_evidence((r->>'id')::uuid)->>'missing')::int<>2 then raise exception 'Other site wrongly satisfied plan';end if;
+ entry=public.office_save_work_record(w,j,today,0,null,0,0,'No actual work');
+ if (office_private.plan_evidence((r->>'id')::uuid)->>'missing')::int<>1 then raise exception 'Explicit zero not counted';end if;
+ insert into plan_test_checks values('Exact site match; explicit zero differs from absent record');
+ p=p||jsonb_build_object('workerIds',jsonb_build_array(w),'expectedVersion',1);
+ r=public.office_save_site_plan(gen_random_uuid(),p);
+ if (r->>'missing')::int<>0 or (select status from public.office_company_records where id=caseid)<>'completed' then raise exception 'Cancelled participant did not close reminder';end if;
+ if not exists(select 1 from public.work_entries where id=entry) then raise exception 'Cancellation deleted actual record';end if;
+ insert into plan_test_checks values('Did-not-attend removes expectation, preserves original actual record');
+ -- Operators can plan without receiving finance data; worker cannot call reads/writes.
+ perform set_config('request.jwt.claim.sub',ops::text,true);
+ perform public.office_read_site_plans(today,today,false);
+ perform public.office_save_site_plan(gen_random_uuid(),p||jsonb_build_object('expectedVersion',2));
+ perform set_config('request.jwt.claim.sub',worker_user::text,true);
+ begin perform public.office_read_site_plans(today,today,false);raise exception 'FAIL worker read';exception when raise_exception then if sqlerrm='FAIL worker read' then raise;end if;end;
+ begin perform public.office_save_site_plan(gen_random_uuid(),p);raise exception 'FAIL worker write';exception when raise_exception then if sqlerrm='FAIL worker write' then raise;end if;end;
+ perform set_config('request.jwt.claim.sub','',true);
+ begin perform public.office_read_site_plans(today,today,false);raise exception 'FAIL anonymous read';exception when raise_exception then if sqlerrm='FAIL anonymous read' then raise;end if;end;
+ insert into plan_test_checks values('Operational role permitted; workers/anonymous denied');
+ if has_table_privilege('authenticated','public.office_site_plans','INSERT') or has_function_privilege('authenticated','office_private.scan_site_plans()','EXECUTE') or has_function_privilege('anon','public.office_save_site_plan(uuid,jsonb)','EXECUTE') then raise exception 'Unexpected write or scheduler permission';end if;
+ insert into plan_test_checks values('No direct client writes or public scheduler access');
+ perform set_config('request.jwt.claim.sub',admin::text,true);
+ update office_private.monitor_state set enabled=false where singleton;
+ p=p||jsonb_build_object('jobId',j2,'workerIds',jsonb_build_array(w2),'expectedVersion',0);
+ r=public.office_save_site_plan(gen_random_uuid(),p);
+ if exists(select 1 from office_private.detected_work where issue_key='planned-work:'||(r->>'id')) then raise exception 'Paused monitor created reminder';end if;
+ update office_private.monitor_state set enabled=true where singleton;perform office_private.scan_site_plans();
+ if not exists(select 1 from office_private.detected_work where issue_key='planned-work:'||(r->>'id')) then raise exception 'Resume failed to catch up';end if;
+ insert into plan_test_checks values('Pause honoured; resume catches up');
+end;$$;
+set local role authenticated;
+select set_config('request.jwt.claim.sub',(select id::text from plan_test_users where role='worker'),true);
+do $$begin if exists(select 1 from public.office_site_plans) then raise exception 'RLS leaked plans to worker';end if;end;$$;
+select set_config('request.jwt.claim.sub',(select id::text from plan_test_users where role='operations_admin'),true);
+do $$begin if not exists(select 1 from public.office_site_plans) then raise exception 'Operational RLS read failed';end if;end;$$;
+reset role;
+insert into plan_test_checks values('Actual authenticated-role RLS: operator allowed, worker denied');
+select name from plan_test_checks order by name;
