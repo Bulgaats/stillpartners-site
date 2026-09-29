@@ -5,7 +5,7 @@ lock, approval checks and replay journal. A failed job never stops other jobs.
 """
 import argparse,datetime as dt,fcntl,json,os,pathlib,signal,subprocess,sys,time
 
-JOBS={'assistant':('office_assistant_worker.py',30),'mail':('office_mail_worker.py',60),'sync':('office_mac_sync.py',300)}
+JOBS={'assistant':('office_assistant_worker.py',30),'mail':('office_mail_worker.py',60),'sync':('office_mac_sync.py',300),'inbox':('office_mail_monitor.py',60)}
 def iso(value):return dt.datetime.fromtimestamp(value,dt.timezone.utc).isoformat()
 
 class Runtime:

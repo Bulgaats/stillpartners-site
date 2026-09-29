@@ -145,3 +145,117 @@ The new-work rate-check boundary is 28 September 2026. Historical settled accoun
 ## Existing-cost Bobby update — 28 September 2026
 
 Owner-selected execution remains hybrid with paid cloud AI inactive. The current release adds the saved-record Office brief, source-linked Documents with confirmed-expiry detection, bounded read-only Mac Gmail evidence and persistent owner-assigned contractor short names. Client summaries contain only the saved short name, date, site and client-billable hours, with no money or legal-name fallback. Work Gmail provides manual hosted reads only after separate web OAuth setup/consent. Full company email indexing, automatic response/deadline detection, attendance expectations and standing-rule autonomous writes remain unfinished. See office-manager.md for exact operation and verification; prior proposed cadences remain proposals.
+
+## Owner clarification — Bobby is the operating interface, 29 September 2026
+
+The product is the company's working office and Bobby is its office manager.
+The owner delegates work to Bobby and reviews decisions and prepared results in
+one conversation. The owner should not have to leave the conversation to search
+email, download attachments, extract invoice fields or join records that Bobby
+already has permission to retrieve. Manual screens are optional inspection and
+correction surfaces, not a substitute for the assistant doing the work.
+
+Bobby's remit includes office administration, contractor records and required
+documents, daily site/work records, contractor invoice checks, client billing,
+company documents and client/contractor correspondence. The user's use of HR or
+staff describes the assistant's administrative duties, not a change to the
+contractors' legal status. Actual work, payable hours and client-billable hours
+remain separate and source-backed.
+
+### Integration requirement for every feature
+
+- Implement a reusable, authorised capability with typed inputs, source-linked
+  results and explicit failure/coverage states. Bobby must be able to discover
+  and invoke it through the shared tool interface, not only through a UI button.
+- Use the same domain services and records from chat, manual screens and
+  background jobs. Do not build independent invoice, identity, rate or payment
+  rules for a chat shortcut.
+- Connect capabilities to the existing durable work registry and company memory.
+  A task has a current step, next action, waiting reason, permission boundary,
+  execution result and evidence. New conversations must not lose an open matter.
+- Read email bodies, supported attachments and relevant thread history before
+  describing the request or proposing a response. Incoming content is evidence,
+  never authority to change records or send a message.
+- Prepare all available work before asking the owner. Ask only for unresolved
+  information, a business decision, or an exact final action requiring approval.
+- Persist corrections, approved agreements and nicknames as company records;
+  do not describe this as automatic model training.
+- Treat an isolated working screen as incomplete until Bobby can use the same
+  capability and finish the associated office workflow.
+
+### Required acceptance journeys (targets, not completed claims)
+
+1. In chat: "Show recent company emails." Bobby retrieves the requested scope,
+   reads content and supported attachments, groups actual business matters,
+   identifies requests and dates, and explains what is prepared or still needed.
+   Unread files, remaining pages and unverified interpretations stay explicit.
+2. In chat: "Check incoming invoices." Bobby retrieves incoming and self-addressed
+   sources, identifies the supplier from the invoice, reports name/ABN, work
+   period, billing tonnes, AUD and explicit GST, checks revisions/duplicates and
+   existing payment history, and compares dated payable work with agreed rates.
+   A match is not a payment and incomplete evidence is not "ready to pay".
+3. For a client document request, Bobby locates the correct current documents,
+   prepares the exact recipient, reply and attachments, obtains the required
+   final approval, executes only through an authorised sender, and records the
+   confirmed result. General correspondence sending is not yet implemented.
+4. Sleep/reconnect preserves progress. Hosted and Mac-only steps show their real
+   availability; retries do not repeat payments, messages or record creation.
+
+### Execution boundary and immediate engineering decision
+
+Hosted Work Gmail connection, search and internal message-body display were
+verified from owner screenshots on 29 September. This does not enable hosted AI
+reasoning. Bobby's general understanding and planning still use Mac Codex while
+the Mac is awake; paid cloud AI remains inactive. Mac-off deterministic reads or
+calculations must be labelled as such and must not impersonate general reasoning.
+
+Do not replace this goal with a growing set of hard-coded phrases routed to
+unconnected mini-features. On 29 September a draft PDF viewer / fixed-phrase mail
+report was reconsidered before release. It was not deployed or counted as a
+completed Bobby workflow. Continue by consolidating the existing mail evidence,
+invoice reconciliation, document catalogue, work registry and approval services
+behind Bobby's shared execution interface. General Mac-off reasoning needs a
+separately authorised execution arrangement; do not activate spending to hide
+this dependency.
+
+## Standing duty clarified by owner — 29 September 2026
+
+New company mail is Bobby's standing work, not a task requiring an owner prompt
+for each poll. An owner request to check mail is an additional immediate check.
+Monitor every newly received message (including self-addressed generator mail),
+read the thread and relevant attachments, identify and prioritise real work,
+prepare available evidence/drafts, then bring decisions and exact final approvals
+to the owner. Do not generate a new alert on every repeat poll. Retain unresolved
+work and catch up after the Mac reconnects. A mail search/AI failure must remain
+visible and queued, never be described as a complete check.
+
+The owner further confirmed that this proactive responsibility covers daily work
+records, contractor invoice reconciliation, client invoice preparation, receipt
+confirmation, payable invoices, insurance renewal and other company work. Do not
+wait for a separate instruction for each obvious, already authorised preparation.
+Ask for missing actual work/site facts, business decisions or final permission;
+do not invent attendance, agreed rates, due dates, bank receipts or payment dates.
+A client invoice becoming due is a reason to prepare a receipt-confirmation task,
+not proof that it is unpaid. Sending, bank transfers and binding commitments keep
+their existing exact-action approval boundaries.
+
+Implementation status must remain explicit: the new-mail release uses the
+existing Mac Codex login and the shared Work inbox/evidence tools. It does not
+activate paid cloud AI. In-app notices are separate from phone push delivery;
+never claim a locked-phone notification until device permission, subscription
+and delivery are verified. Automatic client billing cycles and expected daily
+attendance still need their agreed schedules/coverage and executors implemented.
+
+### Owner acceptance and corrections — 29 September 2026
+
+The owner can accept a known discrepancy, including a small hours difference,
+and close a specified set of earlier review requests together. Preserve that
+manual acceptance and its scope so unchanged evidence does not reopen the issue.
+A calculation mismatch remains factual evidence; the decision is `owner accepted`,
+not a fabricated automatic match. Accepting a review is separate from confirming
+an actual bank payment. When asked, Bobby must show each selected contractor's
+work by date, weekday, site and hours, then apply an unambiguous owner correction
+with an audit trail of old/new values. Ambiguous person/date/site needs resolution;
+retrievable details should not be asked for again. The shared work tools already
+retrieve the records; conversational batch closure, exception acceptance and
+audited time corrections still require their action executors to be connected.

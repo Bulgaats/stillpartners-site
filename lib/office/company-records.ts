@@ -16,7 +16,8 @@ export const companyRecordProposal=z.object({
 });
 export type CompanyRecordProposal=z.infer<typeof companyRecordProposal>;
 export type CompanyRecord={id:string;kind:'memory'|'work';title:string;body:string;status:CompanyRecordProposal['status'];category:CompanyRecordProposal['category'];priority:CompanyRecordProposal['priority'];due_date:string|null;effective_date:string|null;next_action:string;outcome:string;source_ref:string;version:number;created_at:string;updated_at:string;detection?:{rule:string;active:boolean;observedAt:string;summary:string;evidence:Record<string,unknown>}|null};
-export type MonitorStatus={enabled:boolean;work_from:string;last_checked_at:string|null;last_error:string|null;last_result:{activeConditions?:number;snapshotAvailable?:boolean;created?:number;updated?:number;cleared?:number}};
+export type MailWatchStatus={started_at:string;last_scan_at:string|null;last_review_at:string|null;heartbeat_at:string|null;status:'waiting_mac'|'checking'|'ok'|'error';pending:number;error_type:string|null};
+export type MonitorStatus={mail?:MailWatchStatus;enabled:boolean;work_from:string;last_checked_at:string|null;last_error:string|null;last_result:{activeConditions?:number;snapshotAvailable?:boolean;created?:number;updated?:number;cleared?:number}};
 // The button records an owner's inbox decision, not evidence of an external action.
 export function reviewedWorkDraft(draft:CompanyRecordProposal,status:'completed'|'cancelled'):CompanyRecordProposal {
  if(draft.kind!=='work'||!draft.id)throw new Error('Review an existing work item first.');

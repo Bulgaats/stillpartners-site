@@ -42,6 +42,13 @@ class MailReader:
    if transport is not None:transport.timeout=15
   return self.api
  def get(self,id):return self.service().users().messages().get(userId='me',id=identity(id),format='full').execute(num_retries=1)
+ def thread(self,id,offset=0):
+  if type(offset) is not int or offset<0:raise ValueError('Invalid thread offset')
+  raw=self.service().users().threads().get(userId='me',id=identity(id),format='full').execute(num_retries=1)
+  messages=sorted(raw.get('messages',[]),key=lambda m:(int(m['internalDate']),m['id']))
+  return {'threadId':id,'messages':[view(m) for m in messages[offset:offset+3]],'total':len(messages),
+   'nextOffset':offset+3 if offset+3<len(messages) else None,
+   'coverage':'Thread includes incoming and Sent messages. Follow nextOffset and each message body offset; attachments are unread until extracted.'}
  def search(self,query,page=''):
   result=self.service().users().messages().list(userId='me',q=query,maxResults=50,pageToken=page or None,includeSpamTrash=True).execute(num_retries=1)
   return {'messages':result.get('messages',[]),'nextPageToken':result.get('nextPageToken'),'query':query,'checkedAt':dt.datetime.now(dt.timezone.utc).isoformat(),'coverage':'This result page contains message IDs only; read matching messages and attachments. Follow nextPageToken for all results. Includes incoming, Sent and self-addressed messages matching the query.'}

@@ -86,3 +86,21 @@ class KnowledgeTests(unittest.TestCase):
    r=registry_lookup('51824753556','Example Person',{})
   self.assertFalse(r['registeredHolderMatch']);self.assertIsNone(r['checkedAt']);self.assertEqual(r['status'],'review')
 if __name__=='__main__':unittest.main()
+
+class FreshWorkflowTests(unittest.TestCase):
+ def test_import_reload_exposes_new_sources_in_same_bobby_task(self):
+  import uuid
+  with tempfile.TemporaryDirectory() as tmp:
+   root=pathlib.Path(tmp);(root/'data').mkdir();register=root/'data/register.json';register.write_text(json.dumps({'account':'work@stillpartners.net','documents':[],'payments':[]}))
+   k=Knowledge(root,{'_assistantTaskId':str(uuid.uuid4())})
+   def importer(*args):
+    register.write_text(json.dumps({'account':'work@stillpartners.net','documents':[document('a')],'payments':[]}))
+    return {'reply':'Imported source','invoiceRefresh':{'document_ids':['a'],'published':True}}
+   with patch('office_assistant_worker.check_invoices',side_effect=importer),patch('office_context.refresh',side_effect=lambda c:{**c,'freshness':{'status':'current'}}):result=k.refresh_invoices()
+   self.assertEqual(result['import']['document_ids'],['a']);self.assertEqual(k.records('invoices')[0]['name'],'Example Person')
+ def test_live_payment_merge_deduplicates_and_respects_reversal(self):
+  k=Knowledge.__new__(Knowledge);k.context={'paymentEvents':[{'id':'one','document_id':'d','kind':'payment','amount_cents':100},{'id':'two','document_id':'d','kind':'payment','amount_cents':200}]}
+  doc={'id':'d','paidCents':100,'amountCents':300,'payments':[{'id':'one'}]}
+  self.assertEqual(k.payment_evidence(doc)['recordedCents'],300)
+  k.context['paymentEvents'].append({'id':'void','document_id':'d','kind':'void','target_id':'one'})
+  self.assertEqual(k.payment_evidence(doc)['status'],'Review');self.assertIsNone(k.payment_evidence(doc)['recordedCents'])
