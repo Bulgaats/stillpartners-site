@@ -22,7 +22,7 @@ def day(v):
 def schema(properties,required=()):
  return {'type':'object','additionalProperties':False,'properties':properties,'required':list(required)}
 def string(description=''):return {'type':'string','maxLength':300,'description':description}
-COLLECTIONS=('invoices','suppliers','contractors','clients','sites','workRecords','agreedRates','contactReviews','companyMemory','workItems','documents')
+COLLECTIONS=('invoices','suppliers','contractors','clients','sites','workRecords','agreedRates','contactReviews','companyMemory','workItems','documents','plannedWork')
 TOOLS=[
  {'name':'search_company_records','description':'Search saved company records and imported invoices. Paginated; follow nextOffset for all results. Supplier groups use issuer name + ABN, never sender. Dates are Perth dates. Does not check the live inbox.',
  'inputSchema':schema({'collection':{'type':'string','enum':list(COLLECTIONS)},'query':string(),'from':string('Inclusive YYYY-MM-DD'),'to':string('Inclusive YYYY-MM-DD'),'dateField':{'type':'string','enum':['received','issueDate','workDate','due_date','effective_date']},'offset':{'type':'integer','minimum':0},'limit':{'type':'integer','minimum':1,'maximum':30}},('collection',))},

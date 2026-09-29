@@ -7,7 +7,7 @@ import type {InvoiceSnapshot} from '../invoice-snapshot';
 import {gmailGet,gmailToken,mailView,flattenParts,type GmailPart} from './gmail';
 type Row=Record<string,unknown>;
 export type ToolResult={data:unknown;content?:Row};
-const collection=z.enum(['invoices','contractors','clients','sites','workRecords','agreedRates','contactReviews','companyMemory','workItems','documents']);
+const collection=z.enum(['invoices','contractors','clients','sites','workRecords','agreedRates','contactReviews','companyMemory','workItems','documents','plannedWork']);
 const str={type:'string'},num={type:'integer'};
 function tool(name:string,description:string,properties:Row){return {type:'function',name,description,strict:true,parameters:{type:'object',properties,required:Object.keys(properties),additionalProperties:false}};}
 export const CLOUD_TOOLS=[

@@ -43,6 +43,17 @@ def from_export(export,previous,now=None):
   companyMemory=[r for r in records if r['kind']=='memory'],workItems=[r for r in records if r['kind']=='work'],
   documents=tables['office_documents'],paymentEvents=tables['office_invoice_events'])
  context['documents']=[{**d,'files':[{k:f[k] for k in ('id','filename','mime','bytes','sha256')} for f in tables.get('office_document_files',[]) if f['document_id']==d['id'] and f['status']=='ready']} for d in tables['office_documents']]
+ context['plannedWork']=[]
+ entries={(e['worker_id'],e['job_id'],e['work_date']):e for e in tables['work_entries']}
+ workers={w['id']:w for w in tables['workers']};jobs={j['id']:j for j in tables['jobs']}
+ for plan in tables.get('office_site_plans',[]):
+  participants=[]
+  for pp in tables.get('office_site_plan_people',[]):
+   if pp['plan_id']!=plan['id']:continue
+   w=workers.get(pp['worker_id'],{});e=entries.get((pp['worker_id'],plan['job_id'],plan['work_date']))
+   participants.append({'id':pp['worker_id'],'fullName':w.get('full_name',''),'shortName':names.get(pp['worker_id'],{}).get('short_name',''),'active':pp['active'],'entryId':e['id'] if e else None,'hours':e['hours'] if e else None})
+  j=jobs.get(plan['job_id'],{})
+  context['plannedWork'].append({'id':plan['id'],'jobId':plan['job_id'],'workDate':plan['work_date'],'reminderTime':plan['reminder_time'],'site':j.get('site_name',''),'address':j.get('location',''),'note':plan['note'],'people':participants,'meaning':'Owner-entered expectation only. Missing hours are unknown, not zero work.'})
  context['workRecords']=[]
  for e in tables['work_entries']:
   if not start<=e['work_date']<=end:continue

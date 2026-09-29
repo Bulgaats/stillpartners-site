@@ -1,4 +1,6 @@
 import 'server-only';
+import {readSitePlans} from './site-plan-data';
+import {planReply} from './site-plans';
 import {createServerSupabaseClient,createServiceRoleSupabaseClient} from '@/lib/supabase/server';
 import {officeData} from './data';
 import {documentRecords} from './document-data';
@@ -21,6 +23,11 @@ function slice(rows:DirectRow[],cursor:string){const n=cursor?Number(cursor):0;i
 export async function executeOfficeRead(owner:string,input:DirectRequest):Promise<DirectResult>{
  const request=directRequest.parse(input),{kind,query,cursor}=request,today=getPerthIsoDate();
  const base={request,title:DIRECT_LABELS[kind],checkedAt:new Date().toISOString(),coverage:'Current saved company records. No approval, payment or outgoing message was changed.'};
+ if(kind==='plans'||kind==='missing_hours'){
+  const from=request.from||addIsoDays(today,1),to=request.to||from,result=await readSitePlans(kind==='plans'?from:null,kind==='plans'?to:null,kind==='missing_hours');
+  const rows=result.plans.filter(p=>includes(planReply(p),query)).map(p=>({id:p.id,title:`${p.workDate} · ${p.site}`,detail:planReply(p),source:`/office?view=plans&date=${p.workDate}`}));
+  return {...base,...slice(rows,cursor),coverage:`Live saved site plans and work records. ${result.enabled?'Reminders enabled':'Automatic reminders paused'}. Last server scan: ${result.lastScan||'Not confirmed'}. Planned participation never creates hours or payments. Phone push is not enabled.`};
+ }
  if(kind==='mail'){
   const epoch=(day:string)=>Math.floor(Date.parse(day+'T00:00:00+08:00')/1000);
   const q=[query||(!request.from&&!request.to?'newer_than:14d':''),request.from?`after:${epoch(request.from)}`:'',request.to?`before:${epoch(addIsoDays(request.to,1))}`:''].filter(Boolean).join(' ');

@@ -222,3 +222,41 @@ Validation: full JavaScript unit suite and targeted Python evidence/worker suite
   owner-edit preservation, older-message ordering, pause, information-only
   handling and no financial-event changes. Private mail ledger tables deliberately
   deny direct client access. Existing unrelated database-advisor warnings remain.
+
+## Site plans and missing hours — 29 September 2026
+
+Today → **Plan tomorrow’s sites**, or Sites → **Site plans**. Select date, site,
+participants and the editable reminder time (default 17:00 Perth), then Save plan.
+Site addresses reuse the existing site directory. Add/manage a location there if
+needed. Full names/short names are searchable; a person cannot be planned twice
+at different sites on the same date. Remove and save the old participation before
+moving them; no original actual hours are deleted. Uncheck someone who did not
+attend; history is retained. Stale edits stop for reload; retries use the same ID.
+
+Enter hours opens existing daily work for that site/date. Planned people appear
+with blank hours; recorded rows keep their actual hours. The existing actual,
+contractor-payable and client-billable distinctions and locks stay unchanged.
+At/after the reminder time, one grouped Work inbox case lists missing people.
+Saving hours/cancelling participation clears an untouched case; owner-edited
+case notes are preserved. Manual terminal decisions suppress the unchanged alert;
+new missing evidence may reopen it. A source at another site never silently
+satisfies the plan. No entry is not zero hours.
+
+One `office-site-plan-reminders` database cron checks every five minutes, honours
+the existing monitor pause, and needs neither Mac nor paid AI. A visible app
+refresh checks current gaps every minute while open. Phone push notifications
+are not enabled. The cron persists reminders while the app is closed, but that
+is not proof that a locked phone received them. Status/error timestamps are
+returned by the shared plan service.
+
+Bobby direct tools **Site plans** / **Missing hours**, `/plans`, `/missing_hours`,
+`маргаашийн төлөвлөгөөг харуул` and `цаг нь дутуу хүмүүсийг харуул` use the same
+records. Plans default to tomorrow unless dates are selected. Model context/tools
+include `plannedWork`; creation/editing uses the shared operational planner, not
+an unimplemented free-text mutation. No existing legacy assignments or historical
+invoice periods have been turned into expectations.
+
+Verification: rollback synthetic database scenarios for dates, exact site,
+missing/zero, replay, conflicts, role denial, cancel/pause/catch-up; targeted
+TypeScript and Mac evidence tests; production build. Owner-authenticated phone
+visual verification and locked-phone delivery remain separate/unverified.

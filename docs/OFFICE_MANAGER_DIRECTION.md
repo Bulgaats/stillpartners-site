@@ -280,3 +280,23 @@ file is separate from extracting or verifying its content. Deterministic invoice
 comparison uses known imported source fields and current saved work/rates, not
 guessed numbers from an unread incoming PDF. All approval/payment evidence rules
 remain unchanged.
+
+## Planned site participation → missing hours — 29 September 2026
+
+Owner-approved daily flow: enter tomorrow's sites/addresses and participants,
+then ask for actual hours after the work day. Site selection comes first.
+A plan is an expectation, never a work entry or payment. Default reminder time
+is visibly editable at 17:00 Perth per site/day; it is a product default, not
+an asserted business agreement. Only new explicit plans create expectations;
+legacy assignments and settled historical invoices are not imported/re-audited.
+
+The same hosted records feed the site planner, daily-entry people, Bobby's direct
+reads/model evidence and existing Work inbox. One grouped reminder lists only
+people with no actual entry for that exact site/date. Explicit zero is a record;
+work elsewhere requires correction of the plan, not an inferred match. Cancelling
+participation retains its history and never erases actual work. Future automatic
+client invoice preparation must use actual approved work, not planned people.
+
+The database checks due plans every five minutes independently of the Mac,
+respects Company → Work inbox → Pause checks, and updates one case per site/day.
+Current delivery is inside the app; locked-phone push remains unconfigured.
