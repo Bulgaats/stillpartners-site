@@ -22,9 +22,11 @@ export default async function OfficePage({searchParams}:{searchParams?:Promise<{
   const params=await searchParams;const today=getPerthIsoDate();const cycle=params?.payday?payrunPeriod(params.payday):null;
   const a=params?.from && validDate(params.from)?params.from:cycle?.from??addIsoDays(today,-27);
   const b=params?.to && validDate(params.to)?params.to:cycle?.to??today;
-  const data=await officeData(session.profile.role==="admin",a<b?a:b,a<b?b:a);
+  const [data,existing]=await Promise.all([
+    officeData(session.profile.role==="admin",a<b?a:b,a<b?b:a),
+    getOperationsWorkspaceData({session,rangeStart:a<b?a:b,rangeEnd:a<b?b:a,includeLegacyWork:false})
+  ]);
   data.viewerId=session.userId;
-  const existing=await getOperationsWorkspaceData({session,rangeStart:data.from,rangeEnd:data.to,includeLegacyWork:false});
   const management={clients:existing.clients,projects:existing.projects,clientInvoices:existing.clientInvoices,isFinanceAdmin:existing.isFinanceAdmin};
   let snapshot:InvoiceSnapshot|null=null;
   if(data.finance){const db=await createServerSupabaseClient();const {data:row}=await db.from("office_invoice_snapshots").select("payload").order("exported_at",{ascending:false}).limit(1).maybeSingle();const parsed=invoiceSnapshotSchema.safeParse(row?.payload);if(parsed.success)snapshot=parsed.data;}
