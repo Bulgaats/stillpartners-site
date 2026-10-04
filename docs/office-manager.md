@@ -328,3 +328,33 @@ refreshes run together; hidden pages stop periodic polling and refresh on return
 Queued Mac work is described as queued, rather than claiming the Mac is offline.
 No model, background worker, billing, sending or payment behaviour is changed.
 General model requests and new source extraction still depend on Mac execution.
+
+## Daily interaction and save path — 4 October 2026
+
+Daily reads and Save day now use one same-origin, authenticated JSON endpoint,
+without waiting behind unrelated UI server actions. A save calls the existing
+versioned plan and guarded work services, returns per-item receipts and the fresh
+selected day, and does not render the whole office after each site. Plan conflicts
+stop work writes; partial receipts survive read-back failure. Failed drafts remain.
+The page consumes the day result for history/finance freshness. Background attention
+panels load on Overview, not during Daily entry. Directory saves no longer request
+a second refresh after server-side revalidation already refreshed the page.
+
+The people picker is a fixed modal with a stable checkbox list, selected count,
+search and Done. Other-site people remain excluded; saved work cannot be unchecked.
+Remove site clears only that day's planned participation and unsaved hours, with
+confirmation where needed; sites with actual saved work are retained. The directory
+has explicit Archive/Restore, using existing audited contractor status changes.
+Archiving preserves history and is distinct from deleting a person's source records.
+New sites, clients and contractors continue through the existing shared Company
+forms. No database schema, payment, invoice or original-source migration is involved.
+
+Save acknowledgements display observed elapsed time; the endpoint emits Server-Timing.
+These changes remove redundant round trips, not a promise of sub-second network or
+model execution. Tests and synthetic UI checks are separate from owner-phone timing.
+
+Observed production headers before this release routed /office through iad1,
+while the existing Supabase project is ap-south-1. Configure the existing Vercel
+functions in bom1 (Mumbai) to colocate repeated database calls. This is one region,
+not an additional server or plan activation. Validate the deployed route header;
+logged-out redirect timing is not a substitute for authenticated save timing.

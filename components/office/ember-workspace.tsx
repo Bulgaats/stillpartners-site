@@ -4,7 +4,6 @@ import {logout} from "@/app/actions/auth";
 import {LocationsPanel,ClientsAndAccessPanel,ClientInvoiceHistory,type CompanyManagementData} from "./company-management";
 import type {OperationsActionResult} from "@/app/actions/operations";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { CalendarDays, Sparkles, CheckCheck, Building2, ArrowUpRight, Clock3, MapPin, Wallet, FileText } from "lucide-react";
 import { type OfficeResult } from "@/app/actions/office";
 import { type OfficeData } from "@/lib/office/foundation";
@@ -28,8 +27,14 @@ const ClientDrafts=dynamic(()=>import('./client-drafts').then(m=>m.ClientDrafts)
 const AssistantChat=dynamic(()=>import('./assistant-chat').then(m=>m.AssistantChat),{loading:()=> <p role="status">Opening Bobby…</p>});
 const colors=["#b4a0e8","#83b9e1","#92cdb8","#e8b783"];
 const clientColor=(id:string)=>colors[Array.from(id).reduce((n,c)=>n+c.charCodeAt(0),0)%colors.length];
-export function EmberWorkspace({data,management,today,initialPlanDate,initialTab="daily"}:{data:OfficeData;management:CompanyManagementData;today:string;initialPlanDate?:string;initialTab?:"daily"|"history"|"invoices"|"plans"}) {
- const router=useRouter();
+export function EmberWorkspace({data:initialData,management,today,initialPlanDate,initialTab="daily"}:{data:OfficeData;management:CompanyManagementData;today:string;initialPlanDate?:string;initialTab?:"daily"|"history"|"invoices"|"plans"}) {
+ const [data,setData]=useState(initialData);
+ useEffect(()=>setData(initialData),[initialData]);
+ useEffect(()=>{const saved=(event:Event)=>{
+  const snapshot=(event as CustomEvent<{day:string;entries:OfficeData['entries']}>).detail;
+  if(snapshot?.day&&snapshot.entries)setData(d=>({...d,entries:[...d.entries.filter(e=>e.workDate!==snapshot.day),...snapshot.entries]}));
+ };window.addEventListener('office-work-saved',saved);return()=>window.removeEventListener('office-work-saved',saved);},[]);
+
  const [billingPreset,setBillingPreset]=useState<{clientId:string;from:string;to:string}|null>(null);
  const [tab,setTab]=useState(initialTab==="invoices"&&data.finance?"money":"sites");
  const [section,setSection]=useState(initialTab==="invoices"?"contractor-invoices":initialTab==="history"?"history":"daily");
@@ -50,7 +55,7 @@ export function EmberWorkspace({data,management,today,initialPlanDate,initialTab
  const [pending,start]=useTransition();const [notice,setNotice]=useState<OfficeResult|null>(null);
  const currentContactImports=financeReady?activeContactImports(data,snapshot):[];
  const count=currentContactImports.filter(i=>i.status==="pending").length;
- const run=(action:()=>Promise<OfficeResult>)=>start(async()=>{try{const r=await action();setNotice(r);if(r.ok)router.refresh();}catch{setNotice({ok:false,message:"Could not save. Please try again."});}});
+ const run=(action:()=>Promise<OfficeResult>)=>start(async()=>{try{const r=await action();setNotice(r);}catch{setNotice({ok:false,message:"Could not save. Please try again."});}});
  const runManagement=(action:()=>Promise<OperationsActionResult>)=>run(async()=>{const r=await action();return {ok:r.ok,message:r.message??r.error??(r.ok?"Saved.":"Could not save.")};});
  function navigate(destination:string){
   if(destination==="today"){setTab("today");return;}
@@ -65,8 +70,8 @@ export function EmberWorkspace({data,management,today,initialPlanDate,initialTab
  return <main className={`ember ${tab==="assistant"&&data.finance?"ember-chat-mode":""}`}><div className="ember-shell">
  <header className="ember-top"><a href="/office" className="ember-brand"><Image src="/assets/logo/logo-icon-light.svg" alt="Still Partners" width="38" height="38"/><span>STILL PARTNERS<small>YOUR COMPANY OFFICE</small></span></a><form action={logout}><button type="submit" className="ember-text-button">Sign out</button></form></header>
  <div className="ember-content"><div className="ember-heading"><p className="eyebrow">STILL PARTNERS / OFFICE</p><h1>{headings[tab]}</h1><p className="muted">{new Intl.DateTimeFormat("en-AU",{weekday:"long",day:"numeric",month:"long",year:"numeric",timeZone:"Australia/Perth"}).format(new Date(today+"T12:00:00+08:00"))}</p></div>
- <PlanAttention open={openPlans}/>
- {data.finance&&<MailAttention open={()=>navigate("work")}/>}
+ {tab==="today"&&<PlanAttention open={openPlans}/>}
+ {tab==="today"&&data.finance&&<MailAttention open={()=>navigate("work")}/>}
  {notice&&<p role="status" className={notice.ok?"ember-notice":"ember-notice error"}>{notice.message}</p>}
  {needsFinance&&!financeReady&&<p className="ember-notice" role={financeError?"alert":"status"}>{financeError||"Loading finance records…"}{financeError&&<button onClick={()=>setFinanceRetry(v=>v+1)}>Retry</button>}</p>}
  {tab==="today"&&<>
