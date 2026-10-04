@@ -37,3 +37,9 @@ export function directReply(result:DirectResult){return {
  reply:result.title,action:'none' as const,name:'',email:'',phone:'',abn:'',group:'regular' as const,clientId:'',address:'',section:'none' as const,
  direct:result,evidence:{toolCalls:[{tool:'office_'+result.request.kind,ok:true}],totalCalls:1,coverage:result.coverage}
 };}
+
+/** Explicit read controls share the exact same authorised services as chat tools. */
+export function officeShortcut(kind:'work'|'mail'|'invoices'|'contacts'|'documents',day=''):DirectRequest{
+ if(kind==='work'&&!validDate(day))throw new Error('A work summary needs an exact day.');
+ return directRequest.parse({kind,...(kind==='work'?{from:day,to:day}:{})});
+}
