@@ -7,12 +7,14 @@ export async function getOperationsWorkspaceData({
   session,
   rangeStart,
   rangeEnd,
-  includeLegacyWork = true
+  includeLegacyWork = true,
+  includeClientInvoices = true
 }: {
   session: SessionProfile;
   rangeStart: string;
   rangeEnd: string;
   includeLegacyWork?: boolean;
+  includeClientInvoices?: boolean;
 }): Promise<OperationsWorkspaceData> {
   if (!canAccessOperations(session.profile.role)) {
     throw new Error("Operations access required.");
@@ -55,7 +57,7 @@ export async function getOperationsWorkspaceData({
             .from("client_worker_rates")
             .select("id, client_id, worker_id, rate_per_tonne")
         : Promise.resolve({ data: [], error: null }),
-      isFinanceAdmin
+      isFinanceAdmin && includeClientInvoices
         ? supabase
             .from("client_invoices")
             .select(

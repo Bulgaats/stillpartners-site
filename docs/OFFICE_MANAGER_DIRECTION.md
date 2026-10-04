@@ -329,3 +329,30 @@ Atomic move between sites, lazy finance-page loading and Bobby's general Mac-onl
 reasoning remain separate unfinished work. No paid cloud model has been enabled.
 Production build and synthetic tests are required before release; owner-phone
 acceptance and real-network speed are not established by these tests.
+
+
+## One coherent phone office — owner rule, 4 October 2026
+
+Every change must reduce effort in the end-to-end company workflow: daily site
+participation → actual/payable/billable records → client billing and contractor
+invoice checks → explicit payment confirmation and source filing. Do not add
+separate mini-apps, duplicate business rules or extra approval screens to solve
+isolated problems. Prefer shared records/services used by both Bobby and manual
+controls. Measure real workflow completion and phone responsiveness; keep
+implementation, deployment and owner-device acceptance distinct.
+
+### Demand-loaded finance
+
+The Daily landing response no longer reads or includes the contractor snapshot,
+payment event history, Mac filing receipts/status or legacy client invoices.
+Money, finance Overview and contact-review screens request the guarded finance
+bundle when opened. Payment history and filing receipts still retrieve every
+page; invalid/missing query results block finance controls with Retry, never
+masquerade as unpaid balances or an empty register. Leaving those screens drops
+the bundle; server refresh invalidates it. Daily remains mounted and retains its
+unsaved hours across navigation. Invoice, client-billing and Bobby components
+load their browser code on demand. No schema, payment, source or AI-cost changes.
+
+This removes unrelated finance dependencies from everyday entry; it does not
+claim measured device latency or finish the remaining directory/rate loading,
+Bobby execution and atomic site-move work.

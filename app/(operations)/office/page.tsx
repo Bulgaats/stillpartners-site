@@ -1,10 +1,6 @@
-import type {MacSync} from "@/lib/office/mac-sync";
-import type {InvoiceEvent} from "@/lib/office/invoice-events";
 import type { Metadata, Viewport } from "next";
 export const metadata: Metadata = {title:"Still Partners Office",manifest:"/office.webmanifest",appleWebApp:{capable:true,title:"SP Office",statusBarStyle:"black-translucent"}};
 export const viewport: Viewport = {themeColor:"#0c0e11",width:"device-width",initialScale:1};
-import {createServerSupabaseClient} from "@/lib/supabase/server";
-import {invoiceSnapshotSchema, type InvoiceSnapshot} from "@/lib/office/invoice-snapshot";
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth/session";
 import { canAccessOperations } from "@/lib/auth/roles";
@@ -24,15 +20,9 @@ export default async function OfficePage({searchParams}:{searchParams?:Promise<{
   const b=params?.to && validDate(params.to)?params.to:cycle?.to??today;
   const [data,existing]=await Promise.all([
     officeData(session.profile.role==="admin",a<b?a:b,a<b?b:a),
-    getOperationsWorkspaceData({session,rangeStart:a<b?a:b,rangeEnd:a<b?b:a,includeLegacyWork:false})
+    getOperationsWorkspaceData({session,rangeStart:a<b?a:b,rangeEnd:a<b?b:a,includeLegacyWork:false,includeClientInvoices:false})
   ]);
   data.viewerId=session.userId;
   const management={clients:existing.clients,projects:existing.projects,clientInvoices:existing.clientInvoices,isFinanceAdmin:existing.isFinanceAdmin};
-  let snapshot:InvoiceSnapshot|null=null;
-  if(data.finance){const db=await createServerSupabaseClient();const {data:row}=await db.from("office_invoice_snapshots").select("payload").order("exported_at",{ascending:false}).limit(1).maybeSingle();const parsed=invoiceSnapshotSchema.safeParse(row?.payload);if(parsed.success)snapshot=parsed.data;}
-  const invoiceEvents:InvoiceEvent[]=[];
-  if(data.finance){const db=await createServerSupabaseClient();for(let offset=0;;offset+=1000){const {data:rows,error}=await db.from("office_invoice_events").select("id,document_id,kind,source_digest,amount_cents,payment_date,reason,target_id,created_at").order("created_at").order("id").range(offset,offset+999);if(error)throw new Error("Payment history unavailable. Reload before recording payments.");invoiceEvents.push(...(rows??[]) as InvoiceEvent[]);if(!rows||rows.length<1000)break;}}
-  const macSync:MacSync={devices:[],receipts:[]};
-  if(data.finance){const db=await createServerSupabaseClient();const {data:devices,error}=await db.rpc("office_mac_status");if(error)throw new Error("Mac status unavailable");macSync.devices=devices??[];for(let offset=0;;offset+=1000){const {data:rows,error}=await db.from("office_mac_receipts").select("event_id,status,file_state,message,updated_at").order("event_id").range(offset,offset+999);if(error)throw new Error("Mac receipt history unavailable");macSync.receipts.push(...(rows??[]));if(!rows||rows.length<1000)break;}}
-  return <OfficeWorkspace macSync={macSync} invoiceEvents={invoiceEvents} snapshot={snapshot} management={management} data={data} today={today} initialPlanDate={params?.date&&validDate(params.date)?params.date:undefined} initialTab={params?.view==="plans"?"plans":params?.view==="invoices"?"invoices":params?.view==="history"?"history":"daily"} />;
+  return <OfficeWorkspace management={management} data={data} today={today} initialPlanDate={params?.date&&validDate(params.date)?params.date:undefined} initialTab={params?.view==="plans"?"plans":params?.view==="invoices"?"invoices":params?.view==="history"?"history":"daily"} />;
 }
