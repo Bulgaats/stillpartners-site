@@ -316,3 +316,15 @@ load their browser code on demand. No schema, payment, source or AI-cost changes
 This removes unrelated finance dependencies from everyday entry; it does not
 claim measured device latency or finish the remaining directory/rate loading,
 Bobby execution and atomic site-move work.
+
+## Bobby read responsiveness — 4 October 2026
+
+The fixed composer exposes Today’s records, Latest email, Saved invoices,
+Contractors and Documents as typed requests to the existing authorised direct
+services. These remain usable while a model task waits. Today uses an exact Perth
+date; saved invoices remain explicitly distinct from live Gmail and new imports.
+Successful direct reads refresh their conversation immediately. Chat and task
+refreshes run together; hidden pages stop periodic polling and refresh on return.
+Queued Mac work is described as queued, rather than claiming the Mac is offline.
+No model, background worker, billing, sending or payment behaviour is changed.
+General model requests and new source extraction still depend on Mac execution.
