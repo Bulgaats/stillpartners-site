@@ -51,7 +51,13 @@ export async function voidOfficeRate(input:{id:string;reason:string}):Promise<Of
 }
 const workSchema=z.object({workerId:z.string().uuid(),jobId:z.string().uuid(),workDate:z.string().date(),actualHours:z.number().min(0).max(24),contractorHours:z.number().min(0).max(24).nullable(),clientHours:z.number().min(0).max(24).nullable(),agreementNote:z.string().trim().max(2000).nullable(),expectedUpdatedAt:z.string().nullable()});
 export async function saveOfficeWork(input:z.input<typeof workSchema>):Promise<OfficeResult> {
-  const db=await access(false);const parsed=workSchema.safeParse(input);
+  const db=await access(false);
+  const saved=await saveWork(db,input);
+  if(saved.ok){revalidatePath("/office");revalidatePath("/operations");}
+  return saved;
+}
+async function saveWork(db:Awaited<ReturnType<typeof access>>,input:z.input<typeof workSchema>):Promise<OfficeResult>{
+  const parsed=workSchema.safeParse(input);
   if(!parsed.success)return {ok:false,message:parsed.error.issues[0].message};
   const v=parsed.data;
   const {data:existing,error:readError}=await db.from('work_entries').select('id,hours,updated_at').eq('worker_id',v.workerId).eq('job_id',v.jobId).eq('work_date',v.workDate).maybeSingle();
@@ -62,5 +68,24 @@ export async function saveOfficeWork(input:z.input<typeof workSchema>):Promise<O
     if(!adjustError&&Number(adjust?.contractor_hours??existing.hours)===v.contractorHours&&Number(adjust?.client_hours??existing.hours)===v.clientHours&&(adjust?.agreement_note??'')===(v.agreementNote??''))return {ok:true,message:'This work record is already saved; no duplicate was added.'};
   }
   const response=await db.rpc("office_save_work_record",{p_worker:v.workerId,p_job:v.jobId,p_date:v.workDate,p_hours:v.actualHours,p_expected_updated_at:v.expectedUpdatedAt,p_contractor_hours:v.contractorHours,p_client_hours:v.clientHours,p_note:v.agreementNote});
-  return result(response.error,"Work record saved. No invoice approved and no payment recorded.");
+  return response.error?{ok:false,message:response.error.message}:{ok:true,message:"Work record saved."};
+}
+
+// One browser request and one revalidation; existing per-row RPC remains authoritative.
+export async function saveOfficeWorkBatch(inputs:z.input<typeof workSchema>[]){
+ const db=await access(false);
+ const parsed=z.array(workSchema).min(1).max(100).safeParse(inputs);
+ if(!parsed.success)throw new Error('Choose between 1 and 100 valid work records.');
+ const keys=parsed.data.map(v=>`${v.workDate}:${v.jobId}:${v.workerId}`);
+ if(new Set(keys).size!==keys.length)throw new Error('Each work record must appear once.');
+ const results:{key:string;ok:boolean;message:string}[]=[];
+ // Four distinct rows at a time. DB locks, timestamps and replay checks still apply.
+ for(let start=0;start<parsed.data.length;start+=4){
+  const group=await Promise.all(parsed.data.slice(start,start+4).map(async(v,i)=>{
+   try{return {key:keys[start+i],...await saveWork(db,v)};}
+   catch{return {key:keys[start+i],ok:false,message:'Save could not be confirmed. Your draft is retained for retry.'};}
+  }));results.push(...group);
+ }
+ if(results.some(r=>r.ok)){revalidatePath('/office');revalidatePath('/operations');}
+ return results;
 }

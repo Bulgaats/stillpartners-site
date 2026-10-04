@@ -300,3 +300,32 @@ client invoice preparation must use actual approved work, not planned people.
 The database checks due plans every five minutes independently of the Mac,
 respects Company → Work inbox → Pause checks, and updates one case per site/day.
 Current delivery is inside the app; locked-phone push remains unconfigured.
+
+
+## Daily workflow simplification — 4 October 2026
+
+Owner priority is practical phone use: one date, grouped sites, people and hours
+on the same screen. Daily is now the landing tab; Today/Tomorrow and date selection
+reuse the existing site-plan and work-record services. Select sites, add multiple
+people inline, enter hours in their rows, or apply hours to a site's unlocked rows.
+People already planned/recorded/locally selected on that day are hidden from other
+pickers. Existing historical multi-site work is preserved, not merged or erased.
+Future participation has blank hours; actuals are only entered on/past the work day.
+Payable/client hours and notes remain in row Details; locks and original timestamps
+are retained. One Save day reports partial failures and keeps their drafts. The
+hours batch uses one browser call, four bounded concurrent guarded row operations,
+and one cache invalidation per destination. This is not an all-or-nothing day
+transaction: each original guarded work RPC remains atomic. Site plans retain
+version checks and stable retry IDs. No invoice/payment/source record is migrated.
+
+The board fetches the selected day without reloading a history range. Unsaved
+hours reuse existing viewer-scoped device recovery; unsaved people selections
+remain in the mounted screen and warn before date changes/unload. The older
+separate plan/work editors are no longer in the navigation. Existing overview,
+finance, history, documents, contacts and Bobby remain reachable.
+
+This is the first simplified daily workflow, not a completed app-wide redesign.
+Atomic move between sites, lazy finance-page loading and Bobby's general Mac-only
+reasoning remain separate unfinished work. No paid cloud model has been enabled.
+Production build and synthetic tests are required before release; owner-phone
+acceptance and real-network speed are not established by these tests.
