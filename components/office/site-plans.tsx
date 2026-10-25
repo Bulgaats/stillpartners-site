@@ -7,7 +7,7 @@ import {pendingPeople,type PlanRead,type SitePlan,type SitePlanInput} from '@/li
 export type PlanSelection={id:string;day:string;people:string[];nonce:number};
 export function PlanAttention({open}:{open:(day:string)=>void}){
  const [data,setData]=useState<PlanRead|null>(null),[error,setError]=useState(false);
- useEffect(()=>{let alive=true,busy=false;const refresh=async()=>{if(busy||document.hidden)return;busy=true;try{const r=await missingWorkPlans();if(alive){setData(r);setError(false);}}catch{if(alive)setError(true);}finally{busy=false;}};void refresh();const t=setInterval(()=>void refresh(),60000);document.addEventListener('visibilitychange',refresh);window.addEventListener('office-work-saved',refresh);return()=>{alive=false;clearInterval(t);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('office-work-saved',refresh);};},[]);
+ useEffect(()=>{let alive=true,busy=false;const refresh=async()=>{if(busy||document.hidden)return;busy=true;try{const r=await missingWorkPlans();if(alive){setData(r);setError(false);}}catch{if(alive)setError(true);}finally{busy=false;}};void refresh();document.addEventListener('visibilitychange',refresh);window.addEventListener('office-work-saved',refresh);return()=>{alive=false;document.removeEventListener('visibilitychange',refresh);window.removeEventListener('office-work-saved',refresh);};},[]);
  if(error)return <aside className="ember-notice" role="status">Hours reminder status could not refresh. <button onClick={()=>open('')}>Open site plans</button></aside>;
  if(!data?.plans.length||!data.enabled)return null;
  const count=data.plans.reduce((n,p)=>n+p.missing,0);

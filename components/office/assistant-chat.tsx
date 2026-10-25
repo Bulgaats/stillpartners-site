@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {applyContractorNamesTask} from '@/app/actions/contractor-names';
 import {CompanyRecordProposalView} from './company-record-proposal';
 import {ContractorBatch} from './contractor-batch';
+import {RefreshGate} from '@/lib/office/refresh-gate';
 import {MessageSquare,Plus,PanelLeft,ArrowDown,Send,RefreshCw,X,Pencil} from 'lucide-react';
 import {submitAssistantTask,listAssistantTasks,listAssistantConversations,renameAssistantConversation,applyAssistantTask} from '@/app/actions/assistant';
 import {assistantResponse,directResult,type AssistantTask} from '@/lib/office/assistant';
@@ -16,17 +17,18 @@ export function AssistantChat({navigate,clients}:{navigate:(section:string)=>voi
  const router=useRouter(),[tasks,setTasks]=useState<AssistantTask[]>([]),[prompt,setPrompt]=useState(''),[notice,setNotice]=useState(''),[pending,start]=useTransition(),[refreshing,setRefreshing]=useState(false);
  const [conversations,setConversations]=useState<Conversation[]>([]),[selected,setSelected]=useState<string|null>(null),[ready,setReady]=useState(false),[loading,setLoading]=useState(false),[drawer,setDrawer]=useState(false),[more,setMore]=useState(false),[moreChats,setMoreChats]=useState(false),[legacy,setLegacy]=useState(0),[atBottom,setAtBottom]=useState(true);
  const panel=useRef<HTMLElement>(null),scroller=useRef<HTMLDivElement>(null),input=useRef<HTMLTextAreaElement>(null),id=useRef(''),selectedRef=useRef<string|null>(null),nearEnd=useRef(true),drafts=useRef<Record<string,Draft>>({}),listLimit=useRef(30),prepend=useRef<{height:number;top:number}|null>(null),initialised=useRef(false);
+ const refreshGate=useRef(new RefreshGate());
  const directInFlight=useRef(new Set<string>()),quickRetry=useRef<{key:string;id:string}|null>(null);
  const active=tasks.some(t=>t.status==='queued'||t.status==='running');
  const title=selected==='legacy'?'Other requests':conversations.find(c=>c.id===selected)?.title??'New chat';
- const refresh=useCallback(async(manual=false)=>{
+ const refresh=useCallback(async(manual=false)=>refreshGate.current.run(async()=>{
   const key=selectedRef.current;if(manual){setRefreshing(true);setNotice('Refreshing conversation…');}
   try{
    const [chats,result]=await Promise.all([listAssistantConversations(listLimit.current),key?listAssistantTasks(key==='legacy'?null:key):Promise.resolve(null)]);setConversations(chats.items);setMoreChats(chats.hasMore);setLegacy(chats.legacyCount);
    if(key&&result){if(selectedRef.current===key){setTasks(previous=>{const merged=new Map(previous.map(t=>[t.id,t]));result.items.forEach(t=>merged.set(t.id,t));return [...merged.values()].sort((a,b)=>a.created_at.localeCompare(b.created_at)||a.id.localeCompare(b.id));});}}
    if(manual)setNotice('Conversation is up to date.');
   }catch{setNotice('Could not refresh. Your draft is kept. Try Refresh.');}finally{if(manual)setRefreshing(false);}
- },[]);
+ }),[]);
  // Successful direct reads finish in this request; show them immediately instead of
  // waiting for the next poll. Keep the lease trigger in-flight through refresh.
  useEffect(()=>{for(const task of tasks.filter(t=>(t.executor==='cloud'||t.executor==='direct')&&(t.status==='queued'||t.status==='running'))){
@@ -55,8 +57,10 @@ export function AssistantChat({navigate,clients}:{navigate:(section:string)=>voi
    if(result.items.length){const page=await listAssistantTasks(key);if(live&&selectedRef.current===key){setTasks(page.items);setMore(page.hasMore);}}
   }catch{if(live)setNotice('Could not load chats. Try Refresh.');}finally{if(live)setReady(true);}})();
   const visibleRefresh=()=>{if(document.visibilityState==='visible')void refresh();};
-  const timer=setInterval(visibleRefresh,10000);document.addEventListener('visibilitychange',visibleRefresh);return()=>{live=false;clearInterval(timer);document.removeEventListener('visibilitychange',visibleRefresh);};
+  document.addEventListener('visibilitychange',visibleRefresh);return()=>{live=false;document.removeEventListener('visibilitychange',visibleRefresh);};
  },[refresh]);
+ // Poll only while a requested task is pending. Idle chats make no timer reads.
+ useEffect(()=>{if(!active)return;const timer=setTimeout(()=>{if(document.visibilityState==='visible')void refresh();},15000);return()=>clearTimeout(timer);},[active,tasks,refresh]);
  // VisualViewport keeps the composer above the phone keyboard, including standalone PWA mode.
  useEffect(()=>{
   const main=panel.current?.closest<HTMLElement>('.ember');const viewport=window.visualViewport;

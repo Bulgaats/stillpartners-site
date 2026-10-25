@@ -1,5 +1,6 @@
 'use server';
 import {z} from 'zod';
+import {cachedSnapshot,rememberSnapshot} from '@/lib/office/snapshot-cache';
 import {getSessionProfile} from '@/lib/auth/session';
 import {createServerSupabaseClient} from '@/lib/supabase/server';
 import {getOperationsWorkspaceData} from '@/lib/operations/data';
@@ -14,11 +15,17 @@ export async function loadOfficeFinance(from:string,to:string){
  z.string().date().parse(from);z.string().date().parse(to);
  const db=await createServerSupabaseClient();
  async function snapshot(){
-  const {data,error}=await db.from('office_invoice_snapshots').select('payload').order('exported_at',{ascending:false}).limit(1).maybeSingle();
+  const meta=await db.from('office_invoice_snapshots').select('source_digest').order('exported_at',{ascending:false}).limit(1).maybeSingle();
+  if(meta.error)throw new Error('Invoice register unavailable. Retry before recording payments.');
+  if(!meta.data)return null;
+  const digest=meta.data.source_digest;
+  const cached=cachedSnapshot(session!.userId,digest);if(cached)return cached;
+  const {data,error}=await db.from('office_invoice_snapshots').select('payload').eq('source_digest',digest).maybeSingle();
   if(error)throw new Error('Invoice register unavailable. Retry before recording payments.');
-  if(!data)return null;
+  if(!data)throw new Error('Invoice snapshot changed; reload before recording payments.');
   const parsed=invoiceSnapshotSchema.safeParse(data.payload);
   if(!parsed.success)throw new Error('Invoice register needs attention. Payments are unavailable until it loads correctly.');
+  rememberSnapshot(session!.userId,digest,parsed.data);
   return parsed.data;
  }
  async function events(){

@@ -1,3 +1,5 @@
+import {measuredFetch} from '@/lib/office/egress-fetch';
+const officeFetch=measuredFetch(fetch,metric=>console.info('office_response_bytes',metric));
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
@@ -22,6 +24,7 @@ export async function createServerSupabaseClient() {
     config.url,
     config.anonKey,
     {
+      global: {fetch:officeFetch},
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -59,6 +62,7 @@ export function createServiceRoleSupabaseClient() {
   }
 
   return createClient(config.url, serviceRoleKey, {
+    global: {fetch:officeFetch},
     auth: {
       autoRefreshToken: false,
       persistSession: false

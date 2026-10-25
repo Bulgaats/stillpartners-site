@@ -14,10 +14,10 @@ export function MailAttention({open}:{open:()=>void}){
  useEffect(()=>{
   let alive=true,running=false;
   const refresh=async()=>{if(running||document.hidden)return;running=true;try{const next=await mailAttentionSummary();if(alive)setSummary(next);}catch{/* Retain the last acknowledged notice. */}finally{running=false;}};
-  void refresh();const timer=setInterval(()=>void refresh(),60000);
+  void refresh();
   document.addEventListener('visibilitychange',refresh);
   window.addEventListener('focus',refresh);
-  return()=>{alive=false;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh);};
+  return()=>{alive=false;document.removeEventListener('visibilitychange',refresh);window.removeEventListener('focus',refresh);};
  },[]);
  if(!summary?.count)return null;
  return <aside className="ember-notice office-mail-attention" role="status"><strong>Bobby · {summary.count} {summary.count===1?'email needs':'emails need'} your attention</strong><p>{summary.items[0]?.title}</p><button className="ember-text-button" onClick={open}>View prepared work →</button></aside>;

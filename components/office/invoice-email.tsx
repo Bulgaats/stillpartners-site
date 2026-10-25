@@ -1,4 +1,5 @@
 'use client';
+import {RefreshGate} from '@/lib/office/refresh-gate';
 import {useCallback,useEffect,useRef,useState,useTransition} from 'react';
 import {listInvoiceMail,prepareInvoiceMail,approveInvoiceMail,cancelInvoiceMail} from '@/app/actions/invoice-mail';
 import type {InvoiceMail,MailCapability} from '@/lib/office/invoice-mail';
@@ -6,8 +7,10 @@ import type {ClientDraft} from '@/lib/office/client-drafts';
 export function InvoiceEmail({draft}:{draft:ClientDraft}){const [open,setOpen]=useState(false);return <section className="ember-panel"><button className="ember-link" onClick={()=>setOpen(!open)}>{open?'Close email panel':'Email invoice · review & send'}</button>{open&&<EmailPanel draft={draft}/>}</section>;}
 function EmailPanel({draft:d}:{draft:ClientDraft}){
  const [mails,setMails]=useState<InvoiceMail[]>([]),[cap,setCap]=useState<MailCapability>({ready:false}),[subject,setSubject]=useState('Still Partners invoice '+d.invoice_number),[body,setBody]=useState('Hello,\n\nPlease find attached invoice '+d.invoice_number+' for '+d.period_start+' to '+d.period_end+', together with the work summary.\n\nKind regards,\nStill Partners'),[notice,setNotice]=useState(''),[pending,start]=useTransition();const request=useRef('');
- const refresh=useCallback(async()=>{try{const r=await listInvoiceMail(d.id);setMails(r.mails);setCap(r.capability);}catch{setNotice('Email status unavailable. Refresh before taking another action.');}},[d.id]);
- useEffect(()=>{void refresh();const timer=setInterval(()=>void refresh(),15000);return()=>clearInterval(timer);},[refresh]);
+ const refreshGate=useRef(new RefreshGate());
+ const refresh=useCallback(async()=>refreshGate.current.run(async()=>{try{const r=await listInvoiceMail(d.id);setMails(r.mails);setCap(r.capability);}catch{setNotice('Email status unavailable. Refresh before taking another action.');}}),[d.id]);
+ useEffect(()=>{void refresh();const focus=()=>{if(!document.hidden)void refresh();};document.addEventListener('visibilitychange',focus);return()=>document.removeEventListener('visibilitychange',focus);},[refresh]);
+ useEffect(()=>{if(!mails.some(m=>['queued','sending'].includes(m.status)))return;const timer=setTimeout(()=>{if(!document.hidden)void refresh();},15000);return()=>clearTimeout(timer);},[mails,refresh]);
  function run(action:()=>Promise<{ok:boolean;message:string}>){start(async()=>{try{const r=await action();setNotice(r.message);await refresh();}catch{setNotice('Could not confirm the change. Refresh before retrying.');}});}
  const active=mails.some(m=>['queued','sending','sent','unknown'].includes(m.status));
  return <><h3>Review client email</h3><p>From: work@stillpartners.net</p><p className="ember-footnote">{cap.ready?'Mac reports Gmail sending permission configured. It must remain awake and online.':'Gmail sending permission is not configured. You can prepare previews; approved mail waits for the connection.'}{cap.checkedAt&&' Last checked '+new Date(cap.checkedAt).toLocaleString('en-AU',{timeZone:'Australia/Perth'})}</p>
