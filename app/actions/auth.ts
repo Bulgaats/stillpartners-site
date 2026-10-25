@@ -45,6 +45,9 @@ export async function login(formData: FormData) {
       status: "status" in error ? error.status : undefined,
       message: error.message
     });
+    if (error.status === 402) {
+      redirectToLogin("auth_service_usage_limit", "Sign-in is unavailable because the authentication service has reached its usage limit. Your password has not been verified. Try again after service access is restored.");
+    }
     redirectToLogin("invalid_credentials", loginMessages.invalid);
   }
 
