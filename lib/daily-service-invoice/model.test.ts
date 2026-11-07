@@ -1,0 +1,28 @@
+import { describe,it,expect } from "vitest";
+import { applyProfileRate,inferProfileRate,calculateServiceInvoice,dailyServiceSchema,newInvoice,restoreDraft, type DailyServiceInvoice } from "./model";
+import { serviceInvoicePdf } from "./pdf";
+const sample=():DailyServiceInvoice=>({...newInvoice(),profile:{fullName:"Example Contractor",abn:"51824753556",phone:"0400000000",email:"contractor@example.com",bankName:"Example Bank",bsb:"000-000",accountNumber:"12345678",gstRegistered:false},invoiceNumber:"TEST-001",issueDate:"2026-11-07",dueDate:"2026-11-21",lines:[{id:"1",date:"2026-11-02",site:"Example project",description:"Reinforcement subcontract services",amount:"425.25",tonnes:"0.600"},{id:"2",date:"2026-11-04",site:"Other project",description:"Subcontract services",amount:"110.10",tonnes:""}]});
+describe("daily service invoices",()=>{
+ it("sums daily charges independently from actual tonnes",()=>{const v=sample();const r=calculateServiceInvoice(v);expect(r).toMatchObject({subtotal:535.35,total:535.35,gst:0,tonnes:.6,periodStart:"2026-11-02",periodEnd:"2026-11-04"});v.lines[0].tonnes="12.123";expect(calculateServiceInvoice(v).total).toBe(535.35);});
+ it("rounds GST in cents",()=>{const v=sample();v.profile.gstRegistered=true;expect(calculateServiceInvoice(v)).toMatchObject({gst:53.54,total:588.89});});
+ it("supports single-day and nonconsecutive periods",()=>{const v=sample();v.lines=[v.lines[1]];expect(calculateServiceInvoice(v).periodStart).toBe("2026-11-04");expect(calculateServiceInvoice(v).periodEnd).toBe("2026-11-04");});
+ it("does not invent tonnes when left blank",()=>{const v=sample();v.lines.forEach(l=>l.tonnes="");expect(calculateServiceInvoice(v)).toMatchObject({hasTonnes:false,tonnes:0});expect(dailyServiceSchema.safeParse(v).success).toBe(true);});
+ it.each(["-1","0","1.001","NaN","Infinity","1e3","10,000",""])("rejects invalid charge %s",amount=>{const v=sample();v.lines[0].amount=amount;expect(dailyServiceSchema.safeParse(v).success).toBe(false);});
+ it.each(["-1","0","1.0001","NaN"])("rejects invalid tonnes %s",tonnes=>{const v=sample();v.lines[0].tonnes=tonnes;expect(dailyServiceSchema.safeParse(v).success).toBe(false);});
+ it("rejects invalid dates and due date order",()=>{const v=sample();v.lines[0].date="2026-02-30";expect(dailyServiceSchema.safeParse(v).success).toBe(false);v.lines[0].date="2026-02-28";v.dueDate="2026-01-01";expect(dailyServiceSchema.safeParse(v).success).toBe(false);});
+ it("rejects malformed storage and retains incomplete drafts",()=>{expect(restoreDraft({lines:[]})).toBeNull();expect(restoreDraft(newInvoice())).not.toBeNull();});
+ it("enforces line count and PDF-safe input",()=>{const v=sample();v.lines=Array.from({length:15},()=>v.lines[0]);expect(dailyServiceSchema.safeParse(v).success).toBe(false);v.lines=[sample().lines[0]];v.lines[0].description="Үйлчилгээ";expect(dailyServiceSchema.safeParse(v).success).toBe(false);});
+ it("produces a paginated PDF with original daily charges and no hours",()=>{const v=sample();v.lines=Array.from({length:14},(_,i)=>({...v.lines[0],id:String(i)}));const pdf=new TextDecoder().decode(serviceInvoicePdf(v));expect(pdf.startsWith("%PDF-1.4")).toBe(true);expect(pdf).toContain("/Count 3");expect(pdf).toContain("425.25");expect(pdf.toLowerCase()).not.toContain("hours");expect(pdf).toContain("5953.50");});
+});
+
+describe("explicit per-tonne pricing",()=>{
+ it("calculates 2.4 tonnes at $500 as $1200 and GST as $120",()=>{const v=sample();v.lines=[{...v.lines[0],pricingMode:"tonnage",amount:"500",tonnes:"2.4"}];expect(calculateServiceInvoice(v).total).toBe(1200);v.profile.gstRegistered=true;expect(calculateServiceInvoice(v)).toMatchObject({subtotal:1200,gst:120,total:1320});const pdf=new TextDecoder().decode(serviceInvoicePdf(v));expect(pdf).toContain("1200.00");expect(pdf).toContain("Rate: $500.00/t");});
+ it("keeps legacy daily-charge invoices unchanged",()=>{const v=sample();v.lines=[{...v.lines[0],amount:"500",tonnes:"2.4"}];expect(calculateServiceInvoice(v).total).toBe(500);expect(restoreDraft(v)?.lines[0].pricingMode).toBeUndefined();});
+ it("requires tonnes only in per-tonne mode and rounds each line to cents",()=>{const v=sample();v.lines=[{...v.lines[0],pricingMode:"tonnage",amount:"10.01",tonnes:"0.333"}];expect(calculateServiceInvoice(v).total).toBe(3.33);v.lines[0].tonnes="";expect(dailyServiceSchema.safeParse(v).success).toBe(false);v.lines[0].pricingMode="daily";expect(dailyServiceSchema.safeParse(v).success).toBe(true);});
+ it("supports mixed daily and tonnage lines",()=>{const v=sample();v.lines[0]={...v.lines[0],pricingMode:"tonnage",amount:"500",tonnes:"2.4"};expect(calculateServiceInvoice(v).total).toBe(1310.1);});
+});
+
+describe("profile rate snapshots",()=>{
+ it("applies one rate to current rows without changing original history",()=>{const old=sample();const updated=applyProfileRate(old,"500");expect(updated.lines.every(l=>l.amount==="500"&&l.pricingMode==="tonnage")).toBe(true);expect(old.lines[0].amount).toBe("425.25");expect(newInvoice(updated.profile).lines[0].amount).toBe("500");});
+ it("infers uniform legacy tonnage rate but preserves differing rates",()=>{const v=applyProfileRate(sample(),"500");delete v.profile.ratePerTonne;expect(inferProfileRate(v).profile.ratePerTonne).toBe("500");v.lines[1].amount="600";const restored=inferProfileRate(v);expect(restored.profile.ratePerTonne).toBe("");expect(restored.lines[1].amount).toBe("600");});
+});
