@@ -18,8 +18,8 @@ export const dailyServiceSchema = z.object({
   }),
   invoiceNumber: ascii(40).regex(/^[A-Za-z0-9._-]+$/, "Use letters, numbers, dots, underscores or hyphens."),
   issueDate: dateString, dueDate: dateString,
-  lines: z.array(z.object({id: z.string(), date: dateString, site: ascii(70), description: ascii(100), amount: money, tonnes})).min(1).max(MAX_LINES)
-}).refine(v => v.dueDate >= v.issueDate, {message:"Due date must not be before issue date.", path:["dueDate"]});
+  lines: z.array(z.object({id: z.string(), date: dateString, site: ascii(70), description: ascii(100), amount: money, tonnes, pricingMode: z.enum(["daily","tonnage"]).optional()})).min(1).max(MAX_LINES)
+}).superRefine((v,ctx)=>{v.lines.forEach((line,i)=>{if(line.pricingMode==="tonnage"&&!line.tonnes)ctx.addIssue({code:"custom",path:["lines",i,"tonnes"],message:"Enter actual tonnes for tonnage pricing."});});}).refine(v => v.dueDate >= v.issueDate, {message:"Due date must not be before issue date.", path:["dueDate"]});
 export type DailyServiceInvoice = z.infer<typeof dailyServiceSchema>;
 export type ServiceLine = DailyServiceInvoice["lines"][number];
 export type SavedServiceInvoice = { savedAt: string; invoice: DailyServiceInvoice };
@@ -27,7 +27,7 @@ export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 }
 export function blankLine(date = localDate()): ServiceLine {
-  return {id: crypto.randomUUID(), date, site:"", description:"Reinforcement subcontract services", amount:"", tonnes:""};
+  return {id: crypto.randomUUID(), date, site:"", description:"Reinforcement subcontract services", amount:"", tonnes:"", pricingMode:"tonnage"};
 }
 export function newInvoice(profile?: DailyServiceInvoice["profile"]): DailyServiceInvoice {
   const issueDate = localDate();
@@ -35,12 +35,16 @@ export function newInvoice(profile?: DailyServiceInvoice["profile"]): DailyServi
   return {profile: profile ?? {fullName:"",abn:"",phone:"",email:"",bankName:"",bsb:"",accountNumber:"",gstRegistered:false}, invoiceNumber:`SINV-${issueDate.replaceAll("-", "")}-${crypto.randomUUID().slice(0,6).toUpperCase()}`,issueDate,dueDate:localDate(due),lines:[blankLine(issueDate)]};
 }
 export function calculateServiceInvoice(invoice: DailyServiceInvoice) {
-  // Each agreed daily service charge is entered independently. Never infer production from time or payment.
-  const subtotalCents = invoice.lines.reduce((sum,line) => sum + decimalUnits(line.amount, 2), 0);
+  // Use explicitly selected pricing only. Never infer production from time. Legacy invoices remain daily charges.
+  const subtotalCents = invoice.lines.reduce((sum,line) => sum + lineAmountCents(line), 0);
   const gstCents = invoice.profile.gstRegistered ? Math.round(subtotalCents / 10) : 0;
   const totalTonnesUnits = invoice.lines.reduce((sum,line) => sum + decimalUnits(line.tonnes, 3), 0);
   const dates = invoice.lines.map(line => line.date).filter(date => dateString.safeParse(date).success).sort();
   return {subtotal:subtotalCents/100, gst:gstCents/100, total:(subtotalCents+gstCents)/100, tonnes:totalTonnesUnits/1000, hasTonnes:invoice.lines.some(line=>line.tonnes!==""), periodStart:dates[0]??"",periodEnd:dates.at(-1)??""};
+}
+export function lineAmountCents(line: ServiceLine) {
+  const cents=decimalUnits(line.amount,2);
+  return line.pricingMode==="tonnage" ? Number((BigInt(cents)*BigInt(decimalUnits(line.tonnes,3))+BigInt(500))/BigInt(1000)) : cents;
 }
 export function decimalUnits(value: string, places: number) {
   if (!new RegExp(`^\\d{1,7}(\\.\\d{1,${places}})?$`).test(value)) return 0;
@@ -56,6 +60,6 @@ export function restoreDraft(value: unknown): DailyServiceInvoice | null {
   if (!["fullName","abn","phone","email","bankName","bsb","accountNumber"].every(k => typeof v.profile[k as keyof typeof v.profile] === "string" && String(v.profile[k as keyof typeof v.profile]).length <= 200)) return null;
   if (![v.invoiceNumber,v.issueDate,v.dueDate].every(x => typeof x === "string" && x.length <= 100)) return null;
   if (!Array.isArray(v.lines) || !v.lines.length || v.lines.length > MAX_LINES) return null;
-  if (!v.lines.every(line => line && [line.id,line.date,line.site,line.description,line.amount,line.tonnes].every(x => typeof x === "string" && x.length <= 200))) return null;
+  if (!v.lines.every(line => line && (line.pricingMode===undefined||line.pricingMode==="daily"||line.pricingMode==="tonnage") && [line.id,line.date,line.site,line.description,line.amount,line.tonnes].every(x => typeof x === "string" && x.length <= 200))) return null;
   return v;
 }

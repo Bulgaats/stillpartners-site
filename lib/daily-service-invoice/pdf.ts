@@ -1,4 +1,4 @@
-import { calculateServiceInvoice, dailyServiceSchema, type DailyServiceInvoice } from "./model";
+import { calculateServiceInvoice, lineAmountCents, dailyServiceSchema, type DailyServiceInvoice } from "./model";
 
 // Small dependency-free, browser-only PDF. Data is never posted to a server.
 export function serviceInvoicePdf(input: DailyServiceInvoice): Uint8Array {
@@ -33,12 +33,13 @@ export function serviceInvoicePdf(input: DailyServiceInvoice): Uint8Array {
       wrap(row.site,113,y,46,9,true);
       wrap(row.description,113,y-26,57,8);
       txt(row.tonnes ? Number(row.tonnes).toFixed(3) : "-",419,y,9);
-      txt(cash(Number(row.amount)),478,y,9);
+      txt(cash(lineAmountCents(row)/100),478,y,9);
+      if(row.pricingMode==="tonnage") txt(`Rate: ${cash(Number(row.amount))}/t`,419,y-18,8);
       line(y-48);
     });
     const last=offset+5>=rows.length;
     if(last){
-      txt("Agreed service charges (excluding GST).",42,206,9);
+      txt("Service charges (excluding GST).",42,206,9);
       if(totals.hasTonnes) txt(`Recorded production: ${totals.tonnes.toFixed(3)} tonnes`,42,190,9);
       txt("Subtotal",360,206);txt(cash(totals.subtotal),478,206);
       txt(invoice.profile.gstRegistered?"GST (10%)":"GST (not registered)",360,187,9);txt(cash(totals.gst),478,187);

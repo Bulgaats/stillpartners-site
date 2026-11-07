@@ -14,3 +14,10 @@ describe("daily service invoices",()=>{
  it("enforces line count and PDF-safe input",()=>{const v=sample();v.lines=Array.from({length:15},()=>v.lines[0]);expect(dailyServiceSchema.safeParse(v).success).toBe(false);v.lines=[sample().lines[0]];v.lines[0].description="Үйлчилгээ";expect(dailyServiceSchema.safeParse(v).success).toBe(false);});
  it("produces a paginated PDF with original daily charges and no hours",()=>{const v=sample();v.lines=Array.from({length:14},(_,i)=>({...v.lines[0],id:String(i)}));const pdf=new TextDecoder().decode(serviceInvoicePdf(v));expect(pdf.startsWith("%PDF-1.4")).toBe(true);expect(pdf).toContain("/Count 3");expect(pdf).toContain("425.25");expect(pdf.toLowerCase()).not.toContain("hours");expect(pdf).toContain("5953.50");});
 });
+
+describe("explicit per-tonne pricing",()=>{
+ it("calculates 2.4 tonnes at $500 as $1200 and GST as $120",()=>{const v=sample();v.lines=[{...v.lines[0],pricingMode:"tonnage",amount:"500",tonnes:"2.4"}];expect(calculateServiceInvoice(v).total).toBe(1200);v.profile.gstRegistered=true;expect(calculateServiceInvoice(v)).toMatchObject({subtotal:1200,gst:120,total:1320});const pdf=new TextDecoder().decode(serviceInvoicePdf(v));expect(pdf).toContain("1200.00");expect(pdf).toContain("Rate: $500.00/t");});
+ it("keeps legacy daily-charge invoices unchanged",()=>{const v=sample();v.lines=[{...v.lines[0],amount:"500",tonnes:"2.4"}];expect(calculateServiceInvoice(v).total).toBe(500);expect(restoreDraft(v)?.lines[0].pricingMode).toBeUndefined();});
+ it("requires tonnes only in per-tonne mode and rounds each line to cents",()=>{const v=sample();v.lines=[{...v.lines[0],pricingMode:"tonnage",amount:"10.01",tonnes:"0.333"}];expect(calculateServiceInvoice(v).total).toBe(3.33);v.lines[0].tonnes="";expect(dailyServiceSchema.safeParse(v).success).toBe(false);v.lines[0].pricingMode="daily";expect(dailyServiceSchema.safeParse(v).success).toBe(true);});
+ it("supports mixed daily and tonnage lines",()=>{const v=sample();v.lines[0]={...v.lines[0],pricingMode:"tonnage",amount:"500",tonnes:"2.4"};expect(calculateServiceInvoice(v).total).toBe(1310.1);});
+});
