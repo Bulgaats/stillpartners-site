@@ -5,7 +5,7 @@ test("daily service invoice is separate, validates, exports, persists and suppor
  await page.evaluate(()=>localStorage.setItem("sp-contractor-invoice:draft","original-do-not-change"));
  await expect(page.getByRole("heading",{name:"Daily service invoice",exact:true})).toBeVisible();
  await page.getByRole("button",{name:"Download PDF",exact:true}).click();
- await expect(page.getByRole("alert")).toContainText("Please correct");
+ await expect(page.getByRole("alert").filter({hasText:"Please correct"})).toContainText("Please correct");
  for(const [name,value] of Object.entries({"Full name / business name":"Example Contractor",ABN:"51824753556",Phone:"0400000000",Email:"contractor@example.com","Bank name":"Example Bank",BSB:"000000","Account number":"12345678"}))await page.getByLabel(name,{exact:true}).fill(value);
  await page.getByLabel("GST registered",{exact:true}).check();
  await page.getByLabel("Service date",{exact:true}).fill("2026-11-02");
