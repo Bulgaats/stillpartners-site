@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Download, Share2, Trash2, FileText } from "lucide-react";
-import { blankLine, lineAmountCents, calculateServiceInvoice, dailyServiceSchema, HISTORY_KEY, MAX_LINES, moneyText, newInvoice, restoreDraft, STORAGE_KEY, type DailyServiceInvoice, type SavedServiceInvoice, type ServiceLine } from "@/lib/daily-service-invoice/model";
+import { blankLine, applyProfileRate, inferProfileRate, lineAmountCents, calculateServiceInvoice, dailyServiceSchema, HISTORY_KEY, MAX_LINES, moneyText, newInvoice, restoreDraft, STORAGE_KEY, type DailyServiceInvoice, type SavedServiceInvoice, type ServiceLine } from "@/lib/daily-service-invoice/model";
 import { serviceInvoicePdf } from "@/lib/daily-service-invoice/pdf";
 
 export function DailyServiceInvoiceApp(){
@@ -20,8 +20,9 @@ export function DailyServiceInvoiceApp(){
   useEffect(()=>{
     let draft:DailyServiceInvoice|null=null;
     try{draft=restoreDraft(JSON.parse(localStorage.getItem(STORAGE_KEY)??"null"));}catch{setStorageWarning("Local storage is unavailable. Keep a downloaded copy before leaving.");}
+    if(draft)draft=inferProfileRate(draft);
     setInvoice(draft??newInvoice());
-    setProfileOpen(!draft?.profile.fullName);
+    setProfileOpen(!draft?.profile.fullName||!draft?.profile.ratePerTonne);
     try {const saved:unknown=JSON.parse(localStorage.getItem(HISTORY_KEY)??"[]");if(Array.isArray(saved))setHistory(saved.filter((r):r is SavedServiceInvoice=>r&&typeof r.savedAt==="string"&&dailyServiceSchema.safeParse(r.invoice).success).slice(0,20));}catch{/* History is optional. */}
   },[]);
   useEffect(()=>{if(!invoice)return;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(invoice));}catch{setStorageWarning("Changes cannot be saved on this device. Download your PDF before leaving.");}},[invoice]);
@@ -74,6 +75,7 @@ export function DailyServiceInvoiceApp(){
           <Field label="Bank name" value={invoice.profile.bankName} onChange={v=>profile("bankName",v)} maxLength={60}/>
           <Field label="BSB" value={invoice.profile.bsb} onChange={v=>profile("bsb",v)} maxLength={7}/>
           <Field label="Account number" value={invoice.profile.accountNumber} onChange={v=>profile("accountNumber",v)} maxLength={12}/>
+          <div><Field label="Rate per tonne (AUD, ex GST)" value={invoice.profile.ratePerTonne??""} onChange={v=>{setInvoice(applyProfileRate(invoice,v));setStatus("");}} numeric/><p className="mt-1 text-xs font-normal text-slate-500">Applies to this invoice. Saved invoices stay unchanged.</p></div>
           <label className="flex min-h-12 items-center gap-3 font-bold"><input type="checkbox" className="size-5" checked={invoice.profile.gstRegistered} onChange={e=>profile("gstRegistered",e.target.checked)}/> GST registered</label>
         </div>
       </details>
@@ -83,15 +85,15 @@ export function DailyServiceInvoiceApp(){
         <Field label="Issue date" type="date" value={invoice.issueDate} onChange={v=>update({issueDate:v})}/>
         <Field label="Due date" type="date" value={invoice.dueDate} onChange={v=>update({dueDate:v})}/>
       </div></section>
-      <section className="rounded-xl border bg-white p-4" aria-label="Daily services"><h2 className="mb-3 font-bold">Service days</h2>
+      <section className="rounded-xl border bg-white p-4" aria-label="Daily services"><div className="mb-3 flex items-center justify-between gap-2"><h2 className="font-bold">Service days</h2><span className="text-xs text-slate-500">{invoice.profile.ratePerTonne?moneyText(Number(invoice.profile.ratePerTonne))+"/t":"Set rate in Your details"}</span></div>
         <div className="divide-y">{invoice.lines.map((row,index)=><article key={row.id} className="py-3 first:pt-0" aria-label={`Service row ${index+1}`}>
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] items-end gap-2"><Field label="Service date" type="date" value={row.date} onChange={v=>changeLine(row.id,{date:v})}/><Field label="Project / site" value={row.site} onChange={v=>changeLine(row.id,{site:v})} maxLength={70}/><button type="button" disabled={invoice.lines.length===1||busy} onClick={()=>{setRemoved({line:row,index});update({lines:invoice.lines.filter(x=>x.id!==row.id)});}} className="mb-1 rounded-lg py-3 text-slate-500 disabled:opacity-20" aria-label={`Remove service ${index+1}`}><Trash2 className="mx-auto size-4"/></button></div>
-          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-end gap-2"><Field label="Rate / tonne" value={row.pricingMode==="tonnage"?row.amount:""} onChange={v=>changeLine(row.id,{amount:v,pricingMode:"tonnage"})} numeric/><Field label="Tonnes" value={row.tonnes} onChange={v=>changeLine(row.id,{tonnes:v})} numeric/><div className="pb-3 text-right"><p className="text-xs text-slate-500">AUD ex GST</p><p className="break-words text-sm font-bold">{moneyText(lineAmountCents(row)/100)}</p></div></div>
-          {row.pricingMode!=="tonnage"&&<p className="mt-2 text-xs text-amber-800">Previous fixed charge: {moneyText(Number(row.amount))} (unchanged). Enter the agreed rate per tonne to replace it.</p>}
+          <div className="mt-2 grid grid-cols-2 items-end gap-2"><Field label="Tonnes" value={row.tonnes} onChange={v=>changeLine(row.id,{tonnes:v})} numeric/><div className="pb-3 text-right"><p className="text-xs text-slate-500">AUD ex GST</p><p className="break-words text-sm font-bold">{moneyText(lineAmountCents(row)/100)}</p></div></div>
+          {row.pricingMode!=="tonnage"&&<p className="mt-2 text-xs text-amber-800">Previous fixed charge: {moneyText(Number(row.amount))} (unchanged). Set your rate in Your details to update this invoice.</p>}
           <details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer">Service description</summary><div className="mt-2"><Field label="Description" value={row.description} onChange={v=>changeLine(row.id,{description:v})} maxLength={100}/></div></details>
         </article>)}</div>
-        {invoice.lines.length<MAX_LINES&&<div className="border-t border-dashed pt-3"><Field label="Next service date (optional)" type="date" value="" onChange={v=>{if(!v)return;const previous=invoice.lines.at(-1)!;update({lines:[...invoice.lines,{...blankLine(v),site:previous.site,description:previous.description,amount:previous.pricingMode==="tonnage"?previous.amount:""}]});}}/></div>}
-        {removed&&<p className="mt-2 text-xs text-slate-600">Day removed. <button className="font-bold underline" type="button" disabled={invoice.lines.length>=MAX_LINES} onClick={()=>{const lines=[...invoice.lines];lines.splice(removed.index,0,removed.line);update({lines});setRemoved(null);}}>Undo</button></p>}
+        {invoice.lines.length<MAX_LINES&&<div className="border-t border-dashed pt-3"><Field label="Next service date (optional)" type="date" value="" onChange={v=>{if(!v)return;const previous=invoice.lines.at(-1)!;update({lines:[...invoice.lines,{...blankLine(v),site:previous.site,description:previous.description,amount:invoice.profile.ratePerTonne??""}]});}}/></div>}
+        {removed&&<p className="mt-2 text-xs text-slate-600">Day removed. <button className="font-bold underline" type="button" disabled={invoice.lines.length>=MAX_LINES} onClick={()=>{const lines=[...invoice.lines];lines.splice(removed.index,0,invoice.profile.ratePerTonne?{...removed.line,amount:invoice.profile.ratePerTonne,pricingMode:"tonnage"}:removed.line);update({lines});setRemoved(null);}}>Undo</button></p>}
       </section>
       <section className="rounded-xl bg-white p-4 shadow-sm"><h2 className="font-bold">Invoice summary</h2><div className="mt-3 grid grid-cols-2 gap-2 text-sm"><span>Service period</span><span className="text-right">{totals.periodStart} – {totals.periodEnd}</span><span>Recorded production</span><span className="text-right">{totals.hasTonnes?`${totals.tonnes.toFixed(3)} tonnes`:"Not recorded"}</span><span>Subtotal</span><span className="text-right">{moneyText(totals.subtotal)}</span><span>{invoice.profile.gstRegistered?"GST 10%":"GST (not registered)"}</span><span className="text-right">{moneyText(totals.gst)}</span><strong className="border-t pt-3 text-lg">Total AUD</strong><strong className="border-t pt-3 text-right text-lg">{moneyText(totals.total)}</strong></div></section>
       {!!errors.length&&<div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p className="font-bold">Please correct these details:</p><ul className="mt-2 list-inside list-disc">{errors.map((e,i)=><li key={i}>{e}</li>)}</ul></div>}

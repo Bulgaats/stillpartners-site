@@ -14,7 +14,7 @@ export const dailyServiceSchema = z.object({
   profile: z.object({
     fullName: ascii(70), abn: z.string().regex(/^\d[\d ]{9,16}\d$/, "Enter the 11-digit ABN.").refine(v => v.replace(/\s/g, "").length === 11, "Enter the 11-digit ABN."),
     phone: ascii(30), email: z.string().email().max(80).regex(/^[\x20-\x7E]+$/, "Use English / Latin characters for the PDF."), bankName: ascii(60),
-    bsb: z.string().regex(/^\d{3}[- ]?\d{3}$/, "Enter a 6-digit BSB."), accountNumber: z.string().regex(/^\d{5,12}$/, "Enter 5–12 digits."), gstRegistered: z.boolean()
+    bsb: z.string().regex(/^\d{3}[- ]?\d{3}$/, "Enter a 6-digit BSB."), accountNumber: z.string().regex(/^\d{5,12}$/, "Enter 5–12 digits."), gstRegistered: z.boolean(), ratePerTonne: z.union([z.literal(""),money]).optional()
   }),
   invoiceNumber: ascii(40).regex(/^[A-Za-z0-9._-]+$/, "Use letters, numbers, dots, underscores or hyphens."),
   issueDate: dateString, dueDate: dateString,
@@ -32,7 +32,16 @@ export function blankLine(date = localDate()): ServiceLine {
 export function newInvoice(profile?: DailyServiceInvoice["profile"]): DailyServiceInvoice {
   const issueDate = localDate();
   const due = new Date(`${issueDate}T12:00:00`); due.setDate(due.getDate()+14);
-  return {profile: profile ?? {fullName:"",abn:"",phone:"",email:"",bankName:"",bsb:"",accountNumber:"",gstRegistered:false}, invoiceNumber:`SINV-${issueDate.replaceAll("-", "")}-${crypto.randomUUID().slice(0,6).toUpperCase()}`,issueDate,dueDate:localDate(due),lines:[blankLine(issueDate)]};
+  return {profile: profile ?? {fullName:"",abn:"",phone:"",email:"",bankName:"",bsb:"",accountNumber:"",gstRegistered:false}, invoiceNumber:`SINV-${issueDate.replaceAll("-", "")}-${crypto.randomUUID().slice(0,6).toUpperCase()}`,issueDate,dueDate:localDate(due),lines:[{...blankLine(issueDate),amount:profile?.ratePerTonne??""}]};
+}
+export function applyProfileRate(invoice: DailyServiceInvoice, rate: string): DailyServiceInvoice {
+  return {...invoice,profile:{...invoice.profile,ratePerTonne:rate},lines:invoice.lines.map(line=>({...line,amount:rate,pricingMode:"tonnage"}))};
+}
+export function inferProfileRate(invoice: DailyServiceInvoice): DailyServiceInvoice {
+  if(invoice.profile.ratePerTonne!==undefined)return invoice;
+  const rates=new Set(invoice.lines.filter(l=>l.pricingMode==="tonnage"&&l.amount).map(l=>l.amount));
+  const uniform=invoice.lines.every(l=>l.pricingMode==="tonnage")&&rates.size===1;
+  return {...invoice,profile:{...invoice.profile,ratePerTonne:uniform?[...rates][0]:""}};
 }
 export function calculateServiceInvoice(invoice: DailyServiceInvoice) {
   // Use explicitly selected pricing only. Never infer production from time. Legacy invoices remain daily charges.
@@ -57,6 +66,7 @@ export function restoreDraft(value: unknown): DailyServiceInvoice | null {
   if (!value || typeof value !== "object") return null;
   const v = value as DailyServiceInvoice;
   if (!v.profile || typeof v.profile !== "object" || typeof v.profile.gstRegistered !== "boolean") return null;
+  if(v.profile.ratePerTonne!==undefined&&(typeof v.profile.ratePerTonne!=="string"||v.profile.ratePerTonne.length>100))return null;
   if (!["fullName","abn","phone","email","bankName","bsb","accountNumber"].every(k => typeof v.profile[k as keyof typeof v.profile] === "string" && String(v.profile[k as keyof typeof v.profile]).length <= 200)) return null;
   if (![v.invoiceNumber,v.issueDate,v.dueDate].every(x => typeof x === "string" && x.length <= 100)) return null;
   if (!Array.isArray(v.lines) || !v.lines.length || v.lines.length > MAX_LINES) return null;

@@ -1,5 +1,5 @@
 import { describe,it,expect } from "vitest";
-import { calculateServiceInvoice,dailyServiceSchema,newInvoice,restoreDraft, type DailyServiceInvoice } from "./model";
+import { applyProfileRate,inferProfileRate,calculateServiceInvoice,dailyServiceSchema,newInvoice,restoreDraft, type DailyServiceInvoice } from "./model";
 import { serviceInvoicePdf } from "./pdf";
 const sample=():DailyServiceInvoice=>({...newInvoice(),profile:{fullName:"Example Contractor",abn:"51824753556",phone:"0400000000",email:"contractor@example.com",bankName:"Example Bank",bsb:"000-000",accountNumber:"12345678",gstRegistered:false},invoiceNumber:"TEST-001",issueDate:"2026-11-07",dueDate:"2026-11-21",lines:[{id:"1",date:"2026-11-02",site:"Example project",description:"Reinforcement subcontract services",amount:"425.25",tonnes:"0.600"},{id:"2",date:"2026-11-04",site:"Other project",description:"Subcontract services",amount:"110.10",tonnes:""}]});
 describe("daily service invoices",()=>{
@@ -20,4 +20,9 @@ describe("explicit per-tonne pricing",()=>{
  it("keeps legacy daily-charge invoices unchanged",()=>{const v=sample();v.lines=[{...v.lines[0],amount:"500",tonnes:"2.4"}];expect(calculateServiceInvoice(v).total).toBe(500);expect(restoreDraft(v)?.lines[0].pricingMode).toBeUndefined();});
  it("requires tonnes only in per-tonne mode and rounds each line to cents",()=>{const v=sample();v.lines=[{...v.lines[0],pricingMode:"tonnage",amount:"10.01",tonnes:"0.333"}];expect(calculateServiceInvoice(v).total).toBe(3.33);v.lines[0].tonnes="";expect(dailyServiceSchema.safeParse(v).success).toBe(false);v.lines[0].pricingMode="daily";expect(dailyServiceSchema.safeParse(v).success).toBe(true);});
  it("supports mixed daily and tonnage lines",()=>{const v=sample();v.lines[0]={...v.lines[0],pricingMode:"tonnage",amount:"500",tonnes:"2.4"};expect(calculateServiceInvoice(v).total).toBe(1310.1);});
+});
+
+describe("profile rate snapshots",()=>{
+ it("applies one rate to current rows without changing original history",()=>{const old=sample();const updated=applyProfileRate(old,"500");expect(updated.lines.every(l=>l.amount==="500"&&l.pricingMode==="tonnage")).toBe(true);expect(old.lines[0].amount).toBe("425.25");expect(newInvoice(updated.profile).lines[0].amount).toBe("500");});
+ it("infers uniform legacy tonnage rate but preserves differing rates",()=>{const v=applyProfileRate(sample(),"500");delete v.profile.ratePerTonne;expect(inferProfileRate(v).profile.ratePerTonne).toBe("500");v.lines[1].amount="600";const restored=inferProfileRate(v);expect(restored.profile.ratePerTonne).toBe("");expect(restored.lines[1].amount).toBe("600");});
 });
