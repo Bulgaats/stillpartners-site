@@ -10,13 +10,16 @@ test("daily service invoice is separate, validates, exports, persists and suppor
  await page.getByLabel("GST registered",{exact:true}).check();
  await page.getByLabel("Service date",{exact:true}).fill("2026-11-02");
  await page.getByLabel("Project / site",{exact:true}).fill("Example site");
- await page.getByLabel("Rate per tonne (AUD, ex GST)",{exact:true}).fill("425.25");
+ await page.getByLabel("Rate / tonne",{exact:true}).fill("425.25");
  await page.getByLabel("Tonnes",{exact:true}).fill("1");
- await page.getByRole("button",{name:"Add service day"}).click();
+ await expect(page.getByRole("button",{name:"Add service day"})).toHaveCount(0);
+ await page.getByLabel("Next service date (optional)",{exact:true}).fill("2026-11-04");
  const row=page.getByRole("article",{name:"Service row 2"});
- await row.getByLabel("Service date").fill("2026-11-04");
+ await expect(row.getByLabel("Service date")).toHaveValue("2026-11-04");
+ await expect(row.getByLabel("Rate / tonne")).toHaveValue("425.25");
+ await expect(row.getByLabel("Tonnes")).toHaveValue("");
  await row.getByLabel("Project / site").fill("Other site");
- await row.getByLabel("Rate per tonne").fill("110.10");
+ await row.getByLabel("Rate / tonne").fill("110.10");
  await row.getByLabel("Tonnes").fill("1");
  await expect(page.getByText("$588.89",{exact:true})).toBeVisible();
  await row.getByRole("button",{name:"Remove service 2"}).click();
@@ -25,6 +28,8 @@ test("daily service invoice is separate, validates, exports, persists and suppor
  await expect(page.getByText("$588.89",{exact:true})).toBeVisible();
  await page.reload();
  await expect(page.getByText("$588.89",{exact:true})).toBeVisible();
+ await page.getByRole("region",{name:"Daily services"}).screenshot({path:"/tmp/daily-service-inline-mobile.png"});
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem("sp-daily-service-invoice:v1")!).lines.length)).toBe(2);
  const downloadPromise=page.waitForEvent("download");
  await page.getByRole("button",{name:"Download PDF",exact:true}).click();
  const download=await downloadPromise;await download.saveAs("/tmp/daily-service-example.pdf");
@@ -37,13 +42,13 @@ test("daily service invoice is separate, validates, exports, persists and suppor
  expect(await page.evaluate(()=>localStorage.getItem("sp-contractor-invoice:draft"))).toBe("original-do-not-change");
  await page.getByRole("button",{name:"Start new invoice",exact:true}).click();
  await page.getByRole("button",{name:"Start new",exact:true}).click();
- await expect(page.getByLabel("Rate per tonne (AUD, ex GST)",{exact:true})).toHaveValue("");
+ await expect(page.getByLabel("Rate / tonne",{exact:true})).toHaveValue("");
  await expect(page.getByText("Downloaded / shared history (1)")).toBeVisible();
 });
 
 test("tonnage rate calculates live, persists and preserves old fixed drafts",async({page})=>{
  await page.goto("/contractor-invoice/daily-services");
- await page.getByLabel("Rate per tonne (AUD, ex GST)",{exact:true}).fill("500");
+ await page.getByLabel("Rate / tonne",{exact:true}).fill("500");
  await page.getByLabel("Tonnes",{exact:true}).fill("2.4");
  await expect(page.getByText("$1,200.00",{exact:true}).last()).toBeVisible();
  await page.getByLabel("GST registered",{exact:true}).check();
@@ -53,10 +58,10 @@ test("tonnage rate calculates live, persists and preserves old fixed drafts",asy
  await expect(page.getByLabel("Pricing method")).toHaveCount(0);
  await page.evaluate(()=>{const k="sp-daily-service-invoice:v1";const v=JSON.parse(localStorage.getItem(k)!);delete v.lines[0].pricingMode;localStorage.setItem(k,JSON.stringify(v));});
  await page.reload();
- await expect(page.getByLabel("Rate per tonne (AUD, ex GST)",{exact:true})).toHaveValue("");
+ await expect(page.getByLabel("Rate / tonne",{exact:true})).toHaveValue("");
  await expect(page.getByText("Previous fixed charge:",{exact:false})).toBeVisible();
  await expect(page.getByText("$550.00",{exact:true})).toBeVisible();
- await page.getByLabel("Rate per tonne (AUD, ex GST)",{exact:true}).fill("500");
+ await page.getByLabel("Rate / tonne",{exact:true}).fill("500");
  await expect(page.getByText("$1,320.00",{exact:true})).toBeVisible();
  await page.screenshot({path:"/tmp/daily-service-tonnage-mobile.png",fullPage:true});
 });

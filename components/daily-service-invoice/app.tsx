@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Download, Share2, Plus, Trash2, FileText } from "lucide-react";
+import { Download, Share2, Trash2, FileText } from "lucide-react";
 import { blankLine, lineAmountCents, calculateServiceInvoice, dailyServiceSchema, HISTORY_KEY, MAX_LINES, moneyText, newInvoice, restoreDraft, STORAGE_KEY, type DailyServiceInvoice, type SavedServiceInvoice, type ServiceLine } from "@/lib/daily-service-invoice/model";
 import { serviceInvoicePdf } from "@/lib/daily-service-invoice/pdf";
 
@@ -61,7 +61,7 @@ export function DailyServiceInvoiceApp(){
         <div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-slate-300">Still Partners</p><h1 className="mt-1 text-2xl font-black">Daily service invoice</h1></div><FileText aria-hidden className="mt-1 size-7"/></div>
         <p className="mt-3 text-sm text-slate-200">For one-off or short subcontract services. Add only the days you provided services.</p>
       </header>
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950"><strong>Tonnes × rate per tonne = service charge.</strong> Enter the actual tonnes and agreed rate. No hours are collected or converted into tonnes.</div>
+      
       {storageWarning&&<p role="alert" className="rounded-lg bg-amber-100 p-3 text-sm">{storageWarning}</p>}
       <details className="rounded-xl border bg-white p-4" open={profileOpen} onToggle={e=>setProfileOpen(e.currentTarget.open)}>
         <summary className="cursor-pointer font-bold">Your details {invoice.profile.fullName?`· ${invoice.profile.fullName}`:"· required"}</summary>
@@ -83,17 +83,15 @@ export function DailyServiceInvoiceApp(){
         <Field label="Issue date" type="date" value={invoice.issueDate} onChange={v=>update({issueDate:v})}/>
         <Field label="Due date" type="date" value={invoice.dueDate} onChange={v=>update({dueDate:v})}/>
       </div></section>
-      <section className="grid gap-3"><div className="flex items-center justify-between"><h2 className="text-lg font-black">Services provided</h2><span className="text-xs text-slate-600">{invoice.lines.length} / {MAX_LINES} rows</span></div>
-        {invoice.lines.map((row,index)=><article key={row.id} className="rounded-xl border bg-white p-4 shadow-sm" aria-label={`Service row ${index+1}`}>
-          <div className="mb-3 flex items-center justify-between"><h3 className="font-bold">Service {index+1}</h3><button type="button" disabled={invoice.lines.length===1||busy} onClick={()=>{setRemoved({line:row,index});update({lines:invoice.lines.filter(x=>x.id!==row.id)});}} className="rounded-lg p-2 text-slate-500 disabled:opacity-30" aria-label={`Remove service ${index+1}`}><Trash2 className="size-4"/></button></div>
-          <div className="grid gap-3 sm:grid-cols-2"><Field label="Service date" type="date" value={row.date} onChange={v=>changeLine(row.id,{date:v})}/><Field label="Project / site" value={row.site} onChange={v=>changeLine(row.id,{site:v})} maxLength={70}/></div>
-          <div className="my-3"><Field label="Service description" value={row.description} onChange={v=>changeLine(row.id,{description:v})} maxLength={100}/></div>
-          <div className="grid grid-cols-2 gap-3"><Field label="Rate per tonne (AUD, ex GST)" value={row.pricingMode==="tonnage"?row.amount:""} onChange={v=>changeLine(row.id,{amount:v,pricingMode:"tonnage"})} numeric/><Field label="Tonnes" value={row.tonnes} onChange={v=>changeLine(row.id,{tonnes:v})} numeric/></div>
-          {row.pricingMode!=="tonnage"&&<p className="mt-2 text-xs text-amber-800">Previous fixed charge: {moneyText(Number(row.amount))} (unchanged). Enter the agreed rate per tonne above to replace this saved charge. It will not be treated as a rate automatically.</p>}
-          <p className="mt-3 text-sm font-bold">Line total (ex GST): {moneyText(lineAmountCents(row)/100)}{row.pricingMode==="tonnage"&&row.amount&&row.tonnes?<span className="ml-2 font-normal text-slate-600">({row.tonnes} t × {moneyText(Number(row.amount))}/t)</span>:null}</p>
-        </article>)}
-        {removed&&<div className="flex items-center justify-between rounded-lg bg-amber-50 p-3 text-sm"><span>Service row removed.</span><button className="font-bold underline" type="button" disabled={invoice.lines.length>=MAX_LINES} onClick={()=>{const lines=[...invoice.lines];lines.splice(removed.index,0,removed.line);update({lines});setRemoved(null);}}>Undo</button></div>}
-        <button type="button" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 font-bold disabled:opacity-40" disabled={invoice.lines.length>=MAX_LINES||busy} onClick={()=>update({lines:[...invoice.lines,blankLine(invoice.lines.at(-1)?.date)]})}><Plus className="size-4"/> Add service day</button>
+      <section className="rounded-xl border bg-white p-4" aria-label="Daily services"><h2 className="mb-3 font-bold">Service days</h2>
+        <div className="divide-y">{invoice.lines.map((row,index)=><article key={row.id} className="py-3 first:pt-0" aria-label={`Service row ${index+1}`}>
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2rem] items-end gap-2"><Field label="Service date" type="date" value={row.date} onChange={v=>changeLine(row.id,{date:v})}/><Field label="Project / site" value={row.site} onChange={v=>changeLine(row.id,{site:v})} maxLength={70}/><button type="button" disabled={invoice.lines.length===1||busy} onClick={()=>{setRemoved({line:row,index});update({lines:invoice.lines.filter(x=>x.id!==row.id)});}} className="mb-1 rounded-lg py-3 text-slate-500 disabled:opacity-20" aria-label={`Remove service ${index+1}`}><Trash2 className="mx-auto size-4"/></button></div>
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] items-end gap-2"><Field label="Rate / tonne" value={row.pricingMode==="tonnage"?row.amount:""} onChange={v=>changeLine(row.id,{amount:v,pricingMode:"tonnage"})} numeric/><Field label="Tonnes" value={row.tonnes} onChange={v=>changeLine(row.id,{tonnes:v})} numeric/><div className="pb-3 text-right"><p className="text-xs text-slate-500">AUD ex GST</p><p className="break-words text-sm font-bold">{moneyText(lineAmountCents(row)/100)}</p></div></div>
+          {row.pricingMode!=="tonnage"&&<p className="mt-2 text-xs text-amber-800">Previous fixed charge: {moneyText(Number(row.amount))} (unchanged). Enter the agreed rate per tonne to replace it.</p>}
+          <details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer">Service description</summary><div className="mt-2"><Field label="Description" value={row.description} onChange={v=>changeLine(row.id,{description:v})} maxLength={100}/></div></details>
+        </article>)}</div>
+        {invoice.lines.length<MAX_LINES&&<div className="border-t border-dashed pt-3"><Field label="Next service date (optional)" type="date" value="" onChange={v=>{if(!v)return;const previous=invoice.lines.at(-1)!;update({lines:[...invoice.lines,{...blankLine(v),site:previous.site,description:previous.description,amount:previous.pricingMode==="tonnage"?previous.amount:""}]});}}/></div>}
+        {removed&&<p className="mt-2 text-xs text-slate-600">Day removed. <button className="font-bold underline" type="button" disabled={invoice.lines.length>=MAX_LINES} onClick={()=>{const lines=[...invoice.lines];lines.splice(removed.index,0,removed.line);update({lines});setRemoved(null);}}>Undo</button></p>}
       </section>
       <section className="rounded-xl bg-white p-4 shadow-sm"><h2 className="font-bold">Invoice summary</h2><div className="mt-3 grid grid-cols-2 gap-2 text-sm"><span>Service period</span><span className="text-right">{totals.periodStart} – {totals.periodEnd}</span><span>Recorded production</span><span className="text-right">{totals.hasTonnes?`${totals.tonnes.toFixed(3)} tonnes`:"Not recorded"}</span><span>Subtotal</span><span className="text-right">{moneyText(totals.subtotal)}</span><span>{invoice.profile.gstRegistered?"GST 10%":"GST (not registered)"}</span><span className="text-right">{moneyText(totals.gst)}</span><strong className="border-t pt-3 text-lg">Total AUD</strong><strong className="border-t pt-3 text-right text-lg">{moneyText(totals.total)}</strong></div></section>
       {!!errors.length&&<div role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800"><p className="font-bold">Please correct these details:</p><ul className="mt-2 list-inside list-disc">{errors.map((e,i)=><li key={i}>{e}</li>)}</ul></div>}
